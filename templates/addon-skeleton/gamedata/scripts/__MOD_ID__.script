@@ -1,0 +1,91 @@
+-- __TITLE__
+-- Anomaly 1.5.3 / Anthology 2.1
+-- Logic only. MCM options live in __MOD_ID___mcm.script
+
+local LOG_TAG = "[__MOD_ID__]"
+
+local function opt(path, default)
+	return ui_mcm and ui_mcm.get(path) or default
+end
+
+local function log(fmt, ...)
+	if opt("__MOD_ID__/debug", false) then
+		printf(LOG_TAG .. " " .. fmt, ...)
+	end
+end
+
+-- Module state. Reset it on game load: locals survive between sessions.
+local state = nil
+
+local function reset_state()
+	state = {
+		last_tick = 0,
+	}
+end
+
+----------------------------------------------------------------------
+-- Callbacks
+----------------------------------------------------------------------
+
+local function on_game_load()
+	reset_state()
+	log("loaded")
+end
+
+local function actor_on_first_update()
+	-- db.actor is guaranteed available from here, not earlier.
+	if not opt("__MOD_ID__/enable", true) then
+		return
+	end
+	log("actor ready")
+end
+
+local function actor_on_update()
+	if not state or not opt("__MOD_ID__/enable", true) then
+		return
+	end
+
+	-- Runs every tick: keep it cheap, throttle real work.
+	local now = time_global()
+	if now - state.last_tick < 1000 then
+		return
+	end
+	state.last_tick = now
+
+	-- Heavy work belongs in CreateTimeEvent, not here.
+end
+
+local function save_state(data)
+	data.__MOD_ID__ = {
+		version = 1,
+	}
+end
+
+local function load_state(data)
+	-- Read defensively: the field is absent in saves made before this mod.
+	local saved = data.__MOD_ID__ or {}
+	if saved.version ~= 1 then
+		log("no saved state, starting fresh")
+	end
+end
+
+----------------------------------------------------------------------
+-- Registration
+----------------------------------------------------------------------
+
+function on_game_start()
+	reset_state()
+	RegisterScriptCallback("on_game_load", on_game_load)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("save_state", save_state)
+	RegisterScriptCallback("load_state", load_state)
+end
+
+function on_game_end()
+	UnregisterScriptCallback("on_game_load", on_game_load)
+	UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	UnregisterScriptCallback("actor_on_update", actor_on_update)
+	UnregisterScriptCallback("save_state", save_state)
+	UnregisterScriptCallback("load_state", load_state)
+end

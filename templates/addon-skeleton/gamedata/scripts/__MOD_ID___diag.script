@@ -1,0 +1,27 @@
+-- DIAGNOSTIC ONLY: logs state, changes nothing.
+-- __TITLE__ — diagnostics
+-- Ship separately from the fix, disable in MO2 once the cause is confirmed.
+
+local LOG_TAG = "[__MOD_ID__:diag]"
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function dump_once()
+	-- Log exactly what the hypothesis needs, nothing else.
+	log("actor=%s level=%s", tostring(db.actor ~= nil), tostring(level.name()))
+end
+
+local function actor_on_first_update()
+	dump_once()
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	log("diagnostics active")
+end
+
+function on_game_end()
+	UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+end

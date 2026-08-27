@@ -1,0 +1,13 @@
+; __TITLE__ — DLTX patch example. Delete this file if the mod touches no configs.
+; Patches: gamedata/configs/items/items_food.ltx
+; Why: <one line>
+;
+; Rules:
+;   ![section]  edit an existing section (do NOT repeat parents)
+;   @[section]  same, but create it if missing
+;   [section]   declare a NEW section only — duplicating an existing one crashes the engine
+;   !key        delete a field
+;   >key = a    add to a CSV list      <key = a   remove from a CSV list
+
+![bread]
+eat_satiety = 0.15

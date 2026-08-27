@@ -1,0 +1,19 @@
+-- __TITLE__ — MCM options
+-- Option tree only. Keep game logic in __MOD_ID__.script
+-- Text keys live in gamedata/configs/text/<lang>/ui_st_mcm___MOD_ID__.xml
+
+function on_mcm_load()
+	return {
+		id = "__MOD_ID__",
+		sh = true,
+		gr = {
+			{id = "title", type = "title", text = "ui_mcm___MOD_ID___title"},
+
+			{id = "enable", type = "check", val = 1, def = true,
+			 text = "ui_mcm___MOD_ID___enable"},
+
+			{id = "debug", type = "check", val = 1, def = false,
+			 text = "ui_mcm___MOD_ID___debug"},
+		}
+	}
+end

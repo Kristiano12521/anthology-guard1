@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="ui_mcm___MOD_ID__">
+		<text>__TITLE__</text>
+	</string>
+	<string id="ui_mcm___MOD_ID___title">
+		<text>__TITLE__</text>
+	</string>
+	<string id="ui_mcm___MOD_ID___enable">
+		<text>Enable</text>
+	</string>
+	<string id="ui_mcm___MOD_ID___debug">
+		<text>Debug logging</text>
+	</string>
+</string_table>
