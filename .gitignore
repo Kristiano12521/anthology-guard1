@@ -1,0 +1,25 @@
+# Исходники сборки лежат локально и в git не хранятся (объём + лицензия).
+reference/*
+!reference/README.md
+!reference/.gitkeep
+
+# Артефакты сборки аддонов
+build/*
+!build/README.md
+!build/.gitkeep
+
+# Реальные игровые логи — только локально, там пути и имя пользователя
+logs/*
+!logs/README.md
+!logs/samples/
+!logs/.gitkeep
+
+# Кэш инструментов
+.cache/
+__pycache__/
+*.pyc
+
+# Мусор ОС / редакторов
+.DS_Store
+Thumbs.db
+*.swp

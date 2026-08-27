@@ -1,0 +1,11 @@
+# Файлы движка держим в Windows-1251 и с CRLF — git не должен их конвертировать.
+*.script -text
+*.ltx    -text
+*.xml    -text
+*.seq    -text
+meta.ini -text
+
+# Инструменты и документация — обычный текст
+*.py   text eol=lf
+*.md   text eol=lf
+*.mdc  text eol=lf
