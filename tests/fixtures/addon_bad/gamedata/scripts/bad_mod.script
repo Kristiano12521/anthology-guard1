@@ -1,0 +1,26 @@
+-- Fixture: deliberately breaks the project rules.
+
+RegisterScriptCallback("actor_on_update", function()
+	local squads = alife():squad_members()
+	for _, squad in pairs(squads) do
+		squad:update()
+	end
+end)
+
+function on_game_start()
+	RegisterScriptCallback("npc_on_death_callback", handle_death)
+end
+
+function handle_death(npc)
+	local value = ui_mcm.get("bad_mod/enable")
+	printf("[bad_mod] death %s %s", npc:name(), tostring(value))
+end
+
+function on_mcm_load()
+	return {
+		id = "bad_mod",
+		gr = {
+			{id = "enable", type = "check", def = true, text = "ui_mcm_bad_mod_enable"},
+		}
+	}
+end

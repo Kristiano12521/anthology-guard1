@@ -1,0 +1,14 @@
+-- Fixture: valid MCM option tree.
+
+function on_mcm_load()
+	return {
+		id = "good_mod",
+		sh = true,
+		gr = {
+			{id = "title", type = "title", text = "ui_mcm_good_mod_title"},
+			{id = "enable", type = "check", val = 1, def = true, text = "ui_mcm_good_mod_enable"},
+			{id = "rate", type = "track", val = 2, min = 0, max = 1, step = 0.05, def = 0.5,
+			 text = "ui_mcm_good_mod_rate"},
+		}
+	}
+end

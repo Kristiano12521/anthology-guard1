@@ -1,0 +1,42 @@
+-- Fixture: trimmed stand-in for the callback dispatcher.
+
+local callbacks = {}
+
+function RegisterScriptCallback(name, fn)
+	callbacks[name] = callbacks[name] or {}
+	table.insert(callbacks[name], fn)
+end
+
+function UnregisterScriptCallback(name, fn)
+	if not callbacks[name] then return end
+	for i, registered in ipairs(callbacks[name]) do
+		if registered == fn then
+			table.remove(callbacks[name], i)
+			return
+		end
+	end
+end
+
+function SendScriptCallback(name, ...)
+	if not callbacks[name] then return end
+	for _, fn in ipairs(callbacks[name]) do
+		fn(...)
+	end
+end
+
+function actor_binder:update(delta)
+	SendScriptCallback("actor_on_update", self, delta)
+	if not self.first_update_done then
+		self.first_update_done = true
+		SendScriptCallback("actor_on_first_update", self, delta)
+	end
+end
+
+function actor_binder:save(packet)
+	SendScriptCallback("save_state", self.st)
+end
+
+function actor_binder:load(reader)
+	SendScriptCallback("load_state", self.st)
+	SendScriptCallback("on_game_load")
+end

@@ -1,0 +1,5 @@
+-- Fixture: filename used to force load order.
+
+function on_game_start()
+	printf("[zzzz] loaded last, hopefully")
+end

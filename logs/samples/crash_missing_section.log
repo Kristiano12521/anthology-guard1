@@ -1,0 +1,28 @@
+* Detected CPU: Intel(R) Core(TM) i7-9700K [GenuineIntel], F6/M158/S12, 3600.00 mhz, 33-clk 'rdtsc'
+'xrCore' build 8028, Jan 29 2021
+Initializing File System...
+using fs-ltx fsgame.ltx
+-----loading c:/games/anomaly/gamedata\configs\system.ltx
+* Loading DLTX mod: mod_weapons_anth.ltx
+* Loading DLTX mod: mod_w_ak74_myfix.ltx
+Starting engine...
+* [win32]: free[3358908 K], reserved[229996 K], committed[512992 K]
+! Can't find included file: gamedata\configs\weapons\removed_addon_weapons.ltx
+* phase time: 980 ms
+* phase cmem: 1811023 K
+compiling shader effects_sun
+* Loading objects...
+FATAL ERROR
+
+[error]Expression    : <no expression>
+[error]Function      : CInifile::r_section
+[error]File          : D:\a\xray-monolith\xray-monolith\src\xrCore\Xr_ini.cpp
+[error]Line          : 1214
+[error]Description   : fatal error
+[error]Arguments     : Can't open section 'wpn_ak74_anth_custom'. Please attach [*.ini_log] file to your bug report
+
+stack trace:
+
+SymInit: Symbol-SearchPath: '.;C:\games\anomaly;', symOptions: 530, UserName: 'ivan'
+OS-Version: 10.0.19045 () 0x300-0x1
+C:\games\anomaly\bin\AnomalyDX11AVX.exe:AnomalyDX11AVX.exe (0000000140000000), size: 18690048 (result: 0), SymType: '-exported-'

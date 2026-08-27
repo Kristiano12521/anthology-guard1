@@ -1,0 +1,13 @@
+-- Fixture: MCM tree missing the mandatory val field, unguarded ui_mcm access.
+
+local current = ui_mcm.get("bad_mod/rate")
+
+function on_mcm_load()
+	return {
+		id = "bad_mod",
+		gr = {
+			{id = "rate", type = "track", min = 0, max = 1, step = 0.1, def = 0.5,
+			 text = "ui_mcm_bad_mod_rate"},
+		}
+	}
+end

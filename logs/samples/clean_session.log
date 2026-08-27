@@ -1,0 +1,16 @@
+* Detected CPU: AMD Ryzen 7 5800X3D [AuthenticAMD], F19/M33/S2, 3400.00 mhz, 34-clk 'rdtsc'
+'xrCore' build 8028, Jan 29 2021
+Initializing File System...
+using fs-ltx fsgame.ltx
+-----loading c:/games/anomaly/gamedata\configs\system.ltx
+Starting engine...
+* phase time: 1102 ms
+* phase cmem: 1836211 K
+! Can't find texture 'anth\ui\ui_icon_anth_pda'
+! Can't find texture 'anth\ui\ui_icon_anth_pda'
+~ [my_fix_weapon_jam] loaded
+~ [my_fix_weapon_jam] actor ready
+* Saving spawn...
+* Game saved to c:/games/anomaly/appdata\savedgames\autosave.scop
+~ [my_fix_weapon_jam] jam chance recalculated: 0.031
+* Quitting...

@@ -1,0 +1,45 @@
+* Detected CPU: AMD Ryzen 7 5800X3D [AuthenticAMD], F19/M33/S2, 3400.00 mhz, 34-clk 'rdtsc'
+* CPU features: RDTSC, MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, MWAIT
+* CPU threads: 16
+'xrCore' build 8028, Jan 29 2021
+Initializing File System...
+using fs-ltx fsgame.ltx
+-----loading c:/games/anomaly/gamedata\configs\system.ltx
+* Loading DLTX mod: mod_system_anthology.ltx
+* Loading DLTX mod: mod_items_food_anth_hunger.ltx
+Starting engine...
+* [win32]: free[3358908 K], reserved[229996 K], committed[512992 K]
+* phase time: 1204 ms
+* phase cmem: 1836211 K
+~ Duplicate section 'anth_placeholder' ignored
+! Can't find texture 'anth\weapons\wpn_ak74_anth'
+! Can't find texture 'anth\weapons\wpn_ak74_anth'
+! Can't find texture 'anth\weapons\wpn_ak74_anth'
+* Loading HOM: c:/games/anomaly/gamedata\levels\l03_agroprom\level.hom
+* phase time: 728 ms
+* phase cmem: 2030643 K
+~ [anth_squad_manager] warmup finished, 214 squads tracked
+* Saving spawn...
+~ [anth_squad_manager] simulation tick 1
+! [anth_squad_manager] squad 6821 has no leader, skipping
+~ [anth_squad_manager] simulation tick 2
+! [LUA] ...games\anomaly\gamedata\scripts\anth_squad_manager.script:212: attempt to index field 'squad' (a nil value)
+FATAL ERROR
+
+[error]Expression    : <no expression>
+[error]Function      : CScriptEngine::lua_error
+[error]File          : ..\xrServerEntities\script_engine.cpp
+[error]Line          : 204
+[error]Description   : ...games\anomaly\gamedata\scripts\anth_squad_manager.script:212: attempt to index field 'squad' (a nil value)
+
+stack trace:
+
+0 : [C]  -1
+1 : [Lua] ...games\anomaly\gamedata\scripts\anth_squad_manager.script(212) : update_squad_members
+2 : [Lua] ...games\anomaly\gamedata\scripts\anth_squad_manager.script(88) : actor_on_update
+3 : [Lua] ...games\anomaly\gamedata\scripts\axr_main.script(315) : SendScriptCallback
+SymInit: Symbol-SearchPath: '.;C:\games\anomaly;C:\games\anomaly\bin;', symOptions: 530, UserName: 'ivan'
+OS-Version: 10.0.19045 () 0x300-0x1
+C:\games\anomaly\bin\AnomalyDX11AVX.exe:AnomalyDX11AVX.exe (0000000140000000), size: 18690048 (result: 0), SymType: '-exported-'
+refCount:pBaseZB 1
+refCount:pBaseRT 1

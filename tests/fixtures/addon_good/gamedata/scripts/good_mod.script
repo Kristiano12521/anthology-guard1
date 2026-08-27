@@ -1,0 +1,32 @@
+-- Fixture: addon that follows the project rules.
+
+local last_tick = 0
+
+local function opt(path, default)
+	return ui_mcm and ui_mcm.get(path) or default
+end
+
+local function actor_on_update()
+	local now = time_global()
+	if now - last_tick < 1000 then
+		return
+	end
+	last_tick = now
+	if not opt("good_mod/enable", true) then
+		return
+	end
+end
+
+local function on_game_load()
+	last_tick = 0
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("on_game_load", on_game_load)
+end
+
+function on_game_end()
+	UnregisterScriptCallback("actor_on_update", actor_on_update)
+	UnregisterScriptCallback("on_game_load", on_game_load)
+end
