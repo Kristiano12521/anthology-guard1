@@ -1,0 +1,40 @@
+---
+description: Правила интеграции настроек мода в MCM
+globs: addon/**/*_mcm.script, templates/**/*_mcm.script
+alwaysApply: false
+---
+
+# MCM
+
+MCM ищет файлы, чьё имя оканчивается на `mcm.script`, и вызывает в них `on_mcm_load()`. Функция возвращает дерево опций: уникальный `id` мода и список `gr`.
+
+```lua
+function on_mcm_load()
+    return {
+        id = "my_mod",
+        sh = true,
+        gr = {
+            {id = "enable",    type = "check", val = 1, def = true,  text = "ui_mcm_my_mod_enable"},
+            {id = "intensity", type = "track", val = 2, min = 0, max = 1, step = 0.05, def = 0.5,
+             text = "ui_mcm_my_mod_intensity"},
+        }
+    }
+end
+```
+
+## Правила
+
+- Файл настроек отделён от логики: `<mod>_mcm.script` только описывает дерево, игровая логика живёт в `<mod>.script`.
+- Чтение значения — `ui_mcm.get("my_mod/enable")`, всегда с фолбэком на дефолт:
+
+```lua
+local function opt(path, default)
+    return ui_mcm and ui_mcm.get(path) or default
+end
+```
+
+- `val` обязателен для каждой опции (1 — boolean, 2 — число/значение). Пропущенный `val` роняет `ui_mcm.script` при открытии меню.
+- `def` задаём всегда и он должен совпадать с фолбэком в коде.
+- `text` — ключ строковой таблицы, а не готовая строка. Ключи кладём в `gamedata/configs/text/<lang>/ui_st_mcm_<mod>.xml`.
+- Значения читаем в момент использования либо перечитываем по callback изменения настроек, а не кэшируем один раз при загрузке скрипта.
+- Смена `id` мода или `id` опции сбрасывает пользовательские настройки — переименовывать только с явной причиной.
