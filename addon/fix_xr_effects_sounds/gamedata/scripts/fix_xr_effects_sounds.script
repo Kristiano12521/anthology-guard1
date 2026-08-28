@@ -1,0 +1,173 @@
+-- XR Effects Sound Paths Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Anthology 2.1 xr_effects.script turned \t / \n inside [[ ]] paths
+-- into real TAB / newline. Restore the intended Windows paths.
+-- Originals are not called: they still open the broken path.
+
+local LOG_TAG = "[fix_xr_effects_sounds]"
+local orig = {}
+local patched = {}
+
+local function play_s2d(slot_name, path, delay)
+    local snd = sound_object(path)
+    xr_effects[slot_name] = snd
+    snd:play_at_pos(db.actor, vector():set(0, 0, 0), delay or 0, sound_object.s2d)
+end
+
+local function play_weap(snd, obj)
+    snd:play_at_pos(obj, db.actor:position(), 0, sound_object.s3d)
+end
+
+function patched.x18_gluk(actor, npc)
+    level.add_pp_effector("blink.ppe", 234, false)
+    local sound_obj_l = xr_sound.get_safe_sound_object("affects\\psy_blackout_l")
+    local sound_obj_r = xr_sound.get_safe_sound_object("affects\\psy_blackout_r")
+    local snd_obj = xr_sound.get_safe_sound_object("affects\\tinnitus3a")
+    snd_obj:play_no_feedback(db.actor, sound_object.s2d, 0, vector(), 1.0, 1.0)
+    sound_obj_l:play_no_feedback(db.actor, sound_object.s2d, 0, vector():set(-1, 0, 1), 1.0, 1.0)
+    sound_obj_r:play_no_feedback(db.actor, sound_object.s2d, 0, vector():set(1, 0, 1), 1.0, 1.0)
+    level.add_cam_effector("camera_effects\\earthquake.anm", 1974, false, "")
+end
+
+function patched.weapon_shoot_mod(actor, obj, p)
+    local sound_shoot_svd = sound_object("weapons\\n_svd_shot")
+    local sound_shoot_ak74 = sound_object("weapons\\n_ak74_shot")
+    local sound_shoot_spas12 = sound_object("weapons\\n_spas12_shot")
+    local sound_shoot_pm = sound_object("weapons\\n_pm_shot")
+    local sound_shoot_vintorez = sound_object("weapons\\n_vintorez_shot")
+    local sound_shoot_usp = sound_object("weapons\\n_usp_shot")
+    local sound_explode = sound_object("weapons\\t_f1_explosion")
+    local weap = p[1]
+    if weap == "svd" then
+        play_weap(sound_shoot_svd, obj)
+    elseif weap == "ak74" then
+        play_weap(sound_shoot_ak74, obj)
+    elseif weap == "spas12" then
+        play_weap(sound_shoot_spas12, obj)
+    elseif weap == "pm" then
+        play_weap(sound_shoot_pm, obj)
+    elseif weap == "vintorez" then
+        play_weap(sound_shoot_vintorez, obj)
+    elseif weap == "explode" then
+        play_weap(sound_explode, obj)
+    elseif weap == "usp" then
+        play_weap(sound_shoot_usp, obj)
+    end
+end
+
+function patched.weapon_shoot_mod_sniper(actor, obj, p)
+    local sound_svd = sound_object("weapons\\n_svd_shot")
+    local sound_svu = sound_object("weapons\\n_svu_shot")
+    local weap = p[1]
+    if weap == "svd1" or weap == "svd2" or weap == "svd3" or weap == "svd4" or weap == "svd5"
+        or weap == "svd6" or weap == "svd7" or weap == "svd8" or weap == "svd9" or weap == "svd10" then
+        play_weap(sound_svd, obj)
+    elseif weap == "svu1" or weap == "svu2" or weap == "svu3" or weap == "svu4" or weap == "svu5"
+        or weap == "svu6" or weap == "svu7" or weap == "svu8" or weap == "svu9" or weap == "svu10" then
+        play_weap(sound_svu, obj)
+    end
+end
+
+local s2d_patches = {
+    okr_a5_welcome_tutor_1_f = function()
+        play_s2d("okr_a5_welcome_tutor_1_snd", "characters_voice\\scenario\\okrest\\tutorial_women\\okr_a5_welcome_tutor_1_snd", 0)
+    end,
+    okr_a5_welcome_tutor_2_f = function()
+        play_s2d("okr_a5_welcome_tutor_2_snd", "characters_voice\\scenario\\okrest\\tutorial_women\\okr_a5_welcome_tutor_2_snd", 0)
+    end,
+    okr_a5_welcome_tutor_3_f = function()
+        play_s2d("okr_a5_welcome_tutor_3_snd", "characters_voice\\scenario\\okrest\\tutorial_women\\okr_a5_welcome_tutor_3_snd", 0)
+    end,
+    okr_a5_welcome_tutor_4_f = function()
+        play_s2d("okr_a5_welcome_tutor_4_snd", "characters_voice\\scenario\\okrest\\tutorial_women\\okr_a5_welcome_tutor_4_snd", 0)
+    end,
+    okr_a5_welcome_tutor_5_f = function()
+        play_s2d("okr_a5_welcome_tutor_5_snd", "characters_voice\\scenario\\okrest\\tutorial_women\\okr_a5_welcome_tutor_5_snd", 0)
+    end,
+    okr_a5_welcome_tutor_6_f = function()
+        play_s2d("okr_a5_welcome_tutor_6_snd", "characters_voice\\scenario\\okrest\\tutorial_women\\okr_a5_welcome_tutor_6_snd", 0)
+    end,
+    okr_taxiboy_1_end_road_f = function()
+        play_s2d("okr_taxiboy_1_end_road_snd", "characters_voice\\scenario\\okrest\\taxiboys\\okr_taxiboy_1_end_road_snd", 0)
+    end,
+    okr_taxiboy_1_go_road_f = function()
+        play_s2d("okr_taxiboy_1_go_road_snd", "characters_voice\\scenario\\okrest\\taxiboys\\okr_taxiboy_1_go_road_snd", 0)
+    end,
+    okr_taxiboy_2_end_road_f = function()
+        play_s2d("okr_taxiboy_2_end_road_snd", "characters_voice\\scenario\\okrest\\taxiboys\\okr_taxiboy_2_end_road_snd", 0)
+    end,
+    okr_taxiboy_2_go_road_f = function()
+        play_s2d("okr_taxiboy_2_go_road_snd", "characters_voice\\scenario\\okrest\\taxiboys\\okr_taxiboy_2_go_road_snd", 0)
+    end,
+    und_u13_tesak_say_6_f = function()
+        play_s2d("und_u13_tesak_say_6", "characters_voice\\scenario\\und_bar\\tesak\\und_u13_tesak_say_6", 0)
+    end,
+    nii_e56_prorok_angry_sms_f = function()
+        play_s2d("nii_e56_prorok_angry_sms_say", "characters_voice\\scenario\\niichaz\\prorok\\nii_e56_prorok_angry_sms_say", 0)
+    end,
+    nii_e56_actor_good_f = function()
+        play_s2d("nii_e56_actor_good_say", "characters_voice\\scenario\\niichaz\\actor\\nii_e56_actor_good_say", 1)
+    end,
+    nii_e56_actor_bad_f = function()
+        play_s2d("nii_e56_actor_bad_say", "characters_voice\\scenario\\niichaz\\actor\\nii_e56_actor_bad_say", 1)
+    end,
+    okr_n10_hirsa_sms_say_f = function()
+        play_s2d("okr_n10_hirsa_sms_say", "characters_voice\\scenario\\niichaz\\hirsa\\okr_n10_hirsa_sms_say", 0)
+    end,
+    nii_intro_back_sound_func = function()
+        play_s2d("nii_intro_back_sound", "characters_voice\\scenario\\backmusic_scenes\\nii_intro_back_sound", 0)
+    end,
+}
+
+local function install()
+    if type(xr_effects) ~= "table" then
+        printf(LOG_TAG .. " xr_effects not found - not installed")
+        return false
+    end
+
+    local wrapped = 0
+    local missing = 0
+
+    local function wrap(name, fn)
+        if type(xr_effects[name]) ~= "function" then
+            printf(LOG_TAG .. " missing %s", name)
+            missing = missing + 1
+            return
+        end
+        if xr_effects[name] == fn then
+            return
+        end
+        orig[name] = orig[name] or xr_effects[name]
+        xr_effects[name] = fn
+        wrapped = wrapped + 1
+    end
+
+    for name, fn in pairs(s2d_patches) do
+        wrap(name, fn)
+    end
+    wrap("x18_gluk", patched.x18_gluk)
+    wrap("weapon_shoot_mod", patched.weapon_shoot_mod)
+    wrap("weapon_shoot_mod_sniper", patched.weapon_shoot_mod_sniper)
+
+    printf(LOG_TAG .. " wrapped %d functions, missing %d", wrapped, missing)
+    return wrapped > 0
+end
+
+local function uninstall()
+    if type(xr_effects) ~= "table" then
+        return
+    end
+    for name, fn in pairs(orig) do
+        xr_effects[name] = fn
+    end
+end
+
+function on_game_start()
+    install()
+end
+
+function on_game_end()
+    uninstall()
+end
+
