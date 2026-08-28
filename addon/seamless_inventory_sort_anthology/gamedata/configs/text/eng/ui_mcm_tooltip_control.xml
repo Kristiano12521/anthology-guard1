@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+
+	<string id="ui_mcm_menu_tooltip_control">
+		<text>Tooltip Control</text>
+	</string>
+
+	<string id="ui_mcm_tooltip_control_title">
+		<text>Control item tooltips appearance. </text>
+	</string>
+	<string id="ui_mcm_tooltip_control_title_desc">
+		<text>Hide them if they are cluttering the view (blocking the highlights of related items) or make them hidden by default.</text>
+	</string>
+	
+	<string id="ui_mcm_tooltip_control_enabled">
+		<text>Enable alternative tooltip appearance behavior.</text>
+	</string>
+
+	<string id="ui_mcm_tooltip_control_modes_desc">
+		<text>Choose the mode: \n1. Show by default, hide when key is pressed.
+			\n2. Do not show tooltips on item hover, show if item is explicitly clicked or key pressed while cursor hovered.</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_tcontrol_mode">
+		<text>Tooltips mode:</text>
+	</string>
+	<string id="ui_mcm_lst_ttc_key_to_disable">
+		<text>1. Show by default, hide when required.</text>
+	</string>
+	<string id="ui_mcm_lst_ttc_key_or_click_to_enable">
+		<text>2. Hide by default, show when required.</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_hold_key">
+		<text>Tooltip trigger</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_hold_key_desc">
+		<text>Hold this key to force hide (or show) tooltips.</text>
+	</string>
+	
+	<string id="ui_mcm_tooltip_control_no_clicks">
+		<text>Ignore clicks in mode-2</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_no_clicks_desc">
+		<text>Show only if key is pressed.</text>
+	</string>
+	
+	<string id="ui_mcm_tooltip_control_tt_details">
+		<text>Enabled in details ui</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_tt_details_desc">
+		<text>If disabled - details ui window will behave without any alterations.</text>
+	</string>		
+
+
+	<string id="ui_mcm_tooltip_control_toggle_desc">
+		<text>Switch tooltip behaviour mode by a key stroke (instead of a key hold).
+			Tooltip-mode resets to default one after UI is closed.</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_toggle_mode">
+		<text>Flip modes on key pressed</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_trigger_key">
+		<text>Switch tooltips mode</text>
+	</string>
+
+
+	<string id="ui_mcm_tooltip_control_enabled_delay">
+		<text>Enabled tooltip delay alteration.</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_tooltip_delay">
+		<text>Tooltip show delay (miliseconds).</text>
+	</string>
+		<string id="ui_mcm_tooltip_control_tooltip_click_delay">
+		<text>Delay for hold-or-click to show mode</text>
+	</string>
+		<string id="ui_mcm_tooltip_control_tooltip_click_delay_desc">
+		<text>It's reasonable to set lower-value delay for click-to-show (second) mode.</text>
+	</string>
+
+	<string id="ui_mcm_tooltip_control_tooltip_gui_show_delay">
+		<text>On inventory open delay tooltips by:</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_tooltip_gui_show_delay_desc">
+		<text>additional one-time delay if you are tired of seeing backpack's tooltip.</text>
+	</string>
+
+	<string id="ui_mcm_tooltip_control_fix_stuck_tt">
+		<text>Fix for 'stuck tooltips' in (not only) workshop UI.</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_fix_stuck_tt_desc">
+		<text>Enable before loading game.</text>
+	</string>
+	
+</string_table>

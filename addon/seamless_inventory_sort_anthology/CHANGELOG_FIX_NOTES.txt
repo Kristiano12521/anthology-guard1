@@ -1,0 +1,21 @@
+Правки от Claude (без изменения игровой логики):
+
+1. Убрана зависимость от порядка загрузки по алфавиту ("zzzzz"-костыль).
+   Переименованы файлы:
+     zzzzzy_inventory_antifreeze_anthology.script      -> inventory_antifreeze_anthology.script
+     zzzzzz_seamless_inventory_sort_anthology.script   -> seamless_inventory_sort_anthology.script
+     zzzzzz_seamless_inventory_sort_anthology_mcm.script -> seamless_inventory_sort_anthology_mcm.script
+     zzzzzzz_trade_ui_profiler.script                  -> trade_ui_profiler.script
+
+2. Обновлена единственная реальная межскрипт-ссылка на новый неймспейс
+   (seamless_inventory_sort_anthology.script:237, zzzzzy_inventory_antifreeze_anthology -> inventory_antifreeze_anthology).
+
+3. trade_ui_profiler.script: установка патча перенесена с синхронного
+   вызова внутри on_game_start() на CreateTimeEvent с задержкой 0.
+   Раньше "патчим последним, снаружи Seamless/Antifreeze" держалось
+   только на том, что у файла больше всех букв z в префиксе. Теперь это
+   гарантируется тем, что патч профайлера физически выполняется тактом
+   позже, чем синхронные on_game_start всех остальных скриптов —
+   независимо от имени файла.
+
+Логика мода, MCM-опции, текстуры и .ltx-конфиги не менялись.

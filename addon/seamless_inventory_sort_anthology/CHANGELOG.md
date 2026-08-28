@@ -1,4 +1,12 @@
-# Seamless Inventory Sort / Anthology 2.1 — правки
+# Seamless Inventory Sort / Anthology 2.1
+
+Самодостаточная сборка: содержит все файлы мода, а не только изменённые. **Заменяет** `Seamless_Inventory_Sort_Anthology_2.1_v1.5.3_FIX_delint` — ставится вместо него, а не поверх.
+
+Авторство базовых компонентов (полный текст в `CREDITS.txt`):
+
+- **TheMrDemonized** — Inventory Antifreeze, концепция инкрементальной кучи
+- **Flueno** — Tooltip Control 1.1.2 и оригинальные фиксы залипших подсказок (CC BY-NC-SA 3.0, заголовок сохранён в исходниках)
+- **Razfarg** — Scroll Fix v3, сброс кэша медленного скролла
 
 ## [1.5.4] — 2026-08-28
 
@@ -36,15 +44,15 @@
 **Не затронуто**
 
 - Логика сортировки, батчинг, anti-oscillation, LTT / body_mode, ammo_parts, slot guard, disassembly window — без изменений
-- `tooltip_control_utils.script`, `tooltip_fixes.script`, MCM-страница, тексты, текстуры — не менялись, берутся из оригинального мода
+- `seamless_inventory_sort_anthology_mcm.script`, `tooltip_control_mcm.script`, `tooltip_control_utils.script`, `tooltip_fixes.script`, XML текстов MCM, `ui_inventory_antifreeze.xml`, текстуры `loot_searching` — байт в байт из 1.5.3
 - Метрика `unhighlight_full` добавлена в отчёт профайлера, состав остальных метрик прежний
 
 **Совместимость**
 
 - Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
 - Сейвы: совместим, сохраняемых структур мод не имеет
-- Требует оригинальный `Seamless_Inventory_Sort_Anthology_2.1_v1.5.3_FIX_delint` и грузится **после** него: имена файлов совпадают, MO2 перекрывает их по приоритету
-- Конфликты: любой другой мод, заменяющий те же четыре скрипта
+- Оригинальный `Seamless_Inventory_Sort_Anthology_2.1_v1.5.3_FIX_delint` нужно **отключить**: эта сборка содержит все его файлы целиком
+- Конфликты: `[DBG] Kristiano Fixes ALL IN ONE` содержит свою копию `ui_inventory_antifreeze.xml` и `zzzzzz_seamless_inventory_sort_anthology*.script` — при одновременной установке порядок загрузки решает, чья версия победит
 
 **Проверено**
 

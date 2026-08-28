@@ -1,0 +1,119 @@
+ИЗМЕНЕНИЯ — v1.5.3 NO NPC LOOT CLAIM / HOOK ORDER FIX
+
+УДАЛЕНО
+- NPC Loot Claim полностью удалён из архива: npc_loot_claim.script и его
+  локализация (st_npc_loot_claim.xml, eng/rus). Перекрёстных ссылок на него
+  из других файлов архива не было, миграция сейвов не требуется.
+
+ИСПРАВЛЕНО
+- Установка хуков disassembly_item/disassembly_weapon/disassembly_outfit и
+  ammo_maker.breakdown больше не полагается на то, что имя файла
+  (zzzzzz_...) алфавитно обгоняет zzz_item_parts_milpda другого аддона.
+  install_hooks() теперь вызывается из on_game_start с ограниченным
+  повтором (CreateTimeEvent, до ~10 секунд), пока не убедится, что
+  item_parts/ammo_maker/SortingPlus либо загружены, либо отсутствуют
+  (тогда соответствующая интеграция просто остаётся неактивной). Порядок
+  загрузки файлов относительно других модов больше ни на что не влияет.
+- tooltip_control.script: force_set_all_delays и flip_modes применяли
+  задержку подсказки ко ВСЕМ окнам из alter_tooltip_at, включая те, что
+  отдельно выключены в MCM (например tt_details=false для UIItemSheet).
+  Теперь окно с выключенным флагом пропускается, и его задержка не
+  перезаписывается модом.
+
+ИЗМЕНЕНИЯ — v1.5.2 TRADE HIGHLIGHT OPTIMIZATION RC
+
+ПРОИЗВОДИТЕЛЬНОСТЬ
+- Sparse UnHighlight подтверждён сравнительным игровым тестом.
+- При 901 предметах быстрый режим удерживал примерно 15–17 мс/кадр.
+- Штатный полный обход при постоянном UnHighlight_All достигал 36–46 мс/кадр.
+- Диагностика выключена по умолчанию.
+- При выключенной диагностике profiler session не создаётся.
+
+ИЗМЕНЕНИЯ — v1.5.1 TRADE UI PROFILER TYPE GUARD HOTFIX BETA
+
+КРИТИЧЕСКОЕ
+- Исправлен CTD zzzzzzz_trade_ui_profiler.script:130:
+  bad argument #1 to 'pairs' (table expected, got boolean).
+- В ParseInventory третий аргумент id_list является boolean-флагом.
+- Количество элементов теперь берётся из результата ParseInventory.
+- Добавлены fail-open защиты predicate/units_fn.
+
+ИЗМЕНЕНИЯ — v1.5.0 TRADE UI PROFILER + HIGHLIGHT OPT BETA
+
+ПРОФИЛИРОВАНИЕ
+- Сессионные отчёты только для режима trade.
+- Высокоуровневые inclusive timers и низкоуровневые счётчики.
+- Периодические и финальные отчёты с количеством ячеек обеих сторон.
+- Rate-limited SLOW-сообщения.
+
+ПЕРВАЯ ОПТИМИЗАЦИЯ
+- UIInventory.UnHighlight_All в торговле больше не обходит каждый кадр все
+  ячейки actor/npc bags и корзин.
+- UICellItem.Highlight ведёт слабый набор реально подсвеченных ячеек.
+- Выбранная ячейка сохраняет подсветку по штатному правилу.
+- Оптимизация отдельно отключается в MCM.
+
+ИЗМЕНЕНИЯ — v1.4.3 NPC CONTAINER GUARD HOTFIX BETA
+
+NPC LOOT CLAIM
+- Исправлен вызов stalker-only метода alive() у inventory_box/placeable_blue_box.
+- GUI loot mode больше не считается автоматически лутом трупа.
+- Добавлена защищённая проверка IsStalker().
+- alive() и id() вызываются внутри pcall-замыканий.
+- Обычные контейнеры немедленно обходят систему претензий.
+
+ИЗМЕНЕНИЯ — v1.4.2 TRADE ANTIFREEZE TOGGLE TEST BETA
+
+ДИАГНОСТИКА ТОРГОВЛИ
+- Добавлен отдельный переключатель Antifreeze для торговых контейнеров.
+- По умолчанию выключен.
+- actor_trade_bag и npc_trade_bag используют оригинальный Reinit.
+- actor_bag и npc_bag остаются на многокадровой загрузке.
+- Добавлены явные строки trade bypass / trade deferred start.
+- Настройка применяется при следующем открытии торгового окна.
+
+ИЗМЕНЕНИЯ — v1.4.1 UI PERFORMANCE CORE HOTFIX BETA
+
+КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ
+- Исправлен вылет tooltip_control.script:121 при переключении режима подсказок.
+- get_contextual_delay предварительно объявлена и захватывается как local.
+- Добавлены безопасные проверки gui_state/click_tracker при ранних callbacks.
+
+ANTIFREEZE / SEAMLESS
+- Исправлена межмодульная видимость API Inventory Antifreeze.
+- Добавлен публичный get_api() в namespace Antifreeze.
+- Seamless обращается к zzzzzy_inventory_antifreeze_anthology.get_api().
+- Восстановлена регистрация completion callback.
+- Стартовый лог теперь должен показывать реальную версию Antifreeze, а не false.
+- Добавлено предупреждение при отсутствии API.
+
+ИЗМЕНЕНИЯ — v1.4.0 UI PERFORMANCE CORE BETA
+
+ИНТЕГРАЦИЯ
+- В один архив включены Seamless Inventory Sort, Inventory Antifreeze,
+  Tooltip Control, Slow Scroll Fix v3 и no-sorting NPC Loot Claim.
+
+SCROLL / CONTAINERS
+- Slow Scroll Fix встроен в существующий Antifreeze Reset.
+- Удалён отдельный конкурирующий глобальный Reset-wrapper.
+- Добавлены nil-проверки drag_area и owner.
+- Активная deferred-очередь корректно отменяется при внешнем Reset.
+
+TOOLTIP CONTROL
+- Добавлены one-time guards для hooks и callbacks.
+- Сохранены return-значения OnKeyboard и UIInfoItem.Show.
+- Исправлена обработка повторного GUI_on_show того же окна.
+- При отключении delay control восстанавливаются исходные задержки UI.
+- Опциональные stuck-tooltip фиксы больше не спамят ошибками отсутствующих UI.
+
+NPC LOOT CLAIM
+- Удалены повторные вызовы SortingPlus и busy-wait.
+- GUI-проверка ограничена UIInventory и loot mode.
+- Поиск ближайших претендентов ограничен cooldown 5 секунд на тело.
+- Добавлена очистка claims при уничтожении тела и смене уровня.
+- Удалено ручное создание UIInventory и повторный ui_inventory.start.
+- Сохранены предупреждения, враждебность и репутационные штрафы.
+
+LIFECYCLE
+- Регистрация callbacks Seamless и Antifreeze защищена от дублирования.
+- Постоянные actor_on_update callbacks не добавлены.

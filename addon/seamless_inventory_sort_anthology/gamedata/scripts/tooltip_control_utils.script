@@ -1,0 +1,236 @@
+--[[
+	Item Info Tooltip control utility methods.
+	11/11/2022
+	This work is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+	Author: Flueno
+--]]
+
+
+
+
+local function getId(t)
+	if t and not t._pid then t._pid = string.format("%p", t) end
+	return t and t._pid
+end
+
+------------------------------------
+-------Active GUI state tracker-----
+------------------------------------
+class "GuiState"
+function GuiState:__init()
+	self.last_gui_shown_name = nil
+	self.overlayed_gui_name = nil
+
+	self.last_gui_shown_ts = 0
+	self.is_overlayed = false
+	self.inv_id = nil
+end
+
+function GuiState:isInventoryActive()
+	return "UIInventory" == self.last_gui_shown_name
+end
+
+--function GuiState:isInventoryShown()
+--	return self:is_displayed("UIInventory")
+--end
+
+function GuiState:isGuiOverlayed(gui_ref) --
+	return self.is_overlayed and getId(gui_ref) == self.inv_id and "UIInventory" == self.overlayed_gui_name
+end
+-- _GUIs[name] ~= nil means registered, no instance ref
+function GuiState:trackShown(name, path)
+	self.last_gui_shown_ts = time_global()
+	-- Some Anthology UI paths emit duplicate GUI_on_show for the same window.
+	-- Do not misclassify the second notification as an overlay.
+	if self.last_gui_shown_name == name and not self.is_overlayed then return end
+	if not self.last_gui_shown_name then
+		self.last_gui_shown_name = name
+	else
+		self.overlayed_gui_name = self.last_gui_shown_name
+		self.last_gui_shown_name = name
+		self.is_overlayed = true
+		self.inv_id = getId(self:get_gui_ref("UIInventory"))
+
+	end
+end
+
+function GuiState:trackHidden(name, path, on_overlay_end)
+	if name == self.overlayed_gui_name then
+		self.overlayed_gui_name = nil
+	elseif self.overlayed_gui_name ~= nil then
+		self.last_gui_shown_name = self.overlayed_gui_name
+		self.overlayed_gui_name = nil
+	else
+		self.last_gui_shown_name = nil
+	end
+	if on_overlay_end and self.is_overlayed then on_overlay_end() end
+	self.is_overlayed = false
+end
+
+
+function GuiState:get_gui_owner(name)
+	return _GUIs[name] and _GUIs[name].path and _G[_GUIs[name].path] or nil
+end
+
+function GuiState:get_gui_ref(name)
+	local owner_ref = self:get_gui_owner(name)
+	return owner_ref and owner_ref.GUI or nil
+end
+
+--function GuiState:get_displayed_name(ui_names_list) -- debug only
+--	local displayed = false
+--	for gui_name, n_enabled in pairs(ui_names_list) do
+--		displayed = displayed or (n_enabled and is_displayed(gui_name))
+--		if displayed then return gui_name end
+--	end
+--	return "-"
+--end
+
+function GuiState:is_displayed(gui_name)
+	local gui_ref = self:get_gui_ref(gui_name)
+	return gui_ref and gui_ref:IsShown()
+end
+
+--function GuiState:is_inventory_displayed() --deprecated, use last_gui_shown_name + id blacklisting
+--	--- only UIItemSheet seems to be showed/closed on the top of shown UIInventory
+--	return is_displayed("UIInventory") and not is_displayed("UIItemSheet")
+--end
+
+function GuiState:is_any_displayed(ui_names_list)
+	local displayed = false
+	for gui_name, n_enabled in pairs(ui_names_list) do
+		displayed = displayed or (n_enabled and self:is_displayed(gui_name))
+		if displayed then return true end
+	end
+	return displayed
+end
+
+
+------------------------------
+-------ClickTracker-----------
+------------------------------
+local use_m2 = false
+
+class "ClickTracker"
+function ClickTracker:__init(should_listen_to_kb_events)
+	self.click_threshold_ms = 300 -- greater means it's a hold rather than click
+	self.seen_hvr_oid = nil
+
+	self.cc_selection = {ts = 0, idx = nil, click_ts=0}
+	self.keys_press_data = {}
+
+	self.selected_inv_item = nil -- main inv item selection
+	self.clicked_item = false -- generic (other UI's CC and icons) clicked
+
+	self.listen_to_kb_events = should_listen_to_kb_events
+end
+
+function ClickTracker:isClickedOver(objectID)
+	return objectID == self.clicked_item or objectID == self.selected_inv_item
+end
+
+function ClickTracker:onInventoryItemCellKbEvent(CC, key_id, event_type)
+	local m_key = use_m2 and DIK_keys.MOUSE_2 or DIK_keys.MOUSE_1
+	if self.listen_to_kb_events and CC and CC.hover and CC.hover.idx and key_id == m_key then
+		local now = time_global()
+		if (event_type == ui_events.WINDOW_KEY_PRESSED) then
+			self.cc_selection.ts = now
+			self.cc_selection.idx = CC.hover.idx
+		elseif (event_type == ui_events.WINDOW_KEY_RELEASED)
+				and now - self.cc_selection.ts < 400
+				and CC.hover.idx == self.cc_selection.idx
+		then
+			local is_multiclicking = now - self.cc_selection.click_ts < 500
+			if not is_multiclicking then
+				local obj = CC:GetObj(CC.hover.idx)
+				self.selected_inv_item = obj and obj:id()
+			end
+			self.cc_selection.click_ts = now
+		end
+	end
+end
+
+--- some alternative to M1 click outside ot main inventory gui since not every thing is even clickable
+function ClickTracker:listen_to_mouse_click(tt_requester_id)
+	local m_key = use_m2 and DIK_keys.MOUSE_2 or DIK_keys.MOUSE_1
+	self:on_key_clicked(m_key, tt_requester_id,  function()
+		self.clicked_item = tt_requester_id
+	end)
+end
+
+--local dbl_click_threshold_sec = 0.15 -- cancel pending  click-notifying if next click happens within this timeframe
+--- Correlates pressed and released state of a @key_id on each cal with a previously traced data
+--- Expected to be called on every :Update (and caller having some conditions to lower amount of calls)
+function ClickTracker:on_key_clicked(key_id, caller_id, callback)
+	if not self.keys_press_data[key_id] then
+		self.keys_press_data[key_id] = { ts = 0, pressed = false, click_ts = 0 }
+	end
+	local key_press_data = self.keys_press_data[key_id]
+	local key_pressed_now = (key_state(key_id) == 1)
+	local key_pressed_before = key_press_data.pressed
+	local caller_id_before = key_press_data.caller_id
+	local now = time_global()
+	local delta = (now - key_press_data.ts)
+
+	if delta == 0 then return end -- ignore same frame calls (due overlapped uis?)
+	if key_pressed_before == key_pressed_now then return end --- ignore click holding
+
+
+	key_press_data.ts = now
+	key_press_data.caller_id = caller_id
+
+	local within_delta = delta > 5 and delta < self.click_threshold_ms --
+	local clicked = within_delta
+			and key_pressed_before
+			and not key_pressed_now
+			and (caller_id == caller_id_before)
+	key_press_data.pressed = key_pressed_now
+
+	local is_dblclicking = false
+	if clicked then
+		is_dblclicking = now - key_press_data.click_ts < 400 -- continuous clicking
+		key_press_data.click_ts = now
+		clicked = not is_dblclicking
+	end
+
+	--- Not used in main inventory hence skipping dblclicking check
+	--if is_dblclicking or clicked then RemoveTimeEvent(0,"tt_control_click_" .. key_id) end
+	if clicked then
+		--CreateTimeEvent(0,"tt_control_click_" .. key_id, dbl_click_threshold_sec, function()
+		callback()
+		--return true
+		--end)
+	end
+end
+
+function ClickTracker:hook_InventoryItemKbEvent(kb_pressed_delegatee)
+	return function(ref, dik, keyboard_action)
+		self:onInventoryItemCellKbEvent(ref, dik, keyboard_action)
+		return kb_pressed_delegatee(ref, dik, keyboard_action)
+	end
+end
+
+function ClickTracker:hook_OnTooltipShow(ontooltip_show_delegatee)
+	return function(ref, state)
+		if not state and ref:IsShown() then self:reset_item_selection() end
+		return ontooltip_show_delegatee(ref, state)
+	end
+end
+
+function ClickTracker:enableInventoryItemKbEventListener(state)
+	self.listen_to_kb_events = state
+end
+
+function ClickTracker:updateSelectionToNewHoveredItem(hovered_id)
+	if self.seen_hvr_oid ~= hovered_id then
+		if self.selected_inv_item and self.selected_inv_item ~= hovered_id 	then self.selected_inv_item = nil end
+		if self.clicked_item 	  and self.clicked_item ~= hovered_id 		then self.clicked_item = false end
+		self.seen_hvr_oid = hovered_id
+	end
+
+end
+
+function ClickTracker:reset_item_selection()
+	self.selected_inv_item = nil
+	self.clicked_item = false
+end

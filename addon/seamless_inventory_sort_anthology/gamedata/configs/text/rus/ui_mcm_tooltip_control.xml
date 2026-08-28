@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+
+	<string id="ui_mcm_menu_tooltip_control">
+		<text>Tooltip Control</text>
+	</string>
+
+	<string id="ui_mcm_tooltip_control_title">
+		<text>Контролируйте появления всплывающих подсказок (тултипов) с информацией о предметах.</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_title_desc">
+		<text>Спрячьте их, если они мешают работе с инвентарём (например перекрывая подсветку связаных предметов) или вовсе сделайте отключенными по умолчанию.</text>
+	</string>
+
+	<string id="ui_mcm_tooltip_control_enabled">
+		<text>Разрешить альтернатиный тригер показа тултипов.</text>
+	</string>
+
+	<string id="ui_mcm_tooltip_control_modes_desc">
+		<text>Выберите режим для тултипов: \n1. Отображать по-умолчанию, прятать тултипы при зажатой клавише.
+			\n2. Не отображать тултипы по умолчанию при наведении курсора на элемент, а отображать при клике по элементу или если зажата клавиша.</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_tcontrol_mode">
+		<text>Режим тултипов:</text>
+	</string>		
+	<string id="ui_mcm_lst_ttc_key_to_disable">
+		<text>1. Отображать, прятать по необходимости.</text>
+	</string>
+	<string id="ui_mcm_lst_ttc_key_or_click_to_enable">
+		<text>2. Прятать, отображать по необходимости.</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_hold_key">
+		<text>Клавиша - модификатор тултипов</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_hold_key_desc">
+		<text>Удерживайте эту клавишу чтобы спрятать (или отобразить) тултипы.</text>
+	</string>
+
+	<string id="ui_mcm_tooltip_control_no_clicks">
+		<text>Игнорировать клики для режим-2</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_no_clicks_desc">
+		<text>Только удержание клавиши отобразит тултипы.</text>
+	</string>
+	
+	<string id="ui_mcm_tooltip_control_tt_details">
+		<text>Применять для окна "подробно".</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_tt_details_desc">
+		<text>Если отключено - поведение тултипов не будет меняться в окне с подробной информацией о предмете.</text>
+	</string>
+
+
+	<string id="ui_mcm_tooltip_control_toggle_desc">
+		<text>Сменить режим поведение тултипов на противоположный (и обратно) по нажатию (а не ужержанию) клавиши.
+			Режим сбрасывается на выбранный по-умолчанию при закрытии инвентаря.</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_toggle_mode">
+		<text>Переключать режимы по нажатию клавиши.</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_trigger_key">
+		<text>Сменить режим тултипов</text>
+	</string>
+	
+	
+	<string id="ui_mcm_tooltip_control_enabled_delay">
+		<text>Включить управление задержкой показа тултипов.</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_tooltip_delay">
+		<text>Задержка показа тултипа (мс).</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_tooltip_click_delay">
+		<text>Задержка тултипа в режиме клика.</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_tooltip_click_delay_desc">
+		<text>при покахе тултипов по клику (режи 2) более уместно меньшее значение задержки.</text>
+	</string>		
+	
+	<string id="ui_mcm_tooltip_control_tooltip_gui_show_delay">
+		<text>При открытии инвентаря задерживать тултип на:</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_tooltip_gui_show_delay_desc">
+		<text>если устали от тултипа рюкзака на пол экрана.</text>
+	</string>
+
+	<string id="ui_mcm_tooltip_control_fix_stuck_tt">
+		<text>Фикс для 'зависших тултипов' для UI (верстака и прочих).</text>
+	</string>
+	<string id="ui_mcm_tooltip_control_fix_stuck_tt_desc">
+		<text>Enable before loading game.</text>
+	</string>
+	
+</string_table>

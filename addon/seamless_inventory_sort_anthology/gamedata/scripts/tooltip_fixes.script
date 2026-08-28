@@ -1,0 +1,62 @@
+--[[
+    Stuck-tooltip close fixes by Flueno.
+    Anthology UI Performance Core adaptation:
+      * patch only classes that actually exist;
+      * install every wrapper once;
+      * avoid noisy errors for optional UI modules;
+      * use deterministic unique time-event ids.
+--]]
+
+local patched = {}
+local callbacks_started = false
+local event_seq = 0
+
+local function move_cursor_away()
+    if not (GetCursorPosition and SetCursorPosition) then return end
+    local pos = GetCursorPosition()
+    if not pos then return end
+    pos.x = pos.x + 400
+    pos.y = pos.y - 400
+    SetCursorPosition(pos)
+end
+
+local function patch_close(owner, class_name, method_name)
+    local class_ref = owner and owner[class_name]
+    local original = class_ref and class_ref[method_name]
+    if type(original) ~= "function" then return false end
+
+    local key = tostring(class_ref) .. ":" .. method_name
+    if patched[key] then return true end
+    patched[key] = true
+
+    class_ref[method_name] = function(self, ...)
+        local args = { ... }
+        move_cursor_away()
+        event_seq = event_seq + 1
+        local ev_id = "ttc_close_fix_" .. tostring(event_seq)
+        CreateTimeEvent("UIClose_patch_fix", ev_id, 0.005, function()
+            original(self, unpack(args))
+            return true
+        end)
+    end
+    return true
+end
+
+function on_game_start()
+    if callbacks_started then return end
+    callbacks_started = true
+
+    local apply_fix = true
+    if ui_mcm then
+        local value = ui_mcm.get("tooltip_control/fix_stuck_tt")
+        if value ~= nil then apply_fix = value end
+    end
+    if not apply_fix then return end
+
+    patch_close(ui_workshop, "UIWorkshopCraft", "Close")
+    patch_close(ui_workshop, "UIWorkshopUpgrade", "Close")
+    patch_close(ui_workshop, "UIWorkshopRepair", "Close")
+    patch_close(item_cooking, "UICook", "Close")
+    patch_close(item_repair, "UIRepair", "OnCancel")
+    patch_close(grok_artefacts_melter, "UIRepair", "OnCancel")
+end

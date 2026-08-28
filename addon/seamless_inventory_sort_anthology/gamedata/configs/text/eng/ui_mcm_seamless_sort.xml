@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+
+	<!-- Menu / subgroup labels -->
+	<string id="ui_mcm_menu_seamless_sort"><text>Seamless Inventory Sort</text></string>
+	<string id="ui_mcm_menu_siss_general"><text>General</text></string>
+	<string id="ui_mcm_menu_siss_gaps"><text>Gaps and Disassembly</text></string>
+	<string id="ui_mcm_menu_siss_loot"><text>Looting and Bodies</text></string>
+	<string id="ui_mcm_menu_siss_hl"><text>Loot Highlight</text></string>
+	<string id="ui_mcm_menu_siss_perf"><text>Performance</text></string>
+	<string id="ui_mcm_menu_siss_trade_diag"><text>Trade diagnostics and optimization</text></string>
+	<string id="ui_mcm_menu_siss_antifreeze"><text>Antifreeze - large inventory opening</text></string>
+
+	<!-- General -->
+	<string id="ui_mcm_seamless_sort_siss_general_desc">
+		<text>Keeps a SortingPlus inventory tidy: when an item lands out of order (gun modified, item moved, traded, marked favorite/junk) it snaps back into its sorted position in place, with no flicker and without losing your scroll position.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_general_enable"><text>Enable</text></string>
+	<string id="ui_mcm_seamless_sort_siss_general_enable_desc">
+		<text>Master switch. When off, inventories behave like vanilla SortingPlus (items land at the end until you reopen the window).</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_general_win_inventory"><text>Seamless Sort in inventory window</text></string>
+	<string id="ui_mcm_seamless_sort_siss_general_win_inventory_desc">
+		<text>Keep your own inventory sorted as you modify, move or pick up items. Turn off to let items land at the end in the inventory screen (and the repair screen) until you reopen it.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_general_win_loot"><text>Seamless Sort in loot / stash window</text></string>
+	<string id="ui_mcm_seamless_sort_siss_general_win_loot_desc">
+		<text>Keep both sides sorted while looting bodies, stashes and containers. Turn off to leave the loot screen unsorted as you take and drop items. (The body and Looting Takes Time options on the next page still apply.)</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_general_win_trade"><text>Seamless Sort in trade window</text></string>
+	<string id="ui_mcm_seamless_sort_siss_general_win_trade_desc">
+		<text>Keep both sale bags sorted while trading. Turn off to leave the trade screen unsorted as you move items in and out of the basket.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_general_fav_junk"><text>Re-sort on favorite / junk</text></string>
+	<string id="ui_mcm_seamless_sort_siss_general_fav_junk_desc">
+		<text>When you mark an item favorite or junk (SortingPlus K / J keys or the right-click menu), snap it to the top / bottom instantly in place. When off, SortingPlus' own behavior is used.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_general_no_slot_jump"><text>Keep modified weapons in the bag</text></string>
+	<string id="ui_mcm_seamless_sort_siss_general_no_slot_jump_desc">
+		<text>When you attach or detach a scope, silencer or grenade launcher on a weapon in your bag, the engine rebuilds the weapon and equips it to an empty weapon slot, so it jumps out of your bag into the primary / secondary slot. Turn on to move it straight back to the bag so it stays where it was. Turn off to let the engine equip it.</text>
+	</string>
+
+	<!-- Gaps and Disassembly -->
+	<string id="ui_mcm_seamless_sort_siss_gaps_desc">
+		<text>What happens to the empty slots items leave behind. Keep gaps where things were removed, keep the bag perfectly still while you disassemble, and give ammo parts their own group.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_keep_gaps"><text>Keep gaps after removing items</text></string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_keep_gaps_desc">
+		<text>When you drop, sell or stash an item and nothing else moved, leave the empty slot where it was instead of repacking everything below it. The gap fills back in next time something is added. Enabled by default in v1.1 to reduce layout work; turn off to repack immediately on removal.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_keep_disasm"><text>Keep the bag still when disassembling</text></string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_keep_disasm_desc">
+		<text>While you disassemble, nothing in the bag moves: the dismantled item's slot stays empty and the resulting parts land at the end, so disassembling in quick succession never makes the inventory jump. When you stop, a single re-sort folds the parts into their group and closes the gaps -- the slider below sets how long it waits. Works on its own -- it does not need "Keep gaps after removing items".</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_disasm_delay"><text>Re-sort delay after disassembling (sec)</text></string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_disasm_delay_desc">
+		<text>How long after your last disassembly the bag waits before the settle re-sort. 0 re-sorts the moment the parts land; higher values keep the bag still through a whole disassembly session. Each disassembly restarts the timer. Default 0 s (re-sort as soon as the parts land).</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_ammo_parts_row"><text>Own category for ammo parts</text></string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_ammo_parts_row_desc">
+		<text>Sort casings, bullets and gunpowder (Ammo Maker parts) into their own group right below the ammo instead of mixing them in between the ammo boxes. Takes effect the next time a bag is sorted (reopen the inventory).</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_ap_order"><text>Ammo parts sort position</text></string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_ap_order_desc">
+		<text>Where the ammo parts category sits in the overall sort order, on SortingPlus' scale where ammo is 9 and mutant parts are 10. Default 9.5 puts ammo parts right below the ammo. Lower moves them up (toward weapons and armor), higher moves them down (toward food and junk). Only matters when "Own category for ammo parts" is on. Takes effect on the next sort (reopen the inventory).</text>
+	</string>
+
+	<!-- Looting and Bodies -->
+	<string id="ui_mcm_seamless_sort_siss_loot_desc">
+		<text>How looted dead bodies are handled. Only dead bodies are affected on this page; stashes, containers and your own inventory always sort.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_loot_body_mode"><text>Looted body handling</text></string>
+	<string id="ui_mcm_seamless_sort_siss_loot_body_mode_desc">
+		<text>What to do with a looted dead body's items. Only dead bodies are affected; stashes, containers, companions and your own bag always sort.\n\n- Sort normally: sort the body like any container.\n- Never sort - keep as found: leave the body unsorted (size-kind layout), the same as SortingPlus' "sort npc inventories" off, but for corpses only. No Looting Takes Time needed.\n- Keep Looting Takes Time order: never sort; leave the body exactly in the order Looting Takes Time revealed it. (Looting Takes Time only; behaves like "Sort normally" without it.)\n- Sort after Looting Takes Time reveal: wait for the reveal to finish, then sort once and keep it sorted as you loot. (Looting Takes Time only.)</text>
+	</string>
+	<string id="seamless_sort_siss_loot_body_mode_lst_sort"><text>Sort normally</text></string>
+	<string id="seamless_sort_siss_loot_body_mode_lst_never"><text>Never sort - keep as found</text></string>
+	<string id="seamless_sort_siss_loot_body_mode_lst_ltt_keep"><text>Keep Looting Takes Time order</text></string>
+	<string id="seamless_sort_siss_loot_body_mode_lst_ltt_after"><text>Sort after Looting Takes Time reveal</text></string>
+
+	<!-- Loot Highlight -->
+	<string id="ui_mcm_seamless_sort_siss_hl_desc">
+		<text>Tint items you just took from a container, stash or body with a colored background, so you can see at a glance what you found. The highlight clears when you close the inventory.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new"><text>Highlight new loot</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_desc">
+		<text>Enable the new-loot highlight. Use the sliders below to choose the color.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_r"><text>Color - Red</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_r_desc"><text>Red component of the highlight color (0-255).</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_g"><text>Color - Green</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_g_desc"><text>Green component of the highlight color (0-255).</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_b"><text>Color - Blue</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_b_desc"><text>Blue component of the highlight color (0-255).</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_a"><text>Intensity</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_a_desc">
+		<text>Opacity of the highlight (0-255). Low values give a subtle tint; high values a strong, solid color. Default 60.</text>
+	</string>
+
+	<!-- Performance -->
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_desc">
+		<text>Splits initial sorting and icon creation for a large inventory across multiple frames. The adaptation only affects the actor bag, loot/container bag and two sale bags; every other UI container keeps the original code path.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_enabled"><text>Enable multi-frame loading</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_enabled_desc"><text>Large containers open without one blocking sort. Small containers always use the original immediate path.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_trade_enabled"><text>Use Antifreeze in trade</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_trade_enabled_desc"><text>Enables multi-frame loading for actor_trade_bag and npc_trade_bag. Keep disabled for the diagnostic test: trade lists use the original engine path while Antifreeze remains active in normal inventory and corpse-loot grids. Close and reopen the trade window after changing this option.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_deferred_limit"><text>Minimum items for Antifreeze</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_deferred_limit_desc"><text>Containers below this count are not intercepted. Recommended: 120-200. Lower values engage deferred loading more often.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_frame_budget"><text>Per-frame work budget (ms)</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_frame_budget_desc"><text>Maximum time Antifreeze attempts to spend in one UI frame. 1-2 ms is smoothest; higher values fill the window faster but affect frametime more.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_sort_step"><text>Sorter operations per frame cap</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_sort_step_desc"><text>Secondary safety cap. Actual work is also limited by the millisecond budget.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_icon_step"><text>Icons created per frame cap</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_icon_step_desc"><text>Lower is smoother but fills the window more slowly. Recommended: 8-16.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_indicator"><text>Show animated loading indicator</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_indicator_desc"><text>Shows a spinner while a large list is built. Disabled by default to minimize rendering and texture-memory overhead.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_safe_compare"><text>Safe SortingPlus comparator</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_safe_compare_desc"><text>Catches an unstable sort-key error and uses a deterministic fallback instead of crashing. Recommended.</text></string>
+
+	<string id="ui_mcm_seamless_sort_siss_perf_desc">
+		<text>Batch sorting merges a burst of purchases, transfers or pickups into one final layout pass. Timers sleep until work is due instead of polling every frame. Trade has a separate policy and a safety limit for very large sale bags.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_perf_perf_mode"><text>Performance mode</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_perf_mode_desc">
+		<text>- Instant: v1.0 behaviour, sort after every change.\n- Balanced: short delay and one sort per operation burst. Recommended.\n- Maximum FPS: longer delays for trade and large inventories.</text>
+	</string>
+	<string id="seamless_sort_siss_perf_perf_mode_lst_instant"><text>Instant</text></string>
+	<string id="seamless_sort_siss_perf_perf_mode_lst_balanced"><text>Balanced</text></string>
+	<string id="seamless_sort_siss_perf_perf_mode_lst_fps"><text>Maximum FPS</text></string>
+
+	<string id="ui_mcm_seamless_sort_siss_perf_trade_policy"><text>Trade sorting policy</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_trade_policy_desc">
+		<text>Full: re-sort both sale bags after all changes. Additions only: recommended; sort only the side that received items and leave a gap on the side items were removed from. Off: no live seamless sorting in trade, for maximum smoothness with very large traders.</text>
+	</string>
+	<string id="seamless_sort_siss_perf_trade_policy_lst_full"><text>Full</text></string>
+	<string id="seamless_sort_siss_perf_trade_policy_lst_additions"><text>Additions only</text></string>
+	<string id="seamless_sort_siss_perf_trade_policy_lst_off"><text>Off - maximum FPS</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_trade_max_items"><text>Live trade sort item limit</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_trade_max_items_desc">
+		<text>When one sale bag contains more items than this limit, the addon leaves it unsorted while the trade window is open to avoid a heavy single-frame hitch. 0 disables the limit. Recommended: 300.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_perf_osc_guard"><text>Anti-oscillation guard</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_osc_guard_desc">
+		<text>Back off from re-sorting a container that is churning. Leave on unless troubleshooting.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_perf_osc_limit"><text>Re-sorts before back-off</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_osc_limit_desc">
+		<text>How many re-sorts of one container within a one-second window are allowed before the guard decides it is oscillating. Lower = more aggressive. Default 8.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_perf_osc_cooldown"><text>Back-off time (sec)</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_osc_cooldown_desc">
+		<text>How long the guard stops re-sorting an oscillating container so it can settle, then seamless sorting resumes. Default 1.5 s.</text>
+	</string>
+
+
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_desc"><text>This diagnostic build measures active trade UI methods and writes compact reports to the xray log. Timing format: calls / total ms / average ms / maximum ms. Fast highlight cleanup replaces the stock every-frame full inventory scan with a sparse set of cells that were actually highlighted.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_enabled"><text>Enable trade profiling</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_enabled_desc"><text>Collects counters and timings only while trade UI is open. Keep enabled for this test build.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_interval"><text>Report interval, seconds</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_interval_desc"><text>How often a periodic REPORT is written to the log. Five seconds is recommended.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_slow_ms"><text>Slow call threshold, ms</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_slow_ms_desc"><text>Writes a rate-limited SLOW line when a measured phase exceeds this threshold.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_fast_unhighlight"><text>Fast highlight cleanup</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_fast_unhighlight_desc"><text>In trade mode, processes only cells that were actually highlighted instead of scanning every actor and trader item on every idle frame. Disable and report the exact scenario if a highlight remains stuck.</text></string>
+</string_table>

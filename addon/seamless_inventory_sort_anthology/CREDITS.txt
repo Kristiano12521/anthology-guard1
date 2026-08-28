@@ -1,0 +1,16 @@
+Inventory Antifreeze and incremental heap concept:
+TheMrDemonized — Inventory Antifreeze.
+
+Tooltip Control and original stuck-tooltip fixes:
+Flueno — Tooltip Control 1.1.2 (CC BY-NC-SA 3.0 header preserved in source).
+
+Slow scroll cache reset concept:
+Razfarg — Scroll Fix v3.
+
+(NPC Loot Claim Continued / No-sorting 1.0.6.2 was bundled through v1.5.2 and
+has been removed from this archive as of v1.5.3; no other file depended on it.)
+
+Anthology 2.1 integration:
+container scoping, frame budget, lifecycle cleanup, synchronization, guarded
+scroll reset, duplicate-hook protection, load-order-independent hook
+installation (v1.5.3), and per-window tooltip delay gating (v1.5.3).

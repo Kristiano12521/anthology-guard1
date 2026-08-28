@@ -1,0 +1,166 @@
+<?xml version='1.0' encoding='windows-1251'?>
+<string_table>
+
+	
+	<string id="ui_mcm_menu_seamless_sort"><text>Бесшовная сортировка инвентаря</text></string>
+	<string id="ui_mcm_menu_siss_general"><text>Основные настройки</text></string>
+	<string id="ui_mcm_menu_siss_gaps"><text>Пустые ячейки и разборка</text></string>
+	<string id="ui_mcm_menu_siss_loot"><text>Обыск и тела</text></string>
+	<string id="ui_mcm_menu_siss_hl"><text>Подсветка добычи</text></string>
+	<string id="ui_mcm_menu_siss_perf"><text>Производительность</text></string>
+	<string id="ui_mcm_menu_siss_trade_diag"><text>Диагностика и оптимизация торговли</text></string>
+	<string id="ui_mcm_menu_siss_antifreeze"><text>Antifreeze — открытие больших инвентарей</text></string>
+
+	
+	<string id="ui_mcm_seamless_sort_siss_general_desc">
+		<text>Поддерживает порядок SortingPlus без закрытия окна: изменённые, перемещённые, проданные и помеченные предметы сразу возвращаются на своё место без мерцания и сброса прокрутки.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_general_enable"><text>Включить</text></string>
+	<string id="ui_mcm_seamless_sort_siss_general_enable_desc">
+		<text>Главный переключатель. Если выключено, предметы ведут себя как в обычном SortingPlus и остаются в конце списка до повторного открытия окна.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_general_win_inventory"><text>Сортировать в окне инвентаря</text></string>
+	<string id="ui_mcm_seamless_sort_siss_general_win_inventory_desc">
+		<text>Сохранять порядок вашего инвентаря при модификации, перемещении и подборе предметов. Также относится к окну ремонта.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_general_win_loot"><text>Сортировать при обыске и в тайниках</text></string>
+	<string id="ui_mcm_seamless_sort_siss_general_win_loot_desc">
+		<text>Сохранять порядок с обеих сторон окна обыска тел, тайников и контейнеров. Настройки обработки тел и Looting Takes Time применяются отдельно.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_general_win_trade"><text>Сортировать в окне торговли</text></string>
+	<string id="ui_mcm_seamless_sort_siss_general_win_trade_desc">
+		<text>Сохранять порядок в сумках продажи при перемещении предметов в торговую корзину и обратно.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_general_fav_junk"><text>Пересортировать избранное и мусор</text></string>
+	<string id="ui_mcm_seamless_sort_siss_general_fav_junk_desc">
+		<text>После пометки предмета как избранного или мусора сразу перемещать его вверх или вниз списка без полной перезагрузки окна.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_general_no_slot_jump"><text>Оставлять модифицированное оружие в рюкзаке</text></string>
+	<string id="ui_mcm_seamless_sort_siss_general_no_slot_jump_desc">
+		<text>После установки или снятия прицела, глушителя либо подствольника возвращать оружие в рюкзак, если движок попытался автоматически поместить его в свободный оружейный слот.</text>
+	</string>
+
+	
+	<string id="ui_mcm_seamless_sort_siss_gaps_desc">
+		<text>Настройки поведения свободных ячеек, разборки предметов и отдельной группы компонентов боеприпасов.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_keep_gaps"><text>Сохранять пустые ячейки после удаления</text></string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_keep_gaps_desc">
+		<text>При выбрасывании, продаже или перекладывании предмета оставлять освободившееся место, не сдвигая весь список. Пустота заполнится при следующем добавлении предмета. В версии 1.1 включено по умолчанию для снижения нагрузки.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_keep_disasm"><text>Не сдвигать рюкзак во время разборки</text></string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_keep_disasm_desc">
+		<text>Во время последовательной разборки сохранять расположение предметов. Полученные детали временно попадают в конец, затем выполняется одна итоговая сортировка.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_disasm_delay"><text>Задержка сортировки после разборки, сек.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_disasm_delay_desc">
+		<text>Время ожидания после последней разборки. Каждая новая разборка перезапускает таймер. Значение 0 сортирует сразу после появления деталей.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_ammo_parts_row"><text>Отдельная категория компонентов боеприпасов</text></string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_ammo_parts_row_desc">
+		<text>Группировать гильзы, пули и порох отдельно от коробок боеприпасов. Изменение применяется при следующей сортировке.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_ap_order"><text>Позиция компонентов боеприпасов</text></string>
+	<string id="ui_mcm_seamless_sort_siss_gaps_ap_order_desc">
+		<text>Положение категории в порядке SortingPlus: боеприпасы имеют значение 9, части мутантов — 10. Значение 9.5 размещает компоненты сразу после боеприпасов.</text>
+	</string>
+
+	
+	<string id="ui_mcm_seamless_sort_siss_loot_desc">
+		<text>Настройки применяются только к мёртвым NPC. Тайники, контейнеры, спутники и ваш рюкзак сортируются отдельно.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_loot_body_mode"><text>Обработка содержимого тел</text></string>
+	<string id="ui_mcm_seamless_sort_siss_loot_body_mode_desc">
+		<text>Выберите поведение предметов на мёртвом NPC.\n\n- Сортировать обычно: тело обрабатывается как контейнер.\n- Не сортировать: оставить предметы в исходном расположении.\n- Сохранять порядок Looting Takes Time: не мешать последовательному раскрытию предметов.\n- Сортировать после раскрытия: дождаться завершения Looting Takes Time и выполнить одну сортировку.</text>
+	</string>
+	<string id="seamless_sort_siss_loot_body_mode_lst_sort"><text>Сортировать обычно</text></string>
+	<string id="seamless_sort_siss_loot_body_mode_lst_never"><text>Не сортировать — оставить как найдено</text></string>
+	<string id="seamless_sort_siss_loot_body_mode_lst_ltt_keep"><text>Сохранять порядок Looting Takes Time</text></string>
+	<string id="seamless_sort_siss_loot_body_mode_lst_ltt_after"><text>Сортировать после раскрытия Looting Takes Time</text></string>
+
+	
+	<string id="ui_mcm_seamless_sort_siss_hl_desc">
+		<text>Подсвечивать предметы, только что взятые из тела, тайника или контейнера. Подсветка очищается при закрытии инвентаря.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new"><text>Подсвечивать новую добычу</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_desc">
+		<text>Включить подсветку и настроить её цвет ползунками ниже.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_r"><text>Цвет — красный</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_r_desc"><text>Красная составляющая цвета, от 0 до 255.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_g"><text>Цвет — зелёный</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_g_desc"><text>Зелёная составляющая цвета, от 0 до 255.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_b"><text>Цвет — синий</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_b_desc"><text>Синяя составляющая цвета, от 0 до 255.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_a"><text>Интенсивность</text></string>
+	<string id="ui_mcm_seamless_sort_siss_hl_hl_new_a_desc">
+		<text>Прозрачность подсветки, от 0 до 255. Малое значение даёт лёгкий оттенок, большое — яркую заливку. По умолчанию 60.</text>
+	</string>
+
+	
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_desc">
+		<text>Разбивает первоначальную сортировку и создание иконок большого инвентаря на несколько кадров. Адаптация действует только на рюкзак игрока, контейнер/тело и две сумки продажи; остальные интерфейсы используют штатный код.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_enabled"><text>Включить многокадровую загрузку</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_enabled_desc"><text>Большие контейнеры открываются без одной тяжёлой блокирующей сортировки. Малые контейнеры всегда используют штатную мгновенную загрузку.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_trade_enabled"><text>Antifreeze в торговле</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_trade_enabled_desc"><text>Включает многокадровую загрузку для actor_trade_bag и npc_trade_bag. Для диагностического теста оставьте выключенным: торговые списки будут строиться штатным кодом, а Antifreeze продолжит работать в обычном инвентаре и при осмотре тел. После изменения закройте и заново откройте окно торговли.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_deferred_limit"><text>Минимум предметов для Antifreeze</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_deferred_limit_desc"><text>Контейнеры с меньшим количеством предметов не перехватываются. Рекомендуется 120–200. Снижение значения чаще включает постепенную загрузку.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_frame_budget"><text>Бюджет обработки на кадр, мс</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_frame_budget_desc"><text>Максимальное время, которое Antifreeze старается потратить за один UI-кадр. 1–2 мс дают лучшую плавность; большие значения быстрее заполняют окно, но сильнее влияют на frametime.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_sort_step"><text>Предел операций сортировки на кадр</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_sort_step_desc"><text>Дополнительный защитный предел. Реальная работа также ограничена бюджетом в миллисекундах.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_icon_step"><text>Предел создаваемых иконок на кадр</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_icon_step_desc"><text>Меньше — плавнее, но окно заполняется дольше. Рекомендуется 8–16.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_indicator"><text>Показывать анимированный индикатор</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_indicator_desc"><text>Показывает индикатор, пока строится большой список. По умолчанию отключён для минимальной нагрузки и расхода видеопамяти.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_safe_compare"><text>Безопасный компаратор SortingPlus</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_safe_compare_desc"><text>Перехватывает ошибку нестабильного ключа сортировки и использует детерминированный запасной порядок вместо вылета. Рекомендуется оставить включённым.</text></string>
+
+	<string id="ui_mcm_seamless_sort_siss_perf_desc">
+		<text>Режим пакетной сортировки объединяет серию покупок, переносов и подбора предметов в одну итоговую перестройку. Это уменьшает просадки FPS на больших рюкзаках. Защита от циклической сортировки дополнительно останавливает нестабильный контейнер.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_perf_perf_mode"><text>Режим производительности</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_perf_mode_desc">
+		<text>- Мгновенный: поведение версии 1.0, сортировка после каждого изменения.\n- Сбалансированный: короткая задержка, серия операций объединяется в одну сортировку. Рекомендуется.\n- Максимальный FPS: более длинная задержка для торговли и больших инвентарей.</text>
+	</string>
+	<string id="seamless_sort_siss_perf_perf_mode_lst_instant"><text>Мгновенный</text></string>
+	<string id="seamless_sort_siss_perf_perf_mode_lst_balanced"><text>Сбалансированный</text></string>
+	<string id="seamless_sort_siss_perf_perf_mode_lst_fps"><text>Максимальный FPS</text></string>
+
+	<string id="ui_mcm_seamless_sort_siss_perf_trade_policy"><text>Режим сортировки в торговле</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_trade_policy_desc">
+		<text>Полная — пересортировывать обе торговые сумки после любых изменений. Только поступления — рекомендуемый режим: сортировать только ту сторону, куда добавились предметы, а на стороне удаления оставлять свободную ячейку. Отключена — не выполнять бесшовную сортировку в торговле; максимальная плавность для очень крупных торговцев.</text>
+	</string>
+	<string id="seamless_sort_siss_perf_trade_policy_lst_full"><text>Полная</text></string>
+	<string id="seamless_sort_siss_perf_trade_policy_lst_additions"><text>Только поступления</text></string>
+	<string id="seamless_sort_siss_perf_trade_policy_lst_off"><text>Отключена — максимум FPS</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_trade_max_items"><text>Лимит предметов для живой сортировки в торговле</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_trade_max_items_desc">
+		<text>Если в одной торговой сумке больше указанного количества предметов, аддон не пересортировывает её во время открытого окна, чтобы избежать тяжёлого однокадрового фриза. 0 снимает ограничение. Рекомендуемое значение — 300.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_perf_osc_guard"><text>Защита от циклической сортировки</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_osc_guard_desc">
+		<text>Временно прекращать пересортировку нестабильного контейнера. Рекомендуется оставить включённым.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_perf_osc_limit"><text>Пересортировок до паузы</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_osc_limit_desc">
+		<text>Допустимое количество пересортировок одного контейнера за одну секунду. Меньшее значение срабатывает агрессивнее. По умолчанию 8.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_perf_osc_cooldown"><text>Длительность паузы, сек.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_osc_cooldown_desc">
+		<text>Время, на которое сортировка нестабильного контейнера приостанавливается. После паузы бесшовная сортировка возобновляется. По умолчанию 1.5 сек.</text>
+	</string>
+
+
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_desc"><text>Диагностическая версия измеряет активные методы торгового интерфейса и выводит компактный отчёт в xray-лог. Формат времени: вызовы / суммарные мс / средние мс / максимальные мс. Быстрая очистка подсветки заменяет штатный полный обход всех предметов каждый кадр на обработку только реально подсвеченных ячеек.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_enabled"><text>Включить профилирование торговли</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_enabled_desc"><text>Собирает счётчики и таймеры только пока открыто окно торговли. Для тестовой версии оставьте включённым. После определения узкого места параметр можно выключить.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_interval"><text>Интервал отчёта, сек.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_interval_desc"><text>Как часто писать промежуточный REPORT в лог. Рекомендуется 5 секунд. Слишком маленькое значение увеличивает объём журнала.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_slow_ms"><text>Порог медленного вызова, мс</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_slow_ms_desc"><text>Отдельная строка SLOW выводится, когда измеряемый этап превышает этот порог. Сообщения ограничены по частоте.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_fast_unhighlight"><text>Быстрая очистка подсветки</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_fast_unhighlight_desc"><text>В торговле обрабатывает только ячейки, которые действительно были подсвечены, вместо полного обхода всех предметов игрока и торговца каждый кадр. Это первая целевая оптимизация по результатам тестов. При визуальной проблеме с подсветкой отключите параметр и сообщите сценарий.</text></string>
+</string_table>

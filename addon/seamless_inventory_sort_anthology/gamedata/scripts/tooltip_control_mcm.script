@@ -1,0 +1,50 @@
+-- Tooltip Control 1.1.2 — Anthology UI Performance Core integration.
+function on_mcm_load()
+	op = {
+		id = "tooltip_control", sh = true,
+		gr = {
+			{ id = "title", type = "title", text = "ui_mcm_tooltip_control_title" },
+			{ id = "title_desc", type = "desc", clr={200, 200, 200, 255}, text="ui_mcm_tooltip_control_title_desc"},
+
+			{ id = "tooltip_control_title_line", type = "line" },
+
+			{ id = "modes_desc", type = "desc", clr={200, 200, 255, 200}, text="ui_mcm_tooltip_control_modes_desc"},
+			{ id = "enabled", type = "check", val = 1, def = true },
+			{ id = "tcontrol_mode", type = "radio_v", val = 2, def = 1,
+			  content = { { 1, "ttc_key_to_disable" }, --{2,"ttc_click"}, {3,"ttc_key_to_enable"},
+						  { 4, "ttc_key_or_click_to_enable" } }
+			},
+			{ id = "hold_key", type = "key_bind", val = 2, def = DIK_keys.DIK_LMENU },
+			{ id = "no_clicks", type = "check", val = 1, def = false },
+			{ id = "tt_details", type = "check", val = 1, def = true },
+
+			{ id = "tooltip_control_title_line", type = "line" },
+
+			{ id = "toggle_mode_desc", type = "desc",clr={200, 200, 255, 200}, text = "ui_mcm_tooltip_control_toggle_desc"},
+			{ id = "toggle_mode", type = "check", val = 1, def = true },
+			{ id = "trigger_key", type = "key_bind", val = 2, def = DIK_keys.DIK_LMENU },
+
+			{ id = "tooltip_control_title_line", type = "line" },
+
+			{ id = "enabled_delay", type = "check", val = 1, def = true },
+
+			{ id = "tooltip_delay", type = "track", val = 2, def = 320, min = 0, max = 1500, step = 50 },
+			{ id = "tooltip_click_delay", type = "track", val = 2, def = 110, min = 0, max = 500, step = 10 },
+
+			{ id = "tooltip_gui_show_delay", type = "track", val = 2, def = 810, min = 0, max = 2000, step = 100 },
+
+			{ id = "tooltip_control_title_line", type = "line" },
+			{ id = "fix_stuck_tt", type = "check",  val = 1, def = true },
+
+			--{ id = "tt_workshop", type = "check", text="workshop", val = 1, def = true },
+			--{ id = "tt_repair", type = "check", val = 1, def = true },
+			--{ id = "tt_mutant_loot", type = "check", val = 1, def = true },
+			--{ id = "tt_cook", type = "check", val = 1, def = true },
+			--{ id = "tt_recipe", type = "check", val = 1, def = true },
+
+
+		}
+	}
+
+	return op
+end
