@@ -1,0 +1,149 @@
+-- Crowkiller Hello Dialog Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- CPhraseDialog::SayPhrase fatals when dialog[gar_bandit_bookmaker_hello]
+-- has no passing next-phrase after dummy id=0. All six next phrases are
+-- gated on minigame_dialogs.crowkiller_is_* and there is no fallback.
+--
+-- Confirmed in configs/gameplay/dialogs_cs_garbadge.xml (Anthology xdb)
+-- and scripts/minigame_dialogs.script. Current crowkiller starts as ""
+-- until sr_crowkiller.set_scheme runs; talking to Zhivoder on a bandit
+-- start at the Garbage depot hits that window.
+
+local LOG_TAG = "[fix_crowkiller_hello]"
+local FALLBACK_NAME = "gar_bandit_crowkiller"
+
+local orig_is_valiable = nil
+
+local function manager()
+	if type(minigames_manager) ~= "table" or type(minigames_manager.get_minigames_manager) ~= "function" then
+		return nil
+	end
+	local ok, mgr = pcall(minigames_manager.get_minigames_manager)
+	if ok then
+		return mgr
+	end
+	return nil
+end
+
+local function is_crowkiller_profile(rec)
+	if not (rec and rec.game_profile) then
+		return false
+	end
+	local ok, name = pcall(function()
+		return rec.game_profile:get_profile_name()
+	end)
+	return ok and name == "CMGCrowKiller"
+end
+
+local function fill_default_params(mgr, name)
+	mgr:set_minigame_param(name, "highscore", 8)
+	mgr:set_minigame_param(name, "timer", 60)
+	mgr:set_minigame_param(name, "win", false)
+	mgr:set_minigame_param(name, "crows_to_kill", {1, 2, 3, 4})
+	mgr:set_minigame_param(name, "money_multiplier", 300)
+	mgr:set_minigame_param(name, "champion_multiplier", 1000)
+	mgr:set_minigame_param(name, "selected", 0)
+	mgr:set_minigame_param(name, "game_type", "")
+end
+
+local function ensure_current_crowkiller(mgr)
+	local current = mgr:get_current_crowkiller()
+	if type(current) == "string" and current ~= "" and mgr:params_exist(current) then
+		return current
+	end
+
+	-- Skip constructor dummy test_crowkiller: its params are not the depot game.
+	local found = nil
+	if type(mgr.minigames) == "table" then
+		for name, rec in pairs(mgr.minigames) do
+			if type(name) == "string" and name ~= "" and name ~= "test_crowkiller"
+				and is_crowkiller_profile(rec) then
+				found = name
+				break
+			end
+		end
+	end
+
+	if found then
+		mgr:set_current_crowkiller(found)
+		printf(LOG_TAG .. " bound current crowkiller to '%s'", found)
+		return found
+	end
+
+	if not (minigame_crowkiller and minigame_crowkiller.CMGCrowKiller) then
+		return nil
+	end
+
+	if not mgr:params_exist(FALLBACK_NAME) then
+		local ok_new, profile = pcall(minigame_crowkiller.CMGCrowKiller)
+		if not ok_new or not profile then
+			return nil
+		end
+		mgr:create_new_minigame_parameter_list(FALLBACK_NAME, profile)
+		fill_default_params(mgr, FALLBACK_NAME)
+		printf(LOG_TAG .. " created fallback minigame '%s'", FALLBACK_NAME)
+	end
+	mgr:set_current_crowkiller(FALLBACK_NAME)
+	return FALLBACK_NAME
+end
+
+local function state_is_available(st)
+	-- "enabled" is set by start_crowkiller and is not in the hello XML;
+	-- treat it as idle so SayPhrase still has a next phrase.
+	return st == "valiable" or st == "disabled" or st == "enabled" or st == nil or st == ""
+end
+
+local function patched_is_valiable(...)
+	local mgr = manager()
+	if mgr then
+		local ok_bind, bound = pcall(ensure_current_crowkiller, mgr)
+		if ok_bind and bound then
+			local st = mgr:get_minigame_state(bound)
+			if state_is_available(st) then
+				return true
+			end
+		elseif state_is_available(nil) then
+			-- No manager entry: still allow the hello branch so SayPhrase
+			-- has at least one next phrase.
+			return true
+		end
+	end
+
+	if orig_is_valiable then
+		local ok, result = pcall(orig_is_valiable, ...)
+		if ok then
+			return result and true or false
+		end
+		printf(LOG_TAG .. " original crowkiller_is_valiable failed: %s", tostring(result))
+	end
+	return true
+end
+
+local function install()
+	if type(minigame_dialogs) ~= "table" or type(minigame_dialogs.crowkiller_is_valiable) ~= "function" then
+		printf(LOG_TAG .. " minigame_dialogs.crowkiller_is_valiable not found - guard NOT installed")
+		return false
+	end
+	if minigame_dialogs.crowkiller_is_valiable == patched_is_valiable then
+		return true
+	end
+	orig_is_valiable = orig_is_valiable or minigame_dialogs.crowkiller_is_valiable
+	minigame_dialogs.crowkiller_is_valiable = patched_is_valiable
+	printf(LOG_TAG .. " crowkiller_is_valiable wrapped")
+	return true
+end
+
+local function uninstall()
+	if orig_is_valiable and type(minigame_dialogs) == "table" then
+		minigame_dialogs.crowkiller_is_valiable = orig_is_valiable
+	end
+end
+
+function on_game_start()
+	install()
+end
+
+function on_game_end()
+	uninstall()
+end
