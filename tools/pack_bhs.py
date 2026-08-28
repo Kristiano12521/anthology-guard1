@@ -13,8 +13,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 OVERLAY = REPO / "addon" / "anthology_busyhands_stability_fix"
-VERSION = "0.6.3"
-OUT_NAME = "Anthology_BusyHands_Stability_Fix_v0_6_3"
+VERSION = "0.6.4"
+OUT_NAME = "Anthology_BusyHands_Stability_Fix_v0_6_4"
 
 # Overlay files cannot use zzz prefixes (lint). Zip keeps vendor load order.
 OVERLAY_MAP = {

@@ -1,4 +1,4 @@
--- Anthology Busy Hands Stability Fix v0.6.2 - FDDA body search patch
+-- Anthology Busy Hands Stability Fix v0.6.4 - FDDA body search patch
 --
 -- liz_fdda_redone_body_search.script stays vendor. We patch start_body_search
 -- and get_template_action_looting_idle on the MODULE TABLE (same pattern as
@@ -8,8 +8,13 @@
 -- by FDDA, so the idle action re-enters start_body_search and no-ops.
 -- Open loot the same way as vanilla ui_inventory.start("loot", obj):
 -- ui_inventory.script:451-487 / LMode_Init at :3294.
+--
+-- v0.6.4: re-entry during an active body_search is a no-op again (vendor).
+-- 0.6.2 opened loot on that re-entry; npc_on_use + engine DeadBodySearch both
+-- call start("loot"), so UI appeared without idle.is_ui_enabled. Esc then
+-- looked like "not opened yet" and idle opened loot a second time.
 
-local VERSION = "0.6.2"
+local VERSION = "0.6.4"
 
 local function publish_marker()
 	ANTHOLOGY_BHS_FDDA_PATCH_VERSION = VERSION
@@ -116,7 +121,6 @@ local function install()
 
 	fdda_set("start_body_search", function(obj, show_ui)
 		if lam2 and lam2.get_action_with_tag and lam2.get_action_with_tag("body_search") then
-			open_vanilla_loot(obj)
 			return
 		end
 		local obj_id = busyhands_safe_obj_id(obj)
@@ -160,6 +164,10 @@ local function install()
 			if time > self.ui_open_delay then
 				if not self.inv_gui then
 					self.inv_gui = ui_inventory.GUI
+				end
+
+				if not self.is_ui_enabled and self.inv_gui and self.inv_gui:IsShown() then
+					self.is_ui_enabled = true
 				end
 
 				if not self.is_ui_enabled and (not self.inv_gui or not self.inv_gui:IsShown()) then

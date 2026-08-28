@@ -1,5 +1,37 @@
 # Anthology Busy Hands Stability Fix
 
+## [0.6.4] — 2026-08-28
+
+**Изменено**
+
+- `zzzzzz_anthology_bhs_fdda_patch.script` — повторный `start_body_search` при теге `body_search` снова no-op (как вендор). Idle, если GUI уже показан, ставит `is_ui_enabled`.
+
+**Причина**
+
+Use по трупу дважды зовёт `start("loot")`: движок `CUIActorMenu_OnMode_DeadBodySearch` и `UIInventory:npc_on_use`. В 0.6.2 второй вход открывал лут через `LMode_Init` без флага idle. Esc прятал GUI, idle считал окно ещё не открытым и поднимал лут снова — в том числе после своего инвентаря.
+
+**Как исправлено**
+
+Повторный вход не открывает UI. Открывает только idle через `LMode_Init`. Если окно уже видно (свой инвентарь на задержке), idle помечает UI открытым и по Esc завершает поиск, а не открывает лут.
+
+**Не затронуто**
+
+- Вендорский `liz_fdda_redone_body_search.script`.
+- sequential_load 0.6.3 и остальные гарды.
+- Префиксы `zzzzzz_` (load order).
+- Сохраняемое состояние.
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+- В MO2 заменить BHS 0.6.3. Отдельный `fix_bhs_fdda_loot` снять: его повторный open на теге снова даст второй инвентарь.
+
+**Проверено**
+
+- lint overlay: `python tools/lint_addon.py anthology_busyhands_stability_fix`
+- В логе после старта: `Anthology Busy Hands Stability Fix 0.6.4 loaded`, `patched (module-table`, `FDDA body search guards installed: 1`.
+
 ## [0.6.3] — 2026-08-28
 
 **Изменено**

@@ -1,5 +1,8 @@
--- Anthology Busy Hands Stability Fix v0.6.3
+-- Anthology Busy Hands Stability Fix v0.6.4
 --
+-- v0.6.4: FDDA idle must not reopen loot after Esc. Re-entry during an
+-- active body_search is a vendor no-op; idle sets is_ui_enabled if GUI
+-- is already shown.
 -- v0.6.3: sequential_load_magazine — one gradual load at a time; pcall
 -- ammo_get_count (two jobs shared a released ammo box).
 -- v0.6.2: FDDA loot window — patch functions on liz_fdda_redone_body_search
@@ -10,7 +13,7 @@
 -- documented full-file exceptions (mon_sleep, guaranteed_loot,
 -- sequential_load_magazine).
 
-local VERSION = "0.6.3"
+local VERSION = "0.6.4"
 local installed = false
 
 local function safe_object_id(obj)

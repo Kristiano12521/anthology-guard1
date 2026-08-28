@@ -8,8 +8,9 @@
 --
 -- Wrap start_body_search in on_game_start (after BHS file-load patch).
 -- Anomaly keeps the function on the script module table, not always on _G
--- (same pattern as utils_obj.find_close_cover). If a search is already
--- running, open vanilla loot instead of no-op.
+-- (same pattern as utils_obj.find_close_cover). Re-entry during an active
+-- search is a no-op (vendor). Opening loot here raced npc_on_use and made
+-- Esc reopen the window. Idle in BHS 0.6.4 opens via LMode_Init.
 
 local LOG_TAG = "[fix_bhs_fdda_loot]"
 local orig_start_body_search = nil
@@ -26,69 +27,8 @@ local function resolve_start_body_search()
 	return nil, nil
 end
 
-local function object_userdata_ok(obj)
-	if not obj then
-		return false
-	end
-	local ok = pcall(function()
-		return obj:id()
-	end)
-	return ok
-end
-
--- Same loot path as ui_inventory.start("loot", obj):
--- reference/unpacked/gamedata/scripts/ui_inventory.script:451-487
--- and LMode_Init at :3294. Does not call patched ui_inventory.start.
-local function open_vanilla_loot(obj)
-	if not object_userdata_ok(obj) then
-		printf(LOG_TAG .. " skip loot: target userdata is gone")
-		return
-	end
-
-	if not ui_inventory then
-		printf(LOG_TAG .. " skip loot: ui_inventory missing")
-		return
-	end
-
-	if not ui_inventory.GUI then
-		if not ui_inventory.UIInventory then
-			printf(LOG_TAG .. " skip loot: ui_inventory.UIInventory missing")
-			return
-		end
-		ui_inventory.GUI = ui_inventory.UIInventory()
-	end
-
-	local gui = ui_inventory.GUI
-	if not gui then
-		return
-	end
-	if gui:IsShown() then
-		return
-	end
-	if type(ui_inventory.keybind_pass) == "function" and not ui_inventory.keybind_pass() then
-		return
-	end
-
-	if type(ui_inventory.change_last_mode) == "function" then
-		ui_inventory.change_last_mode(4)
-	end
-
-	local ok_init, err_init = pcall(function()
-		gui:LMode_Init(obj)
-	end)
-	if not ok_init then
-		printf(LOG_TAG .. " LMode_Init failed: %s", tostring(err_init))
-		return
-	end
-
-	gui:ShowDialog(true)
-	_GUIs_keyfree["UIInventory"] = true
-	Register_UI("UIInventory", "ui_inventory")
-end
-
 local function patched_start_body_search(obj, show_ui)
 	if lam2 and lam2.get_action_with_tag and lam2.get_action_with_tag("body_search") then
-		open_vanilla_loot(obj)
 		return
 	end
 	return orig_start_body_search(obj, show_ui)
