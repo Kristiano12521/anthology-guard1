@@ -1,0 +1,9 @@
+; Fetch Headlamp Fix — patch tm_anthology_dynamic.ltx
+; Why: Wolf/Fanatic field-kit fetch asks for device_torch (slot-9 torch).
+;      Player inventory has device_torch_dummy (same inv_name, different section), so the count stays x0.
+
+![esc_2_12_stalker_wolf_task_9]
+fetch_func = %=setup_generic_fetch_task(esc_2_12_stalker_wolf_task_9_fetch:1:detector_simple:device_torch_dummy:lead_box:itm_backpack:itm_sleepbag:swiss_knife:army_bowler)%
+
+![esc_2_12_stalker_fanat_task_9]
+fetch_func = %=setup_generic_fetch_task(esc_2_12_stalker_fanat_task_9_fetch:1:detector_simple:device_torch_dummy:lead_box:itm_backpack:itm_sleepbag:swiss_knife:army_bowler)%
