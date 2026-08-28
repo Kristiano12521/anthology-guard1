@@ -1,0 +1,321 @@
+-- Arena Loadout Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Mags Redux bar_fights table is Anomaly 1.5.1 loadouts (1911 / OC-33 / Val / STANAG).
+-- Anthology issues SoC-style guns (PM / MP5 / Groza / G36). Spare mags do not fit.
+-- Exo System free_power only matches exobackpack_exo_outfit and never installs a PSU,
+-- so arena exo_outfit stays at 0 power and the actor is slowed to a crawl.
+
+local LOG_TAG = "[fix_arena_loadout]"
+local APPLY_DELAY = 0.35
+local SPARE_MAGS = 2
+local PSU_SECTION = "exo_power_supply"
+
+local orig_teleport = nil
+local pending_exo_id = nil
+local pending_psu_id = nil
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function has_mags()
+	return magazine_binder
+		and type(magazine_binder.is_supported_weapon) == "function"
+		and type(magazine_binder.weapon_default_magazine) == "function"
+		and type(magazine_binder.is_magazine) == "function"
+		and type(magazine_binder.is_compatible) == "function"
+		and type(magazine_binder.create_mag_data) == "function"
+		and type(magazine_binder.set_data) == "function"
+		and stack and type(stack.push) == "function"
+end
+
+local function has_exo()
+	return item_exo_device
+		and type(item_exo_device.is_exo) == "function"
+		and type(item_exo_device.get_data) == "function"
+		and type(item_exo_device.set_data) == "function"
+		and type(item_exo_device.init_data) == "function"
+		and type(item_exo_device.install_psu) == "function"
+end
+
+local function delay_call(act_id, timer, fn, ...)
+	if magazines and type(magazines.create_time_event) == "function" then
+		magazines.create_time_event("fix_arena_loadout", act_id, timer, fn, ...)
+	else
+		CreateTimeEvent("fix_arena_loadout", act_id, timer, fn, ...)
+	end
+end
+
+local function ammo_for_weapon_mag(wpn, mag_sec)
+	if not (wpn and mag_sec and utils_item and type(utils_item.get_ammo) == "function") then
+		return nil
+	end
+	local map = utils_item.get_ammo(wpn:section(), wpn:id())
+	if not (map and map[1]) then
+		return nil
+	end
+	local calibers = magazine_binder.get_magazine_caliber and magazine_binder.get_magazine_caliber(mag_sec)
+	if type(calibers) ~= "table" then
+		return map[1]
+	end
+	local allow = {}
+	for i = 1, #calibers do
+		allow[calibers[i]] = true
+	end
+	for i = 1, #map do
+		if allow[map[i]] then
+			return map[i]
+		end
+	end
+	return map[1]
+end
+
+function fill_one_mag(id, mag_sec, ammo_sec)
+	if not (id and mag_sec and ammo_sec) then
+		return true
+	end
+	local mag_data = magazine_binder.get_mag_loaded and magazine_binder.get_mag_loaded(id)
+	if not mag_data then
+		mag_data = magazine_binder.create_mag_data(id, mag_sec)
+	end
+	if not mag_data then
+		return true
+	end
+	local amount = SYS_GetParam(2, mag_sec, "max_mag_size") or 0
+	for _ = 1, amount do
+		stack.push(mag_data.loaded, ammo_sec)
+	end
+	if magazine_binder.toggle_carried_mag then
+		magazine_binder.toggle_carried_mag(id)
+	end
+	magazine_binder.set_data(id, mag_data)
+	return true
+end
+
+local function collect_weapons()
+	local weapons = {}
+	db.actor:iterate_inventory(function(_, item)
+		if item and magazine_binder.is_supported_weapon(item) then
+			weapons[#weapons + 1] = item
+		end
+	end)
+	return weapons
+end
+
+local function mag_fits_any(mag, weapons)
+	for i = 1, #weapons do
+		if magazine_binder.is_compatible(weapons[i], mag) then
+			return true
+		end
+	end
+	return false
+end
+
+local function release_item(item)
+	if not item then
+		return
+	end
+	local id = item:id()
+	if magazine_binder.is_carried_mag and magazine_binder.is_carried_mag(id) and magazine_binder.toggle_carried_mag then
+		magazine_binder.toggle_carried_mag(id)
+	end
+	pcall(alife_release, item)
+end
+
+local function fix_arena_mags()
+	if not has_mags() then
+		return
+	end
+
+	local weapons = collect_weapons()
+	if #weapons == 0 then
+		-- Shotgun / knife rounds: drop leftover MAG spares that fit nothing.
+		local leftovers = {}
+		db.actor:iterate_inventory(function(_, item)
+			if item and magazine_binder.is_magazine(item) then
+				leftovers[#leftovers + 1] = item
+			end
+		end)
+		for i = 1, #leftovers do
+			release_item(leftovers[i])
+		end
+		if #leftovers > 0 then
+			log("removed %s leftover magazine(s), no mag-fed weapon", #leftovers)
+		end
+		return
+	end
+
+	local wrong = {}
+	db.actor:iterate_inventory(function(_, item)
+		if item and magazine_binder.is_magazine(item) and not mag_fits_any(item, weapons) then
+			wrong[#wrong + 1] = item
+		end
+	end)
+	for i = 1, #wrong do
+		release_item(wrong[i])
+	end
+
+	local spawned = 0
+	for i = 1, #weapons do
+		local wpn = weapons[i]
+		if wpn then
+			local mag_sec = magazine_binder.weapon_default_magazine(wpn)
+			local ammo_sec = mag_sec and ammo_for_weapon_mag(wpn, mag_sec)
+			if mag_sec and ammo_sec and ini_sys and ini_sys:section_exist(mag_sec) then
+				local have = 0
+				db.actor:iterate_inventory(function(_, item)
+					if item and magazine_binder.is_magazine(item) and magazine_binder.is_compatible(wpn, item) then
+						have = have + 1
+					end
+				end)
+				for _ = have + 1, SPARE_MAGS do
+					local se = alife_create_item(mag_sec, db.actor)
+					if se and se.id then
+						delay_call("fill_" .. se.id, 0, fill_one_mag, se.id, mag_sec, ammo_sec)
+						spawned = spawned + 1
+					end
+				end
+			else
+				log("no default mag/ammo for %s", wpn:section())
+			end
+		end
+	end
+
+	log("mags: removed %s incompatible, spawned %s default", #wrong, spawned)
+end
+
+function install_pending_psu()
+	local exo_id = pending_exo_id
+	local psu_id = pending_psu_id
+	pending_exo_id = nil
+	pending_psu_id = nil
+
+	if not (exo_id and psu_id and has_exo()) then
+		return true
+	end
+
+	local suit = level.object_by_id(exo_id)
+	local psu = level.object_by_id(psu_id)
+	if not (suit and psu and item_exo_device.is_exo(suit)) then
+		log("PSU install skipped: object missing")
+		return true
+	end
+
+	local data = item_exo_device.get_data(suit:id())
+	if not data then
+		data = item_exo_device.init_data(suit:id())
+	end
+	pcall(item_exo_device.install_psu, suit, data, psu)
+
+	data = item_exo_device.get_data(suit:id())
+	if data then
+		local max_power = (data.supply and data.supply.max) or 150
+		data.power = max_power
+		item_exo_device.set_data(suit:id(), data)
+		log("exo id %s charged %s/%s, PSU %s", suit:id(), data.power, max_power, data.supply and data.supply.name or "none")
+	end
+	return true
+end
+
+local function charge_exo_item(item)
+	local id = item:id()
+	local data = item_exo_device.get_data(id)
+	if not data then
+		data = item_exo_device.init_data(id)
+	end
+	data.power = (data.supply and data.supply.max) or 100
+	if data.power < 100 then
+		data.power = 100
+	end
+	item_exo_device.set_data(id, data)
+	return data
+end
+
+local function fix_arena_exo()
+	if not has_exo() then
+		return
+	end
+
+	local exos = {}
+	db.actor:iterate_inventory(function(_, item)
+		if item and item_exo_device.is_exo(item) then
+			exos[#exos + 1] = item
+		end
+	end)
+	if #exos == 0 then
+		return
+	end
+
+	for i = 1, #exos do
+		charge_exo_item(exos[i])
+	end
+
+	local suit = exos[1]
+	local data = item_exo_device.get_data(suit:id())
+	if data and data.supply then
+		log("exo already has PSU %s, power %s", data.supply.name or "?", data.power or 0)
+		return
+	end
+	if not (ini_sys and ini_sys:section_exist(PSU_SECTION)) then
+		log("section %s missing, charged without PSU", PSU_SECTION)
+		return
+	end
+
+	local se = alife_create_item(PSU_SECTION, db.actor)
+	if not (se and se.id) then
+		log("failed to spawn %s", PSU_SECTION)
+		return
+	end
+	pending_exo_id = suit:id()
+	pending_psu_id = se.id
+	delay_call("install_psu", 0.1, install_pending_psu)
+	log("spawned %s for exo id %s", PSU_SECTION, pending_exo_id)
+end
+
+function apply_arena_loadout()
+	if not (db and db.actor) then
+		return true
+	end
+	fix_arena_mags()
+	fix_arena_exo()
+	return true
+end
+
+function patched_bar_arena_teleport(actor, npc)
+	if orig_teleport then
+		orig_teleport(actor, npc)
+	end
+	delay_call("apply", APPLY_DELAY, apply_arena_loadout)
+end
+
+local function install()
+	if not (xr_effects and type(xr_effects.bar_arena_teleport) == "function") then
+		log("xr_effects.bar_arena_teleport not found - guard NOT installed")
+		return false
+	end
+	if xr_effects.bar_arena_teleport == patched_bar_arena_teleport then
+		return true
+	end
+	orig_teleport = xr_effects.bar_arena_teleport
+	xr_effects.bar_arena_teleport = patched_bar_arena_teleport
+	log("bar_arena_teleport wrapped")
+	return true
+end
+
+local function uninstall()
+	if orig_teleport and type(xr_effects) == "table" then
+		xr_effects.bar_arena_teleport = orig_teleport
+	end
+	orig_teleport = nil
+	pending_exo_id = nil
+	pending_psu_id = nil
+end
+
+function on_game_start()
+	install()
+end
+
+function on_game_end()
+	uninstall()
+end
