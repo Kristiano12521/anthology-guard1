@@ -1,5 +1,35 @@
 # HoC Monolith Icon Fix
 
+## [1.1.0] — 2026-08-28
+
+**Изменено**
+
+- `gamedata/textures/ui/ui_fix_hoc_monolith.dds` — иконка Zircon Suit из ST2 (клетка 4×6, scale 2).
+- `gamedata/configs/icon_override/ico_fix_hoc_monolith_icon.ltx` — оба id смотрят на этот DDS, а не на ваниль и не на клетку (24, 6).
+
+**Причина**
+
+В атласе HoC нет отдельного спрайта стандартного комбеза Монолита. Zircon (`Battle_Monolith_Armor`) — тот же слот в ST2.
+
+**Как исправлено**
+
+Свой DDS + `icon_override`. Скрипт HoC читает его раньше `ini_sys`.
+
+**Не затронуто**
+
+- Статы, модель, квест, `monolith_outfit_wings`, атлас HoC, остальные костюмы
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+- В MO2 ниже HoC Icons и Icons for Anthology. Заменить 1.0.1.
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_hoc_monolith_icon`
+- В игре: не прогонялось. Полный перезапуск. F7 / инвентарь — HD-жилет Zircon, не «Ветер свободы» и не ванильная 2×3.
+
 ## [1.0.1] — 2026-08-28
 
 **Изменено**
