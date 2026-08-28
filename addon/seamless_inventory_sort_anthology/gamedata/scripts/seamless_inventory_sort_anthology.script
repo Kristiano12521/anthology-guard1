@@ -1,0 +1,1460 @@
+--[[
+    Seamless Inventory Sort — Anomaly Anthology 2.1 adaptation
+    -----------------------
+    Companion to SortingPlus. SortingPlus orders the inventory when it opens, but
+    the engine appends an item to the END of the list whenever it is modified or
+    moved (a gun respawns on attach/detach, a looted item lands in the bottom
+    row, etc.). This script re-sorts the affected container in place. In the
+    optimized presets, short refresh bursts are merged into one final pass, so
+    bulk transfers and purchases no longer rebuild the layout once per item.
+
+    The re-sort (soft_resort) repositions existing cells into their sorted slots
+    rather than rebuilding the container, so there is no blink, stacked children
+    survive, and loot-box put/take callbacks are not retriggered. It is soft-only
+    by design: when an in-place sort cannot run (no SortingPlus, or a window
+    sorted by size) the order is left untouched -- never a heavy Reinit. This
+    matters most in trade, where a Reinit would re-add basketed items into the
+    sale bag (the classic duplicate / stuck-in-basket bug).
+
+    Behaviour:
+      * Inventory / loot / trade refresh        batch and re-sort the changed bag
+      * Pure removals (drop / sell / stash)     keep the gaps -- no repack, no shuffle (toggleable)
+      * Cells already in their sorted slot      left untouched -- no repaint
+      * Favorite / junk toggle (SortingPlus)    re-sort in place, no rebuild
+      * Scope / silencer / GL attach-detach     keep the weapon in the bag, no auto-equip
+      * Disassembling an item                   freeze the bag; one settle sort after (toggleable)
+      * Ammo crafting resources                 own sort category below ammo (toggleable)
+      * FastTransfer sweep (SHIFT held)         defer, sort once on release
+      * Oscillating sort key (e.g. Mags Redux)  back off until it settles
+      * Looting Takes Time looted bodies        leave in LTT's order
+      * Freshly looted items                    tint in the actor bag
+
+    Everything is configurable through MCM; the defaults below apply when MCM is
+    absent so the mod runs stand-alone. SortingPlus is the only hard dependency.
+--]]
+
+----------------------------------------------------------------------
+-- Settings
+----------------------------------------------------------------------
+
+local VERSION = "1.5.4-fingerprint-and-hotpath"
+
+local DEF = {
+    enable         = true,   -- master on/off
+    win_inventory  = true,   -- seamless sort in the inventory window
+    win_loot       = true,   -- seamless sort in the loot / stash window
+    win_trade      = true,   -- seamless sort in the trade window
+    fav_junk       = true,   -- seamless re-sort on favorite/junk toggle
+    keep_gaps      = true,   -- leave the gap on pure removals instead of repacking
+    keep_disasm    = true,   -- freeze the bag while disassembling; settle re-sort after
+    disasm_delay   = 0,      -- seconds after the last disassembly before the settle re-sort
+    ammo_parts_row = true,   -- own sort category for ammo parts (cases, bullets, powder)
+    ap_order       = 9.5,    -- rank of the ammo-parts category (9=ammo, 10=mutant parts)
+    no_slot_jump   = true,   -- keep a modified bag weapon in the bag (no auto-equip)
+    perf_mode      = "balanced", -- instant / balanced / fps: batch refresh bursts
+    trade_policy   = "additions", -- full / additions / off
+    trade_max_items = 300,   -- skip live trade sorting above this count; 0 = unlimited
+    osc_guard      = true,   -- anti-oscillation back-off
+    osc_limit      = 8,      -- re-sorts per window before backing off
+    osc_cooldown   = 1.5,    -- seconds to back off an oscillating container
+    -- Looted-body handling, one of:
+    --   "sort"      sort the corpse like any container, ignoring LTT (default)
+    --   "never"     never sort a corpse; leave it as found (size-kind layout)
+    --   "ltt_keep"  never sort; keep Looting Takes Time's reveal order
+    --   "ltt_after" defer during the LTT reveal, then sort once and keep sorted
+    body_mode      = "sort",
+    hl_new         = true,   -- tint freshly looted items in the actor bag
+    hl_new_r       = 0,      -- highlight colour, red   (0-255)
+    hl_new_g       = 210,    -- highlight colour, green (0-255)
+    hl_new_b       = 230,    -- highlight colour, blue  (0-255)
+    hl_new_a       = 60,     -- highlight intensity / alpha (0-255, low = subtle)
+}
+
+-- Each option's MCM subgroup (see seamless_inventory_sort_anthology_mcm.script). Kept
+-- here so call sites stay a plain opt(id) regardless of menu layout.
+local OPT_GROUP = {
+    enable         = "siss_general", fav_junk       = "siss_general",
+    win_inventory  = "siss_general", win_loot       = "siss_general",
+    win_trade      = "siss_general", no_slot_jump   = "siss_general",
+    keep_gaps      = "siss_gaps",    keep_disasm    = "siss_gaps",
+    disasm_delay   = "siss_gaps",    ammo_parts_row = "siss_gaps",
+    ap_order       = "siss_gaps",
+    body_mode      = "siss_loot",
+    hl_new         = "siss_hl",      hl_new_r       = "siss_hl",
+    hl_new_g       = "siss_hl",      hl_new_b       = "siss_hl",
+    hl_new_a       = "siss_hl",
+    perf_mode      = "siss_perf",    trade_policy   = "siss_perf",
+    trade_max_items = "siss_perf",      osc_guard      = "siss_perf",
+    osc_limit      = "siss_perf",
+    osc_cooldown   = "siss_perf",
+}
+
+-- Options are read through a cache. ui_mcm.get splits and hashes its path
+-- string on every call, which is too slow for the hot paths here (opt() runs
+-- inside the per-cell highlight functor and on every refresh). The cache is
+-- filled on game start and re-read whenever any option changes.
+local OPT_PATH = {}
+for id, grp in pairs(OPT_GROUP) do
+    OPT_PATH[id] = "seamless_sort/" .. grp .. "/" .. id
+end
+
+local OPTS      = {}
+local sp_npcinv = nil  -- cached SortingPlus "sort npc inventories" toggle
+
+local function refresh_opts()
+    for id, def in pairs(DEF) do
+        local v = ui_mcm and ui_mcm.get(OPT_PATH[id])
+        if v == nil then v = def end
+        OPTS[id] = v
+    end
+    sp_npcinv = nil
+    if ui_mcm then sp_npcinv = ui_mcm.get("SortingPlus/npcinv") end
+end
+
+-- Cached MCM value, or the stand-alone default when MCM is not installed.
+local function opt(id)
+    local v = OPTS[id]
+    if v == nil then return DEF[id] end
+    return v
+end
+
+----------------------------------------------------------------------
+-- State
+----------------------------------------------------------------------
+
+local last_fp    = {}  -- sort key -> fingerprint recorded at last sort
+local last_count = {}  -- sort key -> item count recorded with last_fp
+local last_ids   = {}  -- sort key -> id set recorded with last_fp
+local last_areas = {}  -- sort key -> id -> packed grid pos (y*4096+x) of parent cells
+local rel_armed  = {}  -- sort key -> a FastTransfer release watcher is running
+local ltt_armed  = {}  -- sort key -> an LTT reveal watcher is running
+local dis_armed  = {}  -- sort key -> a disassembly settle watcher is running
+local disasm_until = 0 -- time_global() until which a disassembly's parts may land
+
+-- Refresh bursts (buying, fast transfers, taking several items) are collapsed
+-- into one final sort. pending[key] always points at the newest state of that
+-- container; the time event reads it only after the quiet period expires.
+local pending       = {} -- key -> { self, cc, due, fp, count }
+local pending_armed = {} -- key -> batch watcher installed
+local lifecycle_callbacks_registered = false
+
+----------------------------------------------------------------------
+-- Helpers
+----------------------------------------------------------------------
+
+local function shift_held()
+    return (key_state(DIK_keys.DIK_LSHIFT) ~= 0) or (key_state(DIK_keys.DIK_RSHIFT) ~= 0)
+end
+
+-- True while a disassembly's removals/parts may be landing in this container.
+-- Only the actor bag is treated specially: the parts always go to the player,
+-- and e.g. a corpse bag emptied during the window must keep repacking normally.
+local function disasm_keep(cc)
+    return opt("keep_disasm") and (time_global() < disasm_until)
+           and (cc.ID == "actor_bag")
+end
+
+-- Scan a container once and return everything the refresh path needs. v1.0
+-- walked the same bag several times (fingerprint, removal test, record); on
+-- large inventories those table walks were measurable even when no sort ran.
+-- When keep_gaps is off, no id/position snapshots are allocated.
+local function scan_container(cc, want_snapshot)
+    local h, count = 0, 0
+    local ids, areas
+    if want_snapshot then ids, areas = {}, {} end
+
+    -- The hash must not depend on pairs() order, but it must depend on WHICH id
+    -- sits at which index. A plain "id + indx * k" sum is symmetric: swapping two
+    -- items leaves the total untouched, so a pure reorder read as "nothing
+    -- changed". Multiplying couples the two, and the products stay far inside the
+    -- exact-integer range of a double for realistic id / index magnitudes.
+    for id, indx in pairs(cc.indx_id) do
+        h = h + id * (indx + 1000003)
+        count = count + 1
+        if ids then
+            ids[id] = true
+            local ci = cc.cell[indx]
+            local a = ci and (ci.ID == id) and ci.area
+            if a then areas[id] = a.y * 4096 + a.x end
+        end
+    end
+
+    return { fp = h, count = count, ids = ids, areas = areas }
+end
+
+local function fingerprint(cc)
+    return scan_container(cc, false).fp
+end
+
+-- Record the container's layout as handled. Callers normally pass the scan they
+-- already made, so no second full walk is needed.
+local function record(key, cc, scan)
+    scan = scan or scan_container(cc, opt("keep_gaps"))
+    last_fp[key] = scan.fp
+    last_count[key] = scan.count
+    if not opt("keep_gaps") then
+        last_ids[key], last_areas[key] = nil, nil
+        return
+    end
+    -- A scan made without snapshots is rare (watcher fallback); fill them now.
+    if not scan.ids then scan = scan_container(cc, true) end
+    last_ids[key], last_areas[key] = scan.ids, scan.areas
+end
+
+-- Cheap state update for paths that intentionally leave the current layout
+-- untouched (trade removals / oversized trade bags). No second snapshot scan.
+local function record_basic(key, scan)
+    last_fp[key] = scan.fp
+    last_count[key] = scan.count
+    last_ids[key], last_areas[key] = nil, nil
+end
+
+local function clear_record(key)
+    last_fp[key], last_count[key] = nil, nil
+    last_ids[key], last_areas[key] = nil, nil
+end
+
+-- True when the only difference is removals. The current id/position set comes
+-- from the same scan used for the fingerprint, avoiding another bag traversal.
+local function removal_only(key, scan)
+    local old_ids, old_areas = last_ids[key], last_areas[key]
+    if not (old_ids and scan and scan.ids) then return false end
+    for id in pairs(scan.ids) do
+        if not old_ids[id] then return false end
+        local area, old_area = scan.areas[id], old_areas[id]
+        if area ~= old_area and (area or old_area) then return false end
+    end
+    return true
+end
+
+local af_initial = {}
+local af_refresh = {}
+local AF_KEY_BY_ID = {
+    actor_bag = "actor",
+    npc_bag = "npc",
+    actor_trade_bag = "actor_tbag",
+    npc_trade_bag = "npc_tbag",
+}
+
+-- Resolved once and cached. af_busy() runs from can_soft(), which is called
+-- several times per refresh and twice per container in resort_all_shown, so the
+-- pcall this used to do on every single call sat right on the hot path. The API
+-- table is created at load time and never replaced.
+local af_api      = nil
+local af_resolved = false
+
+local function af_module()
+    if af_resolved then return af_api end
+    -- Each Anomaly script has its own namespace. Resolve the API through the
+    -- actual Antifreeze script module instead of looking for a local global.
+    local mod = inventory_antifreeze_anthology
+    if mod then
+        if mod.get_api then
+            local ok, api = pcall(mod.get_api)
+            if ok and api then
+                af_api, af_resolved = api, true
+                return af_api
+            end
+        end
+        if mod.anthology_inventory_antifreeze then
+            af_api, af_resolved = mod.anthology_inventory_antifreeze, true
+            return af_api
+        end
+    end
+    -- Not resolved yet: the module may still be loading. Stay unresolved so a
+    -- later call can pick it up; on_game_start pins the result either way.
+    return nil
+end
+
+local function af_busy(cc)
+    local af = af_module()
+    if af and af.is_busy then return af.is_busy(cc) end
+    return cc and cc.deferred == true
+end
+
+-- In-place sorting is possible only when SortingPlus is driving this container,
+-- i.e. it is sorted by "kind" (so GetSortMethod and the kind-aware FindFreeCell
+-- are installed).
+local function can_soft(cc)
+    return spairs and cc.GetSortMethod and (cc.sort_method == "kind") and not af_busy(cc)
+end
+
+-- SortingPlus' intended npc-side sort method: "kind" when its "sort npc
+-- inventories" (NPCINV) toggle is on, else "sizekind". Mirrors line 117 of
+-- zzz_rax_sortingplus_mcm so real containers keep whatever the user set there.
+local function npc_default_sort()
+    if sp_npcinv ~= nil then return sp_npcinv and "kind" or "sizekind" end
+    return "kind"
+end
+
+-- Per-window enable. Each inventory window can opt out of seamless sorting
+-- independently. self.mode is the engine's own window flag ("inventory" /
+-- "loot" / "trade" / "repair"); repair reuses the inventory toggle. An unknown
+-- mode is never suppressed.
+local MODE_OPT = {
+    inventory = "win_inventory",
+    repair    = "win_inventory",
+    loot      = "win_loot",
+    trade     = "win_trade",
+}
+
+local function win_on(self)
+    local mode = self and self.mode or ""
+    local id = MODE_OPT[mode]
+    if not id then return true end
+    if mode == "trade" and opt("trade_policy") == "off" then return false end
+    return opt(id)
+end
+
+-- Batching presets. "instant" preserves v1.0 behaviour. "balanced" keeps the
+-- UI feeling immediate but merges normal transfer bursts; "fps" waits longer
+-- and is intended for very large bags / slow CPUs. Delays are milliseconds.
+local PERF = {
+    instant  = { inventory = 0,   repair = 0,   loot = 0,   trade = 0,    large = 999999, extra = 0   },
+    balanced = { inventory = 45,  repair = 45,  loot = 80,  trade = 300,  large = 80,     extra = 180 },
+    fps      = { inventory = 140, repair = 140, loot = 200, trade = 900,  large = 50,     extra = 400 },
+}
+
+local function batch_delay(self, count)
+    local profile = PERF[opt("perf_mode")] or PERF.balanced
+    local mode = self and self.mode or "inventory"
+    local ms = profile[mode] or profile.inventory
+    if count and count >= profile.large then ms = ms + profile.extra end
+    return ms
+end
+
+local function event_seconds(ms)
+    ms = tonumber(ms) or 0
+    if ms < 1 then ms = 1 end
+    return ms / 1000
+end
+
+local function reset_event(ev_id, act_id, seconds)
+    if ResetTimeEvent then
+        ResetTimeEvent(ev_id, act_id, math.max(0.001, seconds or 0.001))
+    end
+end
+
+local function trade_limit()
+    local n = tonumber(opt("trade_max_items")) or 0
+    return n > 0 and n or nil
+end
+
+
+-- Looted-body handling is a single MCM list ("body_mode"); these derive the
+-- three behaviours the sort logic actually needs from it.
+local function body_no_sort()    return opt("body_mode") == "never" end                -- never sort, leave as found
+local function body_defers()     local m = opt("body_mode"); return m == "ltt_keep" or m == "ltt_after" end  -- defer to LTT's reveal
+local function body_sort_after() return opt("body_mode") == "ltt_after" end            -- sort once the reveal finishes
+
+----------------------------------------------------------------------
+-- Anti-oscillation guard
+----------------------------------------------------------------------
+-- Some items have an unstable sort key -- e.g. a Mags Redux magazine counts as
+-- kind "loadout" only while it is being bound, which flips frame to frame. That
+-- makes the sorted layout differ on every refresh, so we would re-sort endlessly
+-- and the list churns. If a container re-sorts more than osc_limit times within
+-- OSC_WINDOW ms we treat it as oscillating and stop sorting it for a cooldown,
+-- letting it settle (items land vanilla-style meanwhile).
+
+local OSC_WINDOW = 1000  -- ms sliding window over which re-sorts are counted
+local osc_win   = {}     -- key -> { t0 = window start ms, n = re-sort count }
+local osc_until = {}     -- key -> back off until this time_global() ms
+
+local function osc_blocked(key)
+    return (osc_until[key] or 0) > time_global()
+end
+
+local function osc_note(key)
+    if not opt("osc_guard") then return end
+    local now = time_global()
+    local w = osc_win[key]
+    if (not w) or (now - w.t0 > OSC_WINDOW) then
+        osc_win[key] = { t0 = now, n = 1 }
+    else
+        w.n = w.n + 1
+        if w.n > opt("osc_limit") then
+            osc_until[key] = now + opt("osc_cooldown") * 1000
+            osc_win[key]   = nil
+        end
+    end
+end
+
+----------------------------------------------------------------------
+-- Looting Takes Time (Redux) compatibility
+----------------------------------------------------------------------
+
+-- Anthology 2.1 loads gamedata\scripts\loot_searching.script, whose global
+-- table is loot_searching. Older GAMMA-oriented versions used the prefixed
+-- global zzzz_loot_searching. Accept both without making LTT mandatory.
+local function get_ltt_module()
+    return loot_searching or zzzz_loot_searching
+end
+-- LTT reveals a looted body's items gradually and pre-places them on the grid,
+-- so re-sorting fights the reveal. We leave looted DEAD BODIES alone -- either
+-- permanently (body_mode "ltt_keep", the LTT author's intent) or only during the
+-- reveal, then sort once (body_mode "ltt_after"). Stashes, your bag, companions
+-- and trade bags are never affected.
+
+-- True while LTT is still revealing this container (any item hidden/silhouette).
+local function ltt_busy(self, cc)
+    if not body_defers() then return false end
+    local lt = get_ltt_module()
+    if not (lt and lt.is_item_hidden and self.GetPartner) then return false end
+    local npc = self:GetPartner()
+    local npc_id = npc and npc:id()
+    if not npc_id then return false end
+    for id in pairs(cc.indx_id) do
+        local ok, hidden = pcall(lt.is_item_hidden, npc_id, id)
+        if ok and hidden then return true end
+    end
+    return false
+end
+
+-- True only for the LOOTED BODY's own panel (npc_bag) -- never the player's bag.
+-- Living partners (companions/traders) and stashes/boxes are excluded.
+local function is_corpse(self, cc)
+    if not (cc and cc.ID == "npc_bag") then return false end
+    if not self.GetPartner then return false end
+    local npc = self:GetPartner()
+    if not npc then return false end
+    if npc.alive and npc:alive() then return false end
+    if IsInvbox(npc) then return false end
+    return true
+end
+
+-- True when LTT is active and this container is its target (a looted dead body).
+local function ltt_corpse(self, cc)
+    if not body_defers() then return false end
+    local lt = get_ltt_module()
+    if not (lt and lt.is_item_hidden) then return false end
+    return is_corpse(self, cc)
+end
+
+-- body_mode "never": leave the corpse exactly as found -- standalone, no LTT.
+local function no_body(self, cc)
+    return body_no_sort() and is_corpse(self, cc)
+end
+
+-- For body_mode "never", force the looted body's panel to the unsorted (size)
+-- layout the same way SortingPlus' NPCINV toggle does, but scoped to corpses
+-- only, while real containers/stashes/companions keep SortingPlus' setting. Run
+-- BEFORE the stock loot refresh so the body is never kind-sorted to begin with.
+-- Only manages sort_method in this mode, to avoid clobbering it otherwise.
+local function apply_body_sort(self)
+    if not (opt("enable") and body_no_sort()) then return end
+    local cc = self.CC and self.CC["npc_bag"]
+    if not cc then return end
+    if is_corpse(self, cc) then
+        cc.sort_method = "sizekind"          -- the "sort npc inventories = off" look
+    else
+        cc.sort_method = npc_default_sort()  -- restore for containers/companions
+    end
+end
+
+-- Whether to skip sorting this container on LTT's behalf.
+local function ltt_skip(self, cc)
+    if not ltt_corpse(self, cc) then return false end
+    if not body_sort_after() then return true end  -- never sort looted bodies
+    return ltt_busy(self, cc)                       -- else sort once revealed
+end
+
+----------------------------------------------------------------------
+-- New-loot highlight
+----------------------------------------------------------------------
+-- Auto-sorting scatters new pickups among existing goods, so it is no longer
+-- obvious what was just found. We tint items taken from a loot container/stash/
+-- body until the inventory closes. Detection is self-contained: in loot mode we
+-- diff the actor bag against a baseline captured when the window opened; any id
+-- that newly appears was looted.
+
+local new_clr   = GetARGB(60, 0, 210, 230)  -- cached highlight colour (MCM-driven)
+local new_items = {}    -- id -> true: looted this session
+local seen_ids  = nil   -- id -> true: actor-bag baseline; nil until established
+
+-- Cache the colour so the per-cell functor is a table read, not a GetARGB call.
+local function refresh_new_color()
+    new_clr = GetARGB(opt("hl_new_a"), opt("hl_new_r"), opt("hl_new_g"), opt("hl_new_b"))
+end
+
+local function reset_new_loot()
+    new_items = {}
+    seen_ids  = nil
+end
+
+local function snapshot_ids(cc)
+    local s = {}
+    if cc and cc.indx_id then
+        for id in pairs(cc.indx_id) do s[id] = true end
+    end
+    return s
+end
+
+-- Mark ids that newly entered the actor bag. The first call only baselines.
+-- Returns true if anything was newly marked (so the caller can repaint).
+-- An EMPTY baseline is treated as "not established yet" and re-taken next time:
+-- opening a box clears the actor bag for a tick before repopulating it (the
+-- engine's deferred box update), and baselining that empty bag would otherwise
+-- flag every item as new once it comes back.
+local function mark_new_loot(cc_a)
+    if not opt("hl_new") or not (cc_a and cc_a.indx_id) then return false end
+    if (not seen_ids) or (not next(seen_ids)) then
+        seen_ids = snapshot_ids(cc_a)
+        return false
+    end
+    local changed = false
+    for id in pairs(cc_a.indx_id) do
+        if not seen_ids[id] then
+            new_items[id] = true
+            seen_ids[id]  = true
+            changed = true
+        end
+    end
+    return changed
+end
+
+-- Persistent-highlight functor (SortingPlus paints cells from these).
+local function check_new_loot(cell)
+    if not opt("hl_new") then return nil end
+    if cell and cell.container and cell.container.ID == "actor_bag" and new_items[cell.ID] then
+        return new_clr
+    end
+    return nil
+end
+
+local function repaint_new_loot(cc)
+    if not (cc and next(new_items)) then return end
+    for id in pairs(new_items) do
+        local ci = cc:GetCell_ID(id)
+        if ci and (ci.ID == id) then pcall(ci.Highlight, ci, false) end
+    end
+end
+
+----------------------------------------------------------------------
+-- Core re-sort
+----------------------------------------------------------------------
+
+-- Reposition existing cells into their sorted slots. No Reset/blink, children
+-- preserved, nothing added or removed.
+local function soft_resort(cc)
+    local items   = {}
+    local cell_of = {}
+    local sec_of  = {}  -- section() is an engine call; keep the one from the scan
+    for id, idx in pairs(cc.indx_id) do
+        local ci = cc.cell[idx]
+        if ci and (ci.ID == id) then
+            local obj = level.object_by_id(id)
+            local sec = obj and obj:section()
+            if sec then
+                items[#items + 1] = obj
+                cell_of[id] = ci
+                sec_of[id]  = sec
+            end
+        end
+    end
+    if #items == 0 then return end
+
+    -- Reset only the grid-packing bookkeeping; cells and contents are kept.
+    for row, cols in pairs(cc.grid) do
+        for col in pairs(cols) do
+            cc.grid[row][col] = true
+        end
+    end
+    cc.row_end       = 0
+    cc.col_end       = 0
+    cc.rKind.last    = false
+    cc.rKind.current = false
+    cc.rKind.row     = 1
+
+    -- Use sea-ex's precomputed comparator (mod 464) when present, else
+    -- SortingPlus's own. Either way each item is placed with the matching
+    -- kind-aware FindFreeCell -- the stock Reinit flow minus the Reset.
+    local seax = seax_sortingplus_opt_sort_by_kind
+    local cmp, find_free
+    if seax and seax.sort_by_kind_factory then
+        cmp, find_free = seax.sort_by_kind_factory(items)
+    else
+        cmp = cc:GetSortMethod()
+    end
+
+    -- Swap in the kind-aware FindFreeCell, but ALWAYS restore it -- even if the
+    -- placement loop errors. Leaving the engine's FindFreeCell pointing at the
+    -- temporary seax closure (whose caches only cover this item set) would make
+    -- the next stock refresh crash with a nil-width compare.
+    local saved_find = cc.FindFreeCell
+    if find_free then cc.FindFreeCell = find_free end
+    local moved = false
+    local ok = pcall(function()
+        for _, obj in spairs(items, cmp) do
+            local id   = obj:id()
+            local area = cc:FindFreeCell(obj, sec_of[id])
+            if area then
+                -- Only re-Set cells that actually move: Set() rebuilds the
+                -- icon, shadow, layers and condition bar, which was the bulk
+                -- of the per-item looting lag on big GAMMA bags.
+                local ci  = cell_of[id]
+                local old = ci.area
+                if not (old and old.y == area.y and old.x == area.x) then
+                    ci:Set(obj, area)
+                    moved = true
+                end
+            end
+        end
+    end)
+    cc.FindFreeCell = saved_find
+    if not ok then return moved end
+
+    if moved then
+        cc:Scroll_Reinit(true)
+    end
+    return moved
+end
+
+-- Run a soft re-sort (when possible) and record the resulting layout so the same
+-- arrangement is not sorted again. Soft-only: if it cannot run, order is left as
+-- is rather than doing a heavy Reinit. Returns true if any cell moved (so the
+-- caller knows whether a scroll restore is needed at all).
+local function resort_now(cc, key, scan)
+    local moved = false
+    if can_soft(cc) then
+        local ok, m = pcall(soft_resort, cc)
+        moved = (ok and m) or false
+    end
+    -- indx_id/fingerprint stay valid, but moved cells have new areas. Refresh
+    -- only the position snapshot after a real move so keep_gaps compares against
+    -- the resulting layout rather than the pre-sort one.
+    if moved and opt("keep_gaps") then
+        local post = scan_container(cc, true)
+        post.fp = scan and scan.fp or post.fp
+        scan = post
+    end
+    record(key, cc, scan)
+    return moved
+end
+
+local function record_or_wait(key, cc, enabled, initial)
+    af_initial[key] = nil
+    if not (cc and enabled) then
+        clear_record(key)
+        return
+    end
+    if af_busy(cc) then
+        clear_record(key)
+        if initial then af_initial[key] = true end
+        return
+    end
+    record(key, cc)
+end
+
+local function on_antifreeze_complete(cc, info)
+    local key = cc and AF_KEY_BY_ID[tostring(cc.ID)]
+    if not key then return end
+
+    local was_initial = af_initial[key]
+    local was_refresh = af_refresh[key]
+    af_initial[key], af_refresh[key] = nil, nil
+
+    if info and info.needs_post_sort and can_soft(cc) then
+        local pos = cc.scroll and cc.scroll:GetCurrentScrollPos()
+        local moved = resort_now(cc, key)
+        if moved and pos and cc.Scroll_SetPos then cc:Scroll_SetPos(pos, true) end
+    else
+        record(key, cc)
+    end
+
+    if key == "actor" and opt("hl_new") then
+        if was_initial then
+            local ids = snapshot_ids(cc)
+            if next(ids) then seen_ids = ids end
+        elseif was_refresh then
+            if mark_new_loot(cc) and next(new_items) then repaint_new_loot(cc) end
+        end
+    end
+end
+
+----------------------------------------------------------------------
+-- Deferral watchers
+----------------------------------------------------------------------
+
+-- FastTransfer sweep: while SHIFT is held, wait; re-sort once on release.
+local function arm_release(cc, key)
+    if rel_armed[key] then return end
+    rel_armed[key] = true
+    local ev_id = "gun_resort_rel_" .. key
+    local act_id = ev_id
+    local deadline = time_global() + 30000
+
+    CreateTimeEvent(ev_id, act_id, 0.05, function()
+        local now = time_global()
+        if (not cc:IsShown()) or now >= deadline then
+            rel_armed[key] = false
+            return true
+        end
+        if shift_held() then
+            reset_event(ev_id, act_id, 0.05)
+            return false
+        end
+
+        local scan = scan_container(cc, opt("keep_gaps"))
+        if scan.fp ~= (last_fp[key] or -1) then
+            local pos = cc.scroll:GetCurrentScrollPos()
+            if resort_now(cc, key, scan) then
+                cc:Scroll_SetPos(pos, true)
+                if cc.ID == "actor_bag" then repaint_new_loot(cc) end
+            end
+        end
+        rel_armed[key] = false
+        return true
+    end)
+end
+
+-- Disassembly settle: the bag is frozen while a disassembly window is live
+-- (see mark_disassembly); each further disassembly extends the window. Once
+-- it expires -- the session is over and all parts have landed -- run ONE
+-- re-sort that folds the parts into their group and closes the gaps. The
+-- re-sort is unconditional: the frozen refreshes were recorded, so the
+-- fingerprint alone cannot tell that the layout was left unsorted.
+local function arm_disasm_settle(cc, key)
+    if dis_armed[key] then return end
+    dis_armed[key] = true
+    local ev_id = "siss_disasm_" .. key
+    local act_id = ev_id
+    local deadline = time_global() + 30000
+    local initial = math.max(50, disasm_until - time_global())
+
+    CreateTimeEvent(ev_id, act_id, event_seconds(initial), function()
+        local now = time_global()
+        if (not cc:IsShown()) or now >= deadline then
+            dis_armed[key] = false
+            return true
+        end
+        if now < disasm_until then
+            reset_event(ev_id, act_id, event_seconds(disasm_until - now))
+            return false
+        end
+        if shift_held() then
+            reset_event(ev_id, act_id, 0.05)
+            return false
+        end
+
+        local pos = cc.scroll:GetCurrentScrollPos()
+        local scan = scan_container(cc, opt("keep_gaps"))
+        if resort_now(cc, key, scan) then
+            cc:Scroll_SetPos(pos, true)
+            if cc.ID == "actor_bag" then repaint_new_loot(cc) end
+        end
+        dis_armed[key] = false
+        return true
+    end)
+end
+
+-- LTT reveal (body_mode "ltt_after"): wait for the reveal to finish, sort once.
+local function arm_ltt_release(self, cc, key)
+    if ltt_armed[key] then return end
+    ltt_armed[key] = true
+    local ev_id = "siss_ltt_" .. key
+    local act_id = ev_id
+    local deadline = time_global() + 30000
+
+    CreateTimeEvent(ev_id, act_id, 0.25, function()
+        if (not cc:IsShown()) or time_global() >= deadline then
+            ltt_armed[key] = false
+            return true
+        end
+        if ltt_busy(self, cc) then
+            reset_event(ev_id, act_id, 0.25)
+            return false
+        end
+
+        if body_sort_after() and (not shift_held()) then
+            local pos = cc.scroll:GetCurrentScrollPos()
+            local scan = scan_container(cc, opt("keep_gaps"))
+            if resort_now(cc, key, scan) then
+                cc:Scroll_SetPos(pos, true)
+            end
+        else
+            record(key, cc)
+        end
+        ltt_armed[key] = false
+        return true
+    end)
+end
+
+-- Execute one final decision on the current container state. The caller passes
+-- a scan so fingerprint/removal/record all share the same traversal.
+local function handle_now(self, cc, key, saved_pos, scan)
+    if not opt("enable") then return end
+    if not (cc and cc:IsShown()) then return end
+    scan = scan or scan_container(cc, opt("keep_gaps"))
+    if scan.fp == (last_fp[key] or -1) then return end
+
+    if osc_blocked(key) then
+        record(key, cc, scan)
+        return
+    end
+    if no_body(self, cc) then
+        record(key, cc, scan)
+        return
+    end
+    if ltt_skip(self, cc) then
+        record(key, cc, scan)
+        if body_sort_after() then arm_ltt_release(self, cc, key) end
+        return
+    end
+    if disasm_keep(cc) then
+        record(key, cc, scan)
+        arm_disasm_settle(cc, key)
+        return
+    end
+    if opt("keep_gaps") and removal_only(key, scan) then
+        record(key, cc, scan)
+        return
+    end
+    if shift_held() then
+        arm_release(cc, key)
+        return
+    end
+
+    local moved = resort_now(cc, key, scan)
+    osc_note(key)
+    if moved and saved_pos then cc:Scroll_SetPos(saved_pos, true) end
+    if moved and cc.ID == "actor_bag" then repaint_new_loot(cc) end
+    return moved
+end
+
+-- Cancel pending work when a window is reset/closed. The installed event notices
+-- the missing entry and exits on its next tick.
+local function cancel_pending(key)
+    if key then pending[key] = nil else
+        for k in pairs(pending) do pending[k] = nil end
+    end
+end
+
+-- Arm one batch watcher per logical bag. Further refreshes only replace the
+-- pending state and push its deadline, so a purchase/transfer burst produces a
+-- single final layout rebuild instead of one rebuild per item.
+local function arm_batch(key, delay_ms)
+    local ev_id = "siss_batch_" .. key
+    local act_id = ev_id
+
+    if pending_armed[key] then
+        reset_event(ev_id, act_id, event_seconds(delay_ms))
+        return
+    end
+
+    pending_armed[key] = true
+    CreateTimeEvent(ev_id, act_id, event_seconds(delay_ms), function()
+        local q = pending[key]
+        if not q then
+            pending_armed[key] = false
+            return true
+        end
+        if not (q.cc and q.cc:IsShown()) then
+            pending[key] = nil
+            pending_armed[key] = false
+            return true
+        end
+
+        local remaining = q.due - time_global()
+        if remaining > 0 then
+            reset_event(ev_id, act_id, event_seconds(remaining))
+            return false
+        end
+
+        -- Remove first: a refresh triggered by sorting may create a new request.
+        pending[key] = nil
+        local scan = scan_container(q.cc, opt("keep_gaps"))
+        local pos = q.cc.scroll:GetCurrentScrollPos()
+        handle_now(q.self, q.cc, key, pos, scan)
+
+        local next_q = pending[key]
+        if next_q then
+            reset_event(ev_id, act_id, event_seconds(next_q.due - time_global()))
+            return false
+        end
+
+        pending_armed[key] = false
+        return true
+    end)
+end
+
+-- Entry point used by UI refresh hooks. A pending bag is not rescanned on every
+-- item in the same burst; only its deadline is extended. This is the key trade
+-- and bulk-looting optimization in v1.1.
+local function request_handle(self, cc, key, saved_pos)
+    if not (opt("enable") and cc and cc:IsShown()) then return end
+    if af_busy(cc) then
+        af_refresh[key] = true
+        return
+    end
+
+    local q = pending[key]
+    if q then
+        local delay = batch_delay(self, q.count)
+        q.self, q.cc = self, cc
+        q.due = time_global() + delay
+        arm_batch(key, delay)
+        return
+    end
+
+    -- Initial change detection needs only fingerprint/count.
+    local scan = scan_container(cc, false)
+    if scan.fp == (last_fp[key] or -1) then return end
+
+    if self and self.mode == "trade" then
+        local policy = opt("trade_policy")
+        local previous = last_count[key]
+        local limit = trade_limit()
+
+        -- Moving an item out of a sale bag should not repack and re-sort every
+        -- remaining cell. The receiving side will be sorted once after the burst.
+        if policy == "additions" and previous ~= nil and scan.count < previous then
+            record_basic(key, scan)
+            return
+        end
+
+        -- A very large trade bag is expensive to repack in one Lua frame. Leave
+        -- it in the engine's current order; reopening the window sorts it normally.
+        if limit and scan.count > limit then
+            record_basic(key, scan)
+            return
+        end
+    end
+
+    local delay = batch_delay(self, scan.count)
+    if delay <= 0 then
+        if opt("keep_gaps") then scan = scan_container(cc, true) end
+        return handle_now(self, cc, key, saved_pos, scan)
+    end
+
+    pending[key] = {
+        self = self, cc = cc, due = time_global() + delay,
+        fp = scan.fp, count = scan.count,
+    }
+    arm_batch(key, delay)
+end
+
+----------------------------------------------------------------------
+-- Small utilities
+----------------------------------------------------------------------
+
+local function scroll_pos(cc)
+    if cc and cc:IsShown() then
+        return cc.scroll:GetCurrentScrollPos()
+    end
+end
+
+----------------------------------------------------------------------
+-- Refresh hooks: run the stock refresh, then re-sort the same frame
+----------------------------------------------------------------------
+
+-- The *_ResetInventories functions run when a window opens or switches mode
+-- and fill the bags with a full, ALREADY SORTED Reinit (spairs in utils_ui).
+-- Record that layout so the first refresh afterwards does not redundantly
+-- re-sort a freshly sorted container -- that redundant pass was the "input
+-- delay when opening containers" people reported. They are also the right
+-- moment to clear the new-loot marks: it happens BEFORE any cell is painted,
+-- unlike GUI_on_show, which fires after the open-time paint (stale tints).
+
+local orig_IReset = ui_inventory.UIInventory.IMode_ResetInventories
+function ui_inventory.UIInventory:IMode_ResetInventories()
+    cancel_pending("actor")
+    reset_new_loot()
+    orig_IReset(self)
+    local cc = self.CC["actor_bag"]
+    record_or_wait("actor", cc, opt("enable") and opt("win_inventory"), true)
+end
+
+-- The looted body is sorted when the window OPENS, via these Reinit paths --
+-- not LMode_RefreshInventories (which only handles later incremental changes).
+-- Set the corpse's sort method before the stock Reinit so it is never kind-
+-- sorted to begin with.
+local orig_LReset = ui_inventory.UIInventory.LMode_ResetInventories
+function ui_inventory.UIInventory:LMode_ResetInventories(reset_only)
+    cancel_pending("actor")
+    cancel_pending("npc")
+    reset_new_loot()
+    if not reset_only then apply_body_sort(self) end
+    orig_LReset(self, reset_only)
+    local cc_a = self.CC["actor_bag"]
+    local cc_b = self.CC["npc_bag"]
+    local enabled = opt("enable") and (opt("win_loot") or opt("hl_new") or body_no_sort() or body_defers())
+    record_or_wait("actor", cc_a, enabled, not reset_only)
+    record_or_wait("npc", cc_b, enabled, not reset_only)
+    -- Baseline immediately only when Antifreeze did not defer the actor bag.
+    if (not reset_only) and opt("hl_new") and not af_busy(cc_a) then
+        local s = snapshot_ids(cc_a)
+        if next(s) then seen_ids = s end
+    end
+end
+
+local orig_LResetNPC = ui_inventory.UIInventory.LMode_ResetNPCInventory
+function ui_inventory.UIInventory:LMode_ResetNPCInventory()
+    cancel_pending("npc")
+    apply_body_sort(self)
+    orig_LResetNPC(self)
+    local cc = self.CC["npc_bag"]
+    local enabled = opt("enable") and (opt("win_loot") or body_no_sort() or body_defers())
+    record_or_wait("npc", cc, enabled, true)
+end
+
+local orig_TReset = ui_inventory.UIInventory.TMode_ResetInventories
+function ui_inventory.UIInventory:TMode_ResetInventories(only_bags)
+    cancel_pending("actor_tbag")
+    cancel_pending("npc_tbag")
+    orig_TReset(self, only_bags)
+    local cc_a = self.CC["actor_trade_bag"]
+    local cc_b = self.CC["npc_trade_bag"]
+    local enabled = opt("enable") and win_on(self)
+    record_or_wait("actor_tbag", cc_a, enabled, true)
+    record_or_wait("npc_tbag", cc_b, enabled, true)
+end
+
+local orig_IMode = ui_inventory.UIInventory.IMode_RefreshInventories
+function ui_inventory.UIInventory:IMode_RefreshInventories()
+    if not (opt("enable") and win_on(self)) then
+        return orig_IMode(self)
+    end
+    local cc_a = self.CC["actor_bag"]
+    local sp_a = scroll_pos(cc_a)
+    orig_IMode(self)
+    request_handle(self, cc_a, "actor", sp_a)
+end
+
+local orig_LMode = ui_inventory.UIInventory.LMode_RefreshInventories
+function ui_inventory.UIInventory:LMode_RefreshInventories()
+    local cc_a = self.CC["actor_bag"]
+    local cc_b = self.CC["npc_bag"]
+    apply_body_sort(self)  -- corpse -> unsorted; containers keep SortingPlus' setting
+    local sp_a = scroll_pos(cc_a)
+    local sp_b = scroll_pos(cc_b)
+    orig_LMode(self)
+    local moved
+    if win_on(self) then
+        moved = request_handle(self, cc_a, "actor", sp_a)
+        request_handle(self, cc_b, "npc", sp_b)
+    end
+    -- Tint new pickups. Repaint only the marked cells -- the old full
+    -- UpdateItems() pass over every bag per taken item was a big part of the
+    -- looting lag. After a re-sort that moved cells, repaint the marked ones
+    -- again so their tint survives the move.
+    if cc_a and (mark_new_loot(cc_a) or moved) and next(new_items) then
+        repaint_new_loot(cc_a)
+    end
+end
+
+-- Trade re-sorts the two SALE BAGS only (never the baskets), and soft-only -- a
+-- trade Reinit would re-add basketed items into the sale bag.
+local orig_TMode = ui_inventory.UIInventory.TMode_RefreshInventories
+function ui_inventory.UIInventory:TMode_RefreshInventories()
+    if not (opt("enable") and win_on(self)) then
+        return orig_TMode(self)
+    end
+    local cc_a = self.CC["actor_trade_bag"]
+    local cc_b = self.CC["npc_trade_bag"]
+    local sp_a = scroll_pos(cc_a)
+    local sp_b = scroll_pos(cc_b)
+    orig_TMode(self)
+    request_handle(self, cc_a, "actor_tbag", sp_a)
+    request_handle(self, cc_b, "npc_tbag",   sp_b)
+end
+
+----------------------------------------------------------------------
+-- Weapon addon: keep a modified bag weapon in the bag
+----------------------------------------------------------------------
+-- Attaching or detaching a scope, silencer or grenade launcher CLONES the
+-- weapon (GAMMA respawns it so each part keeps its own condition). A restore
+-- step then auto-equips the fresh clone into its matching weapon slot whenever
+-- that slot is empty, so a weapon you were only modifying in the bag suddenly
+-- jumps into the primary / secondary slot.
+--
+-- We hook the low-level clone functions themselves -- so EVERY path is covered
+-- (context menu, drag-drop, the toggle-scope hotkey) rather than one UI button
+-- -- snapshot the weapon slots before the clone, then for a short window move
+-- back to the ruck any weapon that fills a slot which was EMPTY before. Slots
+-- that were already occupied are left alone, so a genuinely equipped weapon
+-- keeps its slot. The clone + auto-equip is deferred and the engine may re-
+-- assert the slot for several frames, so we keep reclaiming across the window
+-- (and settle only once the slots stay clean) instead of catching a single
+-- fill -- that one-shot lost the race in the first version of this fix.
+
+local WPN_SLOTS = { 1, 2, 3 }  -- actor weapon slots (primary / secondary / third)
+
+-- ids currently in the weapon slots, false where empty.
+local function slot_snapshot()
+    local s = {}
+    for i = 1, #WPN_SLOTS do
+        local o = db.actor:item_in_slot(WPN_SLOTS[i])
+        s[WPN_SLOTS[i]] = o and o:id() or false
+    end
+    return s
+end
+
+local function arm_slot_guard(pre)
+    local watch = {}
+    for i = 1, #WPN_SLOTS do
+        local n = WPN_SLOTS[i]
+        if not pre[n] then watch[#watch + 1] = n end
+    end
+    if #watch == 0 then return end
+
+    local ev_id, act_id = "siss_wpn_slot", "siss_wpn_slot"
+    local deadline = time_global() + 3000
+    local moved = false
+    local last_move = 0
+
+    CreateTimeEvent(ev_id, act_id, 0.02, function()
+        local now = time_global()
+        if not db.actor then return true end
+
+        for i = 1, #watch do
+            local o = db.actor:item_in_slot(watch[i])
+            if o then
+                db.actor:move_to_ruck(o)
+                moved, last_move = true, now
+            end
+        end
+
+        if moved and (now - last_move >= 500) then return true end
+        if now >= deadline then return true end
+        reset_event(ev_id, act_id, 0.02)
+        return false
+    end)
+end
+
+-- Wrap a low-level attach/detach clone so a modified bag weapon stays in the
+-- bag. Transparent: the original runs and its return values are passed through.
+-- Only armed while the inventory menu is open, so unrelated (e.g. NPC) addon
+-- work never triggers it.
+local function guard_clone(orig)
+    return function(...)
+        if not (db and db.actor and GetActorMenu()
+                and opt("enable") and opt("no_slot_jump")) then
+            return orig(...)
+        end
+        local pre = slot_snapshot()
+        local res = { orig(...) }
+        arm_slot_guard(pre)
+        return unpack(res)
+    end
+end
+
+----------------------------------------------------------------------
+-- Disassembly: freeze the bag while the parts land
+----------------------------------------------------------------------
+-- Disassembling removes the item at once but spawns the parts on a time event
+-- 0-3 s later (3 s with item animations on). Re-sorting on either half made
+-- rapid disassembly sessions jump around. Instead, wrapping the disassembly
+-- entry points opens a short window during which the actor bag is not
+-- re-sorted at all: the dismantled item's slot stays empty (nothing repacks
+-- it) and the parts sit where the stock refresh appends them. Every further
+-- disassembly extends the window; when it expires, one settle re-sort
+-- (arm_disasm_settle) folds the parts into their category and closes the
+-- gaps. Independent of keep_gaps.
+--
+-- The window is the engine's spawn delay plus the "disasm_delay" MCM slider,
+-- so the slider reads as "seconds after the parts land": 0 re-sorts the
+-- moment they arrive, higher values hold the bag still through a whole
+-- disassembly session.
+
+local function mark_disassembly(orig)
+    return function(...)
+        if opt("enable") and opt("keep_disasm") then
+            local anim = actor_effects and actor_effects.is_animations_on
+                         and actor_effects.is_animations_on()
+            disasm_until = time_global() + (anim and 3000 or 0)
+                           + (opt("disasm_delay") or 0) * 1000
+        end
+        return orig(...)
+    end
+end
+
+----------------------------------------------------------------------
+-- Ammo parts: own sort category
+----------------------------------------------------------------------
+-- Ammo Maker's casings, bullets and powders inherit is_component = true but
+-- keep the plain ammo kind, so they sort interleaved with real ammo boxes.
+-- Give them their own category, ordered right after ammo: wrap SortingPlus's
+-- get_sort_kind (and sea-ex's captured copy) to reclassify component sections,
+-- and inject the category's order into SortingPlus's item_order table -- it is
+-- unlocalized on GAMMA. Without that table the kind falls back to "na", which
+-- still groups the resources in their own block at the bottom of the bag.
+
+local AP_KIND  = "ammo_parts"  -- rank comes from the ap_order MCM slider (DEF 9.5)
+
+local function get_sortingplus_module()
+    return zzz_rax_sortingplus_mcm or rax_sortingplus_mcm
+end
+
+local is_comp = {}  -- sec -> is_component (cached; SYS_GetParam parses the ini)
+local function is_ammo_component(sec)
+    local v = is_comp[sec]
+    if v == nil then
+        v = SYS_GetParam(1, sec, "is_component") and true or false
+        is_comp[sec] = v
+    end
+    return v
+end
+
+local function kind_override(orig)
+    return function(sec, ...)
+        local kind = orig(sec, ...)
+        if kind == "ammo" and opt("enable") and opt("ammo_parts_row")
+                and is_ammo_component(sec) then
+            return AP_KIND
+        end
+        return kind
+    end
+end
+
+-- item_order is REPLACED by SortingPlus's loadsettings() on game start and on
+-- every option change, so a one-time injection would be wiped. loadsettings
+-- is public: wrap it (below) so the category is re-injected right after every
+-- rebuild, no matter who triggers one.
+local function inject_ammo_parts_order()
+    local rax = get_sortingplus_module()
+    if rax and rax.item_order and opt("enable") and opt("ammo_parts_row") then
+        rax.item_order[AP_KIND] = opt("ap_order") or 9.5
+    end
+end
+
+local function inject_after(orig)
+    return function(...)
+        local r = { orig(...) }
+        inject_ammo_parts_order()
+        return unpack(r)
+    end
+end
+
+----------------------------------------------------------------------
+-- Hook installation
+----------------------------------------------------------------------
+-- The clone functions are what every attach/detach path funnels through; the
+-- item_parts ones are what every disassembly path funnels through. Hook
+-- whichever exist, idempotently: once at load (so we wrap the base function
+-- before any other mod captures it) and again at game start as a fallback in
+-- case a module was not loaded yet at load time.
+local hooked = {}
+
+-- Returns true once tbl[fn] is wrapped (or already was). Returns false when
+-- the target table/function does not exist YET -- the caller decides whether
+-- that means "try again later" or "this optional module is absent".
+local function install_one_hook(tbl, fn, wrap)
+    if not (tbl and type(tbl[fn]) == "function") then return false end
+
+    local key = tostring(tbl) .. ":" .. fn
+    local current = tbl[fn]
+    local state = hooked[key]
+
+    -- Already points to the wrapper installed by this script.
+    if state and current == state.wrapper then return true end
+
+    local wrapper = wrap(current)
+    tbl[fn] = wrapper
+    hooked[key] = {
+        source  = current,
+        wrapper = wrapper,
+    }
+    return true
+end
+
+-- Returns true once every target in the list is wrapped. utils_item and
+-- item_weapon are core Anomaly files and are always present; item_parts,
+-- ammo_maker and the SortingPlus module are other addons/optional content,
+-- so this is allowed to come back false while they are still loading.
+local function install_hooks()
+    local rax = get_sortingplus_module()
+    local targets = {
+        { utils_item,  "attach_addon",       guard_clone },
+        { utils_item,  "detach_addon",       guard_clone },
+        { item_weapon, "attach_scope",       guard_clone },
+        { item_weapon, "detach_scope",       guard_clone },
+        { item_parts,  "disassembly_item",   mark_disassembly },
+        { item_parts,  "disassembly_weapon", mark_disassembly },
+        { item_parts,  "disassembly_outfit", mark_disassembly },
+        { ammo_maker,  "breakdown",          mark_disassembly },
+        { rax, "get_sort_kind", kind_override },
+        { seax_sortingplus_opt_sort_by_kind, "get_sort_kind", kind_override },
+        { rax, "loadsettings", inject_after },
+    }
+
+    local all_ok = true
+    for _, ref in ipairs(targets) do
+        if not install_one_hook(ref[1], ref[2], ref[3]) then
+            all_ok = false
+        end
+    end
+    return all_ok
+end
+
+-- Hook installation used to depend on this file's zzzzzz_ prefix sorting
+-- after zzz_item_parts_milpda so item_parts/ammo_maker already existed at
+-- load time. That is a load-order bet against another addon's filename and
+-- silently breaks if either mod is ever renamed. Installing from
+-- on_game_start (below) plus a bounded retry removes the dependency
+-- entirely: every module referenced here is either already loaded by
+-- on_game_start or never will be (optional content the user doesn't have),
+-- and install_one_hook is idempotent either way.
+local HOOK_RETRY_LEFT = 20  -- ~10s at 0.5s/attempt, then treat the rest as optional and absent
+local function retry_install_hooks()
+    if install_hooks() then return true end  -- fully installed; stop the timer
+    HOOK_RETRY_LEFT = HOOK_RETRY_LEFT - 1
+    if HOOK_RETRY_LEFT <= 0 then
+        printf("[Seamless Inventory Sort / Anthology] WARNING: some optional hook targets (item_parts/ammo_maker/SortingPlus) were never found; related integrations stay inactive for this session.")
+        return true  -- stop retrying, do not spin forever
+    end
+    return false  -- keep the timer alive, try again
+end
+
+----------------------------------------------------------------------
+-- Favorite / junk toggle hook
+----------------------------------------------------------------------
+-- A favorite/junk toggle changes sort order without moving a cell, so the
+-- refresh hooks above never see a change. SortingPlus signals it through
+-- rax_icon_layers.refresh; we hook that and re-sort the shown bags in place,
+-- replacing the stock full-rebuild (and its blink).
+
+local FAV_CONTAINERS = {
+    { "actor_bag",       "actor"      },
+    { "npc_bag",         "npc"        },
+    { "actor_trade_bag", "actor_tbag" },
+    { "npc_trade_bag",   "npc_tbag"   },
+}
+
+-- Re-sort every shown, sortable bag. Returns true if handled (caller then skips
+-- the stock rebuild). Looted bodies under LTT are skipped.
+local function resort_all_shown(self)
+    if not (opt("enable") and opt("fav_junk")) then
+        return false
+    end
+    if not win_on(self) then
+        return false
+    end
+    local target = false
+    for _, c in ipairs(FAV_CONTAINERS) do
+        local cc = self.CC[c[1]]
+        if cc and cc:IsShown() and can_soft(cc) and not no_body(self, cc) and not ltt_skip(self, cc) then
+            target = true
+            break
+        end
+    end
+    if not target then
+        return false
+    end
+
+    self:UnHighlight_All()
+    self:UpdateItems()  -- redraw the favorite/junk icons
+    for _, c in ipairs(FAV_CONTAINERS) do
+        local cc = self.CC[c[1]]
+        if cc and cc:IsShown() and can_soft(cc) and not no_body(self, cc) and not ltt_skip(self, cc) then
+            local pos = cc.scroll:GetCurrentScrollPos()
+            if resort_now(cc, c[2]) then
+                cc:Scroll_SetPos(pos, true)
+            end
+        end
+    end
+    return true
+end
+
+if rax_icon_layers and rax_icon_layers.refresh then
+    local orig_refresh = rax_icon_layers.refresh
+    function rax_icon_layers.refresh(mode)
+        local self = GetActorMenu()
+        if self then
+            local ok, handled = pcall(resort_all_shown, self)
+            if ok and handled then
+                return  -- handled in place; skip the stock rebuild
+            end
+        end
+        return orig_refresh(mode)
+    end
+end
+
+----------------------------------------------------------------------
+-- Lifecycle
+----------------------------------------------------------------------
+-- "New" loot is scoped to one inventory session. The marks are cleared in the
+-- *_ResetInventories hooks above (window open / mode switch, BEFORE any cell
+-- is painted) and, as a fallback, when the inventory closes. GUI_on_show is
+-- deliberately not used: it fires only after the open-time paint, so a stale
+-- mark would already be visible -- and some close paths never fire
+-- GUI_on_hide at all, which is how stale tints appeared in the first place.
+
+local function on_inv_hide(name)
+    if name == "UIInventory" then
+        cancel_pending()
+        for key in pairs(af_initial) do af_initial[key] = nil end
+        for key in pairs(af_refresh) do af_refresh[key] = nil end
+        reset_new_loot()
+    end
+end
+
+local function on_inv_show(name)
+    if name == "UIInventory" then
+        install_hooks()
+    end
+end
+
+-- Re-read the option cache (and the colour derived from it) on MCM apply.
+local function on_opts_change()
+    cancel_pending()
+    refresh_opts()
+    refresh_new_color()
+    inject_ammo_parts_order()  -- push a changed ap_order into item_order right away
+end
+
+-- "on_game_end" is a regular callback, not an auto-called script entry point,
+-- so it is registered alongside the others below. The UI method wrappers are
+-- deliberately left installed: they are applied once at load time and are not
+-- re-applied per session, so there is nothing to unwind here.
+local function on_game_end()
+    cancel_pending()
+    reset_new_loot()
+    if not UnregisterScriptCallback then return end
+    if lifecycle_callbacks_registered then
+        lifecycle_callbacks_registered = false
+        UnregisterScriptCallback("GUI_on_hide", on_inv_hide)
+        UnregisterScriptCallback("GUI_on_show", on_inv_show)
+        UnregisterScriptCallback("on_option_change", on_opts_change)
+        UnregisterScriptCallback("on_game_end", on_game_end)
+    end
+    local af = af_module()
+    if af and af.unregister_on_complete then
+        af.unregister_on_complete(on_antifreeze_complete)
+    end
+end
+
+function on_game_start()
+    on_opts_change()
+    if not install_hooks() and CreateTimeEvent then
+        CreateTimeEvent("siss_hook_retry", "siss_hook_retry", 0.5, retry_install_hooks)
+    end
+
+    local af = af_module()
+    -- Every script is loaded by now, so pin the lookup result: if the module is
+    -- absent it will stay absent, and af_busy() should stop probing for it.
+    af_resolved = true
+    if af and af.register_on_complete then
+        af.register_on_complete(on_antifreeze_complete)
+    else
+        printf("[Seamless Inventory Sort / Anthology] WARNING: Antifreeze API not found; deferred completion sync is disabled.")
+    end
+
+    printf("[Seamless Inventory Sort / Anthology %s] mode=%s keep_gaps=%s trade_policy=%s trade_max_items=%s antifreeze=%s",
+        VERSION, tostring(opt("perf_mode")), tostring(opt("keep_gaps")),
+        tostring(opt("trade_policy")), tostring(opt("trade_max_items")),
+        tostring(af and af.version or false))
+    if not get_sortingplus_module() then
+        printf("[Seamless Inventory Sort / Anthology] SortingPlus module was not found; seamless sorting is inactive.")
+    end
+    if rax_persistent_highlight and rax_persistent_highlight.register then
+        rax_persistent_highlight.register("zz_seamless_new_loot", check_new_loot)
+    end
+    if not lifecycle_callbacks_registered then
+        RegisterScriptCallback("GUI_on_hide", on_inv_hide)
+        RegisterScriptCallback("GUI_on_show", on_inv_show)
+        RegisterScriptCallback("on_option_change", on_opts_change)
+        RegisterScriptCallback("on_game_end", on_game_end)
+        lifecycle_callbacks_registered = true
+    end
+end

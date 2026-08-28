@@ -1,0 +1,711 @@
+--[[
+    Inventory Antifreeze -- Anthology 2.1 integration
+    Based on Inventory Antifreeze by TheMrDemonized.
+
+    Adaptation goals:
+      * defer only real inventory item grids, never every UICellContainer;
+      * leave the original Reinit path completely untouched for small/unsupported grids;
+      * cap work by both operation count and a millisecond frame budget;
+      * reduce callback lifetime and object-destroy scans;
+      * synchronize completion with Seamless Inventory Sort;
+      * preserve SortingPlus, Mags Redux transfers and optional loading indicator.
+--]]
+
+local VERSION = "1.1.3-explicit-item-data"
+
+anthology_inventory_antifreeze = anthology_inventory_antifreeze or {}
+local API = anthology_inventory_antifreeze
+API.version = VERSION
+API.listeners = API.listeners or {}
+API.patched = API.patched or false
+API.callbacks_registered = API.callbacks_registered or false
+
+-- Public accessor for other script namespaces. Anomaly scripts execute in
+-- separate namespace tables, so a module-local global is not directly visible
+-- from Seamless Inventory Sort.
+function get_api()
+    return API
+end
+
+local DEF = {
+    af_enabled        = true,
+    af_trade_enabled  = false,
+    af_deferred_limit = 120,
+    af_sort_step      = 80,
+    af_icon_step      = 12,
+    af_frame_budget   = 2,
+    af_indicator      = false,
+    af_safe_compare   = true,
+}
+
+local OPTS = {}
+local function refresh_opts()
+    for id, def in pairs(DEF) do
+        local value = ui_mcm and ui_mcm.get("seamless_sort/siss_antifreeze/" .. id)
+        if value == nil then value = def end
+        OPTS[id] = value
+    end
+end
+
+local function opt(id)
+    local value = OPTS[id]
+    if value == nil then return DEF[id] end
+    return value
+end
+
+local ELIGIBLE_ID = {
+    actor_bag       = true,
+    npc_bag         = true,
+    actor_trade_bag = true,
+    npc_trade_bag   = true,
+}
+
+local TRADE_ID = {
+    actor_trade_bag = true,
+    npc_trade_bag   = true,
+}
+
+local function is_eligible(self)
+    return self and ELIGIBLE_ID[tostring(self.ID)] == true and not self.showcase
+end
+
+local function is_trade_container(self)
+    return self and TRADE_ID[tostring(self.ID)] == true
+end
+
+local function deferred_allowed(self)
+    if not opt("af_enabled") then return false, "disabled" end
+    if is_trade_container(self) and not opt("af_trade_enabled") then
+        return false, "trade_disabled"
+    end
+    return true, "enabled"
+end
+
+local function table_size(t)
+    if size_table then return size_table(t) end
+    local n = 0
+    for _ in pairs(t or {}) do n = n + 1 end
+    return n
+end
+
+local function wipe(t)
+    if not t then return end
+    if empty_table then
+        empty_table(t)
+        return
+    end
+    for k in pairs(t) do t[k] = nil end
+end
+
+local function now_ms()
+    if time_continual then return time_continual() end
+    if time_global then return time_global() end
+    return 0
+end
+
+local function log(fmt, ...)
+    if printf then printf("[Inventory Antifreeze / Anthology %s] " .. fmt, VERSION, ...) end
+end
+
+function API.is_busy(cc)
+    return cc and cc.af_active == true
+end
+
+function API.register_on_complete(fn)
+    if type(fn) ~= "function" then return end
+    for i = 1, #API.listeners do
+        if API.listeners[i] == fn then return end
+    end
+    API.listeners[#API.listeners + 1] = fn
+end
+
+function API.unregister_on_complete(fn)
+    for i = #API.listeners, 1, -1 do
+        if API.listeners[i] == fn then table.remove(API.listeners, i) end
+    end
+end
+
+local function notify_complete(self, needs_post_sort)
+    local info = { needs_post_sort = needs_post_sort == true }
+    for i = 1, #API.listeners do
+        pcall(API.listeners[i], self, info)
+    end
+end
+
+local uid = 0
+local function ensure_state(self)
+    if self.af_initialized then return end
+    uid = uid + 1
+    self.af_initialized = true
+    self.af_uid = "siss_af_" .. tostring(uid)
+    self.af_items_data = {}
+    self.af_items_map = {}
+    self.af_t = {}
+    self.af_sorter = nil
+    self.af_base_order = nil
+    self.af_original_find = nil
+    self.af_sorter_update_time = -1
+    self.af_add_key = 65537
+    self.af_active = false
+    self.af_destroy_registered = false
+    self.af_indicator_icon = nil
+    self.af_compare_error_logged = false
+    self.af_force_fallback = false
+    self.af_needs_post_sort = false
+end
+
+local function event_name(self, suffix)
+    return self.af_uid .. "_" .. suffix
+end
+
+local function safe_remove_event(self, suffix)
+    if RemoveTimeEvent and self.af_uid then
+        RemoveTimeEvent(event_name(self, suffix), self.af_uid)
+    end
+end
+
+local function hide_indicator(self)
+    safe_remove_event(self, "icon")
+    if self.af_indicator_icon then pcall(self.af_indicator_icon.Show, self.af_indicator_icon, false) end
+end
+
+local function ensure_indicator(self)
+    if not opt("af_indicator") or self.af_indicator_icon or not self.prof then return end
+    local ok, icon = pcall(function()
+        local xml = CScriptXmlInit()
+        xml:ParseFile("ui_inventory_antifreeze.xml")
+        local wnd = xml:InitStatic("poarch_cringe_seq", self.prof)
+        wnd:Show(false)
+
+        local cont_h, cont_w = self.prof:GetHeight(), self.prof:GetWidth()
+        local icon_w, icon_h = wnd:GetWidth(), wnd:GetHeight()
+        local padding, max_size = 32, 192
+        local avail_w = math.max(math.min(max_size, cont_w) - padding * 2, 0)
+        local avail_h = math.max(math.min(max_size, cont_h) - padding * 2, 0)
+        local scale = math.min(1, math.min(avail_w / icon_w, avail_h / icon_h))
+        wnd:SetWndSize(vector2():set(icon_w * scale, icon_h * scale))
+        wnd:SetWndPos(vector2():set(cont_w / 2, cont_h / 2))
+        return wnd
+    end)
+    if ok then
+        self.af_indicator_icon = icon
+    elseif not self.af_indicator_error_logged then
+        self.af_indicator_error_logged = true
+        log("loading indicator unavailable for container=%s", tostring(self.ID))
+    end
+end
+
+local function show_indicator_later(self)
+    if not opt("af_indicator") then return end
+    ensure_indicator(self)
+    if not self.af_indicator_icon then return end
+    safe_remove_event(self, "icon")
+    CreateTimeEvent(event_name(self, "icon"), self.af_uid, 0.12, function()
+        if self.af_active and self.af_indicator_icon then
+            self.af_indicator_icon:Show(true)
+        end
+        return true
+    end)
+end
+
+local function register_destroy(self)
+    if self.af_destroy_registered then return end
+    if RegisterScriptCallback then
+        RegisterScriptCallback("game_object_on_net_destroy", self)
+        self.af_destroy_registered = true
+    end
+end
+
+local function unregister_destroy(self)
+    if not self.af_destroy_registered then return end
+    if UnregisterScriptCallback then
+        pcall(UnregisterScriptCallback, "game_object_on_net_destroy", self)
+    end
+    self.af_destroy_registered = false
+end
+
+local function cancel_events(self)
+    safe_remove_event(self, "icon")
+    safe_remove_event(self, "sorter")
+    safe_remove_event(self, "post")
+end
+
+local function clear_state(self, notify)
+    if not self.af_initialized then return end
+    local needs_post_sort = self.af_needs_post_sort
+    cancel_events(self)
+    unregister_destroy(self)
+    hide_indicator(self)
+
+    if self.af_original_find then self.FindFreeCell = self.af_original_find end
+    self.af_original_find = nil
+    wipe(self.af_items_data)
+    wipe(self.af_items_map)
+    self.af_t = {}
+    self.af_sorter = nil
+    self.af_base_order = nil
+    self.af_sorter_update_time = -1
+    self.af_add_key = 65537
+    self.af_active = false
+    self.deferred = false
+    self.af_needs_post_sort = false
+
+    if notify then notify_complete(self, needs_post_sort) end
+end
+
+function API.cancel(cc)
+    if cc and cc.af_initialized then clear_state(cc, false) end
+end
+
+local function create_incremental_sorter(t, order)
+    local keys, n = {}, 0
+    for k in pairs(t) do
+        n = n + 1
+        keys[n] = k
+    end
+
+    local function before(a, b)
+        return order(t, a, b)
+    end
+
+    local function sift_down(idx, end_idx)
+        local hole = idx
+        local key = keys[hole]
+        local half = math.floor(end_idx / 2)
+        while hole <= half do
+            local child = hole * 2
+            if child < end_idx and before(keys[child + 1], keys[child]) then
+                child = child + 1
+            end
+            if before(keys[child], key) then
+                keys[hole] = keys[child]
+                hole = child
+            else
+                break
+            end
+        end
+        keys[hole] = key
+    end
+
+    local heap_i = math.floor(n / 2)
+    local heap_built = n <= 1
+
+    return function()
+        if not heap_built then
+            if heap_i >= 1 then
+                sift_down(heap_i, n)
+                heap_i = heap_i - 1
+                if heap_i < 1 then heap_built = true end
+            end
+            return false
+        end
+
+        while n > 0 do
+            local best = keys[1]
+            local value = t[best]
+            keys[1] = keys[n]
+            keys[n] = nil
+            n = n - 1
+            if n > 0 then sift_down(1, n) end
+            if value ~= nil then return false, best, value end
+        end
+        return true
+    end
+end
+
+local function fallback_before(a, b)
+    local na, nb = tonumber(a), tonumber(b)
+    if na and nb then return na < nb end
+    return tostring(a) < tostring(b)
+end
+
+local function prepare_order(self, t)
+    local order = self.af_base_order
+    if type(order) ~= "function" and self.GetSortMethod then
+        order = self:GetSortMethod()
+    end
+
+    if seax_sortingplus_opt_sort_by_kind
+    and seax_sortingplus_opt_sort_by_kind.sort_by_kind_factory
+    and self.sort_method == "kind" then
+        local ok, cmp, find_free = pcall(seax_sortingplus_opt_sort_by_kind.sort_by_kind_factory, t)
+        if ok and type(cmp) == "function" then
+            order = cmp
+            if find_free then self.FindFreeCell = find_free end
+        end
+    end
+
+    if type(order) ~= "function" then return nil end
+    return function(tbl, a, b)
+        local va, vb = tbl[a], tbl[b]
+        if va == nil then return false end
+        if vb == nil then return true end
+
+        if self.af_force_fallback then return fallback_before(a, b) end
+        if not opt("af_safe_compare") then return order(tbl, a, b) end
+        local ok, result = pcall(order, tbl, a, b)
+        if ok then return result and true or false end
+        self.af_force_fallback = true
+        if not self.af_compare_error_logged then
+            self.af_compare_error_logged = true
+            log("sort comparator failed; deterministic fallback enabled | container=%s error=%s", tostring(self.ID), tostring(result))
+        end
+        return fallback_before(a, b)
+    end
+end
+
+local function rebuild_sorter(self)
+    if not self.af_active then return end
+    if self.af_original_find then self.FindFreeCell = self.af_original_find end
+    local order = prepare_order(self, self.af_t)
+    if not order then
+        log("no compatible sort order; deferred mode cancelled | container=%s", tostring(self.ID))
+        clear_state(self, true)
+        return
+    end
+    self.af_sorter = create_incremental_sorter(self.af_t, order)
+end
+
+local function reset_sorter(self, only_if_set)
+    if not self.af_active then return end
+    if only_if_set and not self.af_sorter then return end
+
+    local tg = now_ms()
+    if tg > self.af_sorter_update_time then
+        safe_remove_event(self, "sorter")
+        self.af_sorter_update_time = tg
+        rebuild_sorter(self)
+        return
+    end
+
+    safe_remove_event(self, "sorter")
+    CreateTimeEvent(event_name(self, "sorter"), self.af_uid, 0.001, function()
+        if self.af_active then
+            self.af_sorter_update_time = now_ms()
+            rebuild_sorter(self)
+        end
+        return true
+    end)
+end
+
+local function post_inventory_updates(self)
+    local owner = self.owner
+    if not (owner and owner.isInventoryGUI) then return end
+    safe_remove_event(self, "post")
+    local deadline = now_ms() + 3000
+    CreateTimeEvent(event_name(self, "post"), self.af_uid, 0.05, function()
+        if owner.IsShown and not owner:IsShown() then return true end
+        if API.any_busy and API.any_busy(owner) and now_ms() < deadline then return false end
+
+        if owner.Picker_Refresh then pcall(owner.Picker_Refresh, owner) end
+        if owner.UnHighlight_All then pcall(owner.UnHighlight_All, owner) end
+
+        local actor_trade = owner.CC and owner.CC["actor_trade_bag"]
+        if actor_trade and self.ID == actor_trade.ID
+        and owner.SortJunkTradeReady and owner.SortJunkTrade
+        and zzz_rax_sortingplus_mcm then
+            owner.SortJunkTradeReady = false
+            if owner.mode == "trade" and zzz_rax_sortingplus_mcm.AUTOSELLJUNK then
+                pcall(owner.SortJunkTrade, owner)
+            end
+        end
+
+        if unusable_parts_handler and unusable_parts_handler.GUI_on_show then
+            pcall(unusable_parts_handler.GUI_on_show, "UIInventory")
+        end
+        return true
+    end)
+end
+
+function API.any_busy(owner)
+    if not (owner and owner.CC) then return false end
+    for id in pairs(ELIGIBLE_ID) do
+        local cc = owner.CC[id]
+        if cc and cc.af_active then return true end
+    end
+    return false
+end
+
+local function finish(self)
+    if self.Scroll_Reinit then self:Scroll_Reinit(true) end
+    clear_state(self, true)
+    post_inventory_updates(self)
+end
+
+local ORIG = {}
+
+local function patch()
+    if API.patched then return end
+    if not (utils_ui and utils_ui.UICellContainer) then
+        log("utils_ui.UICellContainer unavailable; integration inactive")
+        return
+    end
+
+    API.patched = true
+    local CC = utils_ui.UICellContainer
+    ORIG.InitControls = CC.InitControls
+    ORIG.Reset = CC.Reset
+    ORIG.Reinit = CC.Reinit
+    ORIG.Update = CC.Update
+    ORIG.Show = CC.Show
+    ORIG.AddItem = CC.AddItem
+    ORIG.RemoveItem = CC.RemoveItem
+    ORIG.TransferItem = CC.TransferItem
+    ORIG.Finalize = CC.__finalize
+
+    CC.InitControls = function(self, ...)
+        local result = ORIG.InitControls(self, ...)
+        if is_eligible(self) then ensure_state(self) end
+        return result
+    end
+
+    -- Razfarg Slow Scroll Fix v3, merged here instead of stacking another
+    -- global UICellContainer wrapper. Nil guards cover compact/foreign grids.
+    local function clear_scroll_cache(self)
+        if not self then return end
+        self.scroll_tg = nil
+        if self.drag_area then
+            self.drag_area.down = 0
+            self.drag_area.up = 0
+        end
+        if self.owner then self.owner.item_in_hold = false end
+        self.scroll_pause = false
+    end
+
+    CC.Reset = function(self, ...)
+        -- An external Reset during deferred loading invalidates the queue. The
+        -- Reset called internally by ORIG.Reinit sees af_active=false and does
+        -- not clear the state prepared immediately afterwards.
+        if self and self.af_active then clear_state(self, false) end
+        clear_scroll_cache(self)
+        if ORIG.Reset then return ORIG.Reset(self, ...) end
+    end
+
+    CC.__finalize = function(self, ...)
+        if self.af_initialized then clear_state(self, false) end
+        if ORIG.Finalize then return ORIG.Finalize(self, ...) end
+    end
+
+    CC.Reinit = function(self, t, tf, ...)
+        if not is_eligible(self) then return ORIG.Reinit(self, t, tf, ...) end
+        ensure_state(self)
+        if self.af_active then clear_state(self, false) end
+
+        local count = t and table_size(t) or 0
+        local allowed, reason = deferred_allowed(self)
+        local use_deferred = allowed and t
+            and count >= tonumber(opt("af_deferred_limit") or 120)
+
+        if not use_deferred then
+            self.deferred = false
+            if is_trade_container(self) and reason == "trade_disabled" then
+                log("trade bypass | container=%s items=%s reason=af_trade_enabled=false",
+                    tostring(self.ID), tostring(count))
+            end
+            return ORIG.Reinit(self, t, tf, ...)
+        end
+
+        if is_trade_container(self) then
+            log("trade deferred start | container=%s items=%s budget_ms=%s icon_step=%s",
+                tostring(self.ID), tostring(count),
+                tostring(opt("af_frame_budget")), tostring(opt("af_icon_step")))
+        end
+
+        local base_order = self.GetSortMethod and self:GetSortMethod()
+        if type(base_order) ~= "function" then
+            self.deferred = false
+            return ORIG.Reinit(self, t, tf, ...)
+        end
+
+        self.af_original_find = self.FindFreeCell
+        self.af_base_order = base_order
+        self.af_active = false
+        self.deferred = false
+        ORIG.Reinit(self, {}, tf, ...)
+
+        wipe(self.af_items_data)
+        wipe(self.af_items_map)
+        self.af_t = t
+        self.af_add_key = 65537
+        local max_key = 0
+        for i, obj in pairs(t) do
+            if type(i) == "number" and i > max_key then max_key = i end
+            local ok, id = pcall(function() return obj and obj:id() end)
+            if not ok or not id then
+                clear_state(self, false)
+                return ORIG.Reinit(self, t, tf, ...)
+            end
+            self.af_items_map[id] = i
+            -- Named fields rather than a positional list: the stock call is
+            -- AddItem(obj, nil, tf[i]), and a { obj, nil, info } array has a hole
+            -- at index 2, where the result of "#" -- and therefore of unpack --
+            -- is left undefined by the language.
+            self.af_items_data[i] = { obj = obj, sec = nil, info = tf and tf[i] }
+        end
+        self.af_add_key = math.max(65537, max_key + 1)
+        self.af_active = true
+        self.deferred = true
+        self.af_needs_post_sort = false
+        self.af_force_fallback = false
+        self.af_compare_error_logged = false
+        register_destroy(self)
+        reset_sorter(self, false)
+        show_indicator_later(self)
+        if self.Scroll_Reinit then self:Scroll_Reinit() end
+        return
+    end
+
+    -- The stock signature is AddItem(obj, sec, info); extra arguments are only
+    -- forwarded on the pass-through path, since a deferred item is replayed
+    -- later through the stock three-argument call anyway.
+    CC.AddItem = function(self, obj, sec, info, ...)
+        if not self.af_active then return ORIG.AddItem(self, obj, sec, info, ...) end
+        if not sec then
+            if not obj then return end
+            sec = obj:section()
+        end
+        local id = obj and obj:id()
+        if id and (self.af_items_map[id] or (self.indx_id and self.indx_id[id])) then return end
+
+        local i = self.af_add_key
+        self.af_add_key = i + 1
+        if id then self.af_items_map[id] = i end
+        self.af_t[i] = obj or sec
+        self.af_items_data[i] = { obj = obj, sec = sec, info = info }
+        reset_sorter(self, false)
+    end
+
+    local function remove_pending(self, obj)
+        if not (self.af_active and obj) then return false end
+        local id = obj:id()
+        local i = self.af_items_map[id]
+        if not i then return false end
+        self.af_items_map[id] = nil
+        self.af_t[i] = nil
+        self.af_items_data[i] = nil
+        reset_sorter(self, true)
+        return true
+    end
+
+    CC.RemoveItem = function(self, obj, sec, ...)
+        if not self.af_active then return ORIG.RemoveItem(self, obj, sec, ...) end
+        local id = obj and obj:id()
+        remove_pending(self, obj)
+        if id and self.indx_id and self.indx_id[id] then
+            return ORIG.RemoveItem(self, obj, sec, ...)
+        end
+    end
+
+    CC.game_object_on_net_destroy = function(self, obj)
+        if not (self.af_active and obj) then return end
+        local id = obj:id()
+        if (self.af_items_map and self.af_items_map[id]) or (self.indx_id and self.indx_id[id]) then
+            self:RemoveItem(obj, obj:section())
+        end
+    end
+
+    CC.TransferItem = function(self, cont_to, obj, sec, ...)
+        if not (cont_to and cont_to.af_active) then
+            return ORIG.TransferItem(self, cont_to, obj, sec, ...)
+        end
+
+        -- TransferItem needs the destination cell immediately to copy trade flags.
+        -- Use the original AddItem for that one transfer, then request one soft
+        -- post-sort from Seamless Inventory Sort after deferred loading completes.
+        local current_add = cont_to.AddItem
+        cont_to.AddItem = ORIG.AddItem
+        local ok, result = pcall(ORIG.TransferItem, self, cont_to, obj, sec, ...)
+        cont_to.AddItem = current_add
+        if not ok then error(result) end
+        cont_to.af_needs_post_sort = true
+        return result
+    end
+
+    CC.Update = function(self, ...)
+        if not (self.af_active and self.af_sorter) then return ORIG.Update(self, ...) end
+
+        local budget = math.max(1, tonumber(opt("af_frame_budget")) or 2)
+        local sort_cap = math.max(1, tonumber(opt("af_sort_step")) or 80)
+        local icon_cap = math.max(1, tonumber(opt("af_icon_step")) or 12)
+        local started = now_ms()
+        local calls, icons = 0, 0
+        local done, key
+
+        while calls < sort_cap and (now_ms() - started) < budget do
+            done, key = self.af_sorter()
+            calls = calls + 1
+            if done or key ~= nil then break end
+        end
+
+        -- Once a heap item has been popped, always draw that item before yielding.
+        -- Otherwise a budget boundary could discard the popped key permanently.
+        if not done and key ~= nil then
+            local data = self.af_items_data[key]
+            if data then ORIG.AddItem(self, data.obj, data.sec, data.info) end
+            icons = 1
+
+            while icons < icon_cap and (now_ms() - started) < budget do
+                done, key = self.af_sorter()
+                if done then break end
+                if key ~= nil then
+                    data = self.af_items_data[key]
+                    if data then ORIG.AddItem(self, data.obj, data.sec, data.info) end
+                    icons = icons + 1
+                end
+            end
+        end
+
+        if done then finish(self) end
+        return ORIG.Update(self, ...)
+    end
+
+    CC.Show = function(self, state, ...)
+        if not state and self.af_active then clear_state(self, false) end
+        return ORIG.Show(self, state, ...)
+    end
+
+    log("low-level patch installed | eligible=actor_bag,npc_bag,actor_trade_bag,npc_trade_bag | trade_toggle=separate")
+end
+
+function GUI_on_show(name)
+    if name ~= "UIInventory" then return end
+    local gui = ui_inventory and ui_inventory.GUI
+    if gui then
+        gui.isInventoryGUI = true
+        gui.SortJunkTradeReady = true
+    end
+end
+
+function GUI_on_hide(name)
+    if name ~= "UIInventory" then return end
+    local gui = ui_inventory and ui_inventory.GUI
+    if gui then gui.SortJunkTradeReady = false end
+end
+
+-- Regular callback, not an auto-called script entry point. The UICellContainer
+-- patch itself stays installed: it is applied once and guarded by API.patched.
+function on_game_end()
+    if not (UnregisterScriptCallback and API.callbacks_registered) then return end
+    API.callbacks_registered = false
+    UnregisterScriptCallback("GUI_on_show", GUI_on_show)
+    UnregisterScriptCallback("GUI_on_hide", GUI_on_hide)
+    UnregisterScriptCallback("on_option_change", refresh_opts)
+    UnregisterScriptCallback("on_game_end", on_game_end)
+end
+
+function on_game_start()
+    refresh_opts()
+    patch()
+    if not API.callbacks_registered then
+        RegisterScriptCallback("GUI_on_show", GUI_on_show)
+        RegisterScriptCallback("GUI_on_hide", GUI_on_hide)
+        RegisterScriptCallback("on_option_change", refresh_opts)
+        RegisterScriptCallback("on_game_end", on_game_end)
+        API.callbacks_registered = true
+    end
+    log("enabled=%s trade=%s limit=%s budget_ms=%s sort_step=%s icon_step=%s indicator=%s safe_compare=%s scroll_fix=true",
+        tostring(opt("af_enabled")), tostring(opt("af_trade_enabled")),
+        tostring(opt("af_deferred_limit")), tostring(opt("af_frame_budget")),
+        tostring(opt("af_sort_step")), tostring(opt("af_icon_step")),
+        tostring(opt("af_indicator")), tostring(opt("af_safe_compare")))
+end

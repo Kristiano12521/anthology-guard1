@@ -1,0 +1,505 @@
+-- Trade UI profiler + safe highlight cleanup optimization for Anomaly Anthology 2.1.
+-- Diagnostic build: records inclusive timings of the exact active UI methods.
+-- It does not cache prices or trade status yet; the purpose is to identify the
+-- first real hot path before changing trade semantics.
+
+local VERSION = "1.5.4-persistent-highlight-fix"
+
+local DEF = {
+    trade_diag_enabled    = false,
+    trade_diag_interval   = 5,
+    trade_diag_slow_ms    = 8,
+    trade_fast_unhighlight = true,
+}
+
+local OPT_PATH = {
+    trade_diag_enabled     = "seamless_sort/siss_trade_diag/trade_diag_enabled",
+    trade_diag_interval    = "seamless_sort/siss_trade_diag/trade_diag_interval",
+    trade_diag_slow_ms     = "seamless_sort/siss_trade_diag/trade_diag_slow_ms",
+    trade_fast_unhighlight = "seamless_sort/siss_trade_diag/trade_fast_unhighlight",
+}
+
+local OPTS = {}
+local INSTALLED = false       -- sparse highlight cleanup (the actual optimization)
+local DIAG_INSTALLED = false  -- profiling wrappers, installed only while diagnostics run
+local CALLBACKS = false
+local RETRY_ARMED = false
+
+local function now()
+    if time_continual then return time_continual() end
+    return time_global()
+end
+
+local function log(fmt, ...)
+    printf("[Trade UI Profiler / Anthology %s] " .. fmt, VERSION, ...)
+end
+
+-- Defined below; declared here so refresh_opts can arm the instrumentation the
+-- first time diagnostics are switched on.
+local install_diag
+
+local function refresh_opts()
+    for id, def in pairs(DEF) do
+        local v = ui_mcm and ui_mcm.get(OPT_PATH[id])
+        if v == nil then v = def end
+        OPTS[id] = v
+    end
+    if OPTS.trade_diag_enabled == true and install_diag then install_diag() end
+end
+
+local function opt(id)
+    local v = OPTS[id]
+    if v == nil then return DEF[id] end
+    return v
+end
+
+local function diag_on()
+    return opt("trade_diag_enabled") == true
+end
+
+local TRADE_CONTAINER = {
+    actor_trade = true,
+    npc_trade = true,
+    actor_trade_bag = true,
+    npc_trade_bag = true,
+}
+
+local function is_trade_ui(self)
+    return self and self.mode == "trade"
+end
+
+local function container_is_trade(self)
+    if not self then return false end
+    if TRADE_CONTAINER[tostring(self.ID)] then return true end
+    return self.owner and self.owner.mode == "trade"
+end
+
+local function cell_is_trade(self)
+    return self and self.container and container_is_trade(self.container)
+end
+
+local TOTAL = {}
+local WINDOW = {}
+local SLOW_LAST = {}
+local SESSION = {
+    id = 0,
+    active = false,
+    ui = nil,
+    started = 0,
+    last_report = 0,
+    reports = 0,
+}
+
+local highlighted = setmetatable({}, { __mode = "k" })
+
+local function clear_table(t)
+    for k in pairs(t) do t[k] = nil end
+end
+
+local function bucket(t, name)
+    local b = t[name]
+    if not b then
+        b = { calls = 0, ms = 0, max = 0, units = 0 }
+        t[name] = b
+    end
+    return b
+end
+
+local function record(name, dt, units)
+    if not (SESSION.active and diag_on()) then return end
+    dt = dt or 0
+    units = units or 0
+    local a = bucket(TOTAL, name)
+    local b = bucket(WINDOW, name)
+    a.calls = a.calls + 1
+    b.calls = b.calls + 1
+    a.ms = a.ms + dt
+    b.ms = b.ms + dt
+    a.units = a.units + units
+    b.units = b.units + units
+    if dt > a.max then a.max = dt end
+    if dt > b.max then b.max = dt end
+
+    local limit = tonumber(opt("trade_diag_slow_ms")) or 8
+    if dt >= limit then
+        local tg = now()
+        if not SLOW_LAST[name] or tg - SLOW_LAST[name] >= 2000 then
+            SLOW_LAST[name] = tg
+            log("SLOW session=%s metric=%s ms=%s units=%s", SESSION.id, name, dt, units)
+        end
+    end
+end
+
+local function count_entries(t)
+    -- ParseInventory's third argument is a boolean id_list flag, not a table.
+    -- Diagnostic helpers must never assume the received value is iterable.
+    if type(t) ~= "table" then return 0 end
+    local n = 0
+    for _ in pairs(t) do n = n + 1 end
+    return n
+end
+
+local PREDICATE_WARNING = {}
+local UNITS_WARNING = {}
+
+local function safe_predicate(predicate, self, ...)
+    if not predicate then return true end
+    local ok, result = pcall(predicate, self, ...)
+    if not ok then
+        local key = tostring(predicate)
+        if not PREDICATE_WARNING[key] then
+            PREDICATE_WARNING[key] = true
+            log("WARNING predicate failed; metric skipped | error=%s", tostring(result))
+        end
+        return false
+    end
+    return result and true or false
+end
+
+local function safe_units(units_fn, ...)
+    if not units_fn then return 0 end
+    local ok, result = pcall(units_fn, ...)
+    if not ok then
+        local key = tostring(units_fn)
+        if not UNITS_WARNING[key] then
+            UNITS_WARNING[key] = true
+            log("WARNING units counter failed; using 0 | error=%s", tostring(result))
+        end
+        return 0
+    end
+    return tonumber(result) or 0
+end
+
+local function metric_text(name, source)
+    local b = source[name]
+    if not b or b.calls == 0 then return name .. "=0" end
+    local avg = b.ms / b.calls
+    return strformat("%s=%s/%s/%s/%s", name, b.calls, round_idp(b.ms,2), round_idp(avg,3), round_idp(b.max,2))
+end
+
+local function bag_text(ui)
+    if not ui or not ui.CC then return "bags=unavailable" end
+    local function one(id)
+        local cc = ui.CC[id]
+        if not cc then return id .. ":-" end
+        return strformat("%s:%s/%s", id, count_entries(cc.indx_id), #cc.cell)
+    end
+    return table.concat({ one("actor_trade_bag"), one("npc_trade_bag"), one("actor_trade"), one("npc_trade") }, " ")
+end
+
+local function report(kind, source, reset_window)
+    if not (SESSION.active and diag_on()) then return end
+    local elapsed = (now() - SESSION.started) / 1000
+    SESSION.reports = SESSION.reports + 1
+    log("REPORT kind=%s session=%s elapsed=%ss %s fast_unhighlight=%s",
+        kind, SESSION.id, round_idp(elapsed,1), bag_text(SESSION.ui), tostring(opt("trade_fast_unhighlight")))
+    log("TIMES format=calls/total_ms/avg_ms/max_ms | %s | %s | %s | %s | %s | %s | %s | %s | %s",
+        metric_text("ui_update", source),
+        metric_text("unhighlight", source),
+        metric_text("unhighlight_full", source),
+        metric_text("container_update", source),
+        metric_text("update_info", source),
+        metric_text("update_items", source),
+        metric_text("refresh_inventories", source),
+        metric_text("reset_inventories", source),
+        metric_text("container_reinit", source))
+    log("COUNTS format=calls/total_ms/avg_ms/max_ms | %s | %s | %s | %s | %s | %s | %s | %s",
+        metric_text("cell_item_update", source),
+        metric_text("trade_status", source),
+        metric_text("cell_cost", source),
+        metric_text("parse_inventory", source),
+        metric_text("tooltip_update", source),
+        metric_text("add_item", source),
+        metric_text("remove_item", source),
+        metric_text("scroll_reinit", source))
+    if reset_window then clear_table(WINDOW) end
+end
+
+local function begin_session(self)
+    SESSION.id = SESSION.id + 1
+    SESSION.active = true
+    SESSION.ui = self
+    SESSION.started = now()
+    SESSION.last_report = SESSION.started
+    SESSION.reports = 0
+    clear_table(TOTAL)
+    clear_table(WINDOW)
+    clear_table(SLOW_LAST)
+    log("BEGIN session=%s diagnostic=%s interval=%ss slow_ms=%s fast_unhighlight=%s",
+        SESSION.id, tostring(diag_on()), tostring(opt("trade_diag_interval")),
+        tostring(opt("trade_diag_slow_ms")), tostring(opt("trade_fast_unhighlight")))
+end
+
+local function finish_session(reason)
+    if not SESSION.active then return end
+    report("final-" .. tostring(reason), TOTAL, false)
+    log("END session=%s reason=%s reports=%s", SESSION.id, tostring(reason), SESSION.reports)
+    SESSION.active = false
+    SESSION.ui = nil
+    clear_table(WINDOW)
+end
+
+local function timed_none(metric, units, fn, ...)
+    local t0 = now()
+    fn(...)
+    record(metric, now() - t0, units)
+end
+
+local function wrap_method(tbl, method, metric, predicate, units_fn, return_one)
+    local original = tbl and tbl[method]
+    if type(original) ~= "function" then
+        log("WARNING missing method %s", tostring(method))
+        return false
+    end
+    if return_one then
+        tbl[method] = function(self, ...)
+            local profile = SESSION.active and diag_on()
+                and safe_predicate(predicate, self, ...)
+            if not profile then return original(self, ...) end
+            local units = safe_units(units_fn, self, ...)
+            local t0 = now()
+            local result = original(self, ...)
+            record(metric, now() - t0, units)
+            return result
+        end
+    else
+        tbl[method] = function(self, ...)
+            local profile = SESSION.active and diag_on()
+                and safe_predicate(predicate, self, ...)
+            if not profile then return original(self, ...) end
+            local units = safe_units(units_fn, self, ...)
+            local t0 = now()
+            original(self, ...)
+            record(metric, now() - t0, units)
+        end
+    end
+    return true
+end
+
+-- Stock UnHighlight_All is not only a cleanup: rax_persistent_highlight hooks
+-- UICellItem:Highlight and paints favorite / junk / new-loot tints inside the
+-- state == false branch. UICellItem:Set never touches the highlight, so that
+-- per-frame full scan is the ONLY thing that ever draws a persistent tint on a
+-- freshly placed cell. Replacing it with a purely sparse pass left those tints
+-- unpainted in the trade window. So the full scan still runs, just on an
+-- interval instead of every frame, and the sparse pass clears explicitly lit
+-- cells in between so hover feedback stays immediate.
+local FULL_PASS_INTERVAL = 100  -- ms between full (repainting) passes
+local last_full_pass = 0
+
+local function install()
+    if INSTALLED then return true end
+    local inv = ui_inventory and ui_inventory.UIInventory
+    local ci = utils_ui and utils_ui.UICellItem
+    if not (inv and ci) then return false end
+
+    -- Track only cells that are actually lit. Keyed on the RESULTING visual
+    -- state rather than the requested one, because a cell carrying a persistent
+    -- tint stays shown after Highlight(false) and still needs the repaint call.
+    local orig_highlight = ci.Highlight
+    ci.Highlight = function(self, state, ...)
+        orig_highlight(self, state, ...)
+        if cell_is_trade(self) then
+            highlighted[self] = (self.hl and self.hl:IsShown()) and true or nil
+        end
+    end
+
+    local orig_unhighlight = inv.UnHighlight_All
+    inv.UnHighlight_All = function(self, ...)
+        if not (is_trade_ui(self) and opt("trade_fast_unhighlight")) then
+            if SESSION.active and diag_on() and is_trade_ui(self) then
+                return timed_none("unhighlight", 0, orig_unhighlight, self, ...)
+            end
+            return orig_unhighlight(self, ...)
+        end
+
+        local t0 = now()
+        if t0 - last_full_pass >= FULL_PASS_INTERVAL then
+            last_full_pass = t0
+            orig_unhighlight(self, ...)
+            record("unhighlight_full", now() - t0, 0)
+            return
+        end
+
+        local touched = 0
+        for cell in pairs(highlighted) do
+            local cont = cell and cell.container
+            if cont and cont.owner == self then
+                if cont.selected ~= cell.indx then
+                    touched = touched + 1
+                    cell:Highlight(false)
+                end
+            end
+        end
+        record("unhighlight", now() - t0, touched)
+    end
+
+    INSTALLED = true
+    log("installed | sparse_unhighlight=true full_pass_ms=%s diagnostic=lazy", FULL_PASS_INTERVAL)
+    return true
+end
+
+-- Everything below is pure instrumentation. It used to be installed
+-- unconditionally, which left permanent wrappers on UICellContainer:Update and
+-- UIInfoItem:Update -- both per-frame, per-container methods -- for the 99% of
+-- sessions that never enable diagnostics. It is now armed on demand instead.
+install_diag = function()
+    if DIAG_INSTALLED then return true end
+    -- Never wrap ahead of the core install: the deferred timer below is what
+    -- guarantees this script patches outside everyone else's wrappers.
+    if not INSTALLED then return false end
+    local inv = ui_inventory and ui_inventory.UIInventory
+    local cc = utils_ui and utils_ui.UICellContainer
+    local ci = utils_ui and utils_ui.UICellItem
+    local ii = utils_ui and utils_ui.UIInfoItem
+    if not (inv and cc and ci and ii) then return false end
+    DIAG_INSTALLED = true
+
+    -- Start before stock/Seamless/Antifreeze trade initialization so the open
+    -- path is included in the same session.
+    local orig_tinit = inv.TMode_Init
+    inv.TMode_Init = function(self, npc)
+        -- Normal gameplay path: no profiler session, no timer reads and no
+        -- report allocations. Sparse highlight cleanup remains independent.
+        if not diag_on() then
+            if SESSION.active then finish_session("disabled") end
+            return orig_tinit(self, npc)
+        end
+
+        if SESSION.active then finish_session("reopen") end
+        begin_session(self)
+        local t0 = now()
+        local result = orig_tinit(self, npc)
+        record("trade_init", now() - t0, 1)
+        report("open", WINDOW, true)
+        return result
+    end
+
+    local orig_update = inv.Update
+    inv.Update = function(self, ...)
+        if not is_trade_ui(self) or not diag_on() then
+            return orig_update(self, ...)
+        end
+
+        if not SESSION.active then begin_session(self) end
+        local t0 = now()
+        local result = orig_update(self, ...)
+        record("ui_update", now() - t0, 1)
+
+        local tg = now()
+        local interval = (tonumber(opt("trade_diag_interval")) or 5) * 1000
+        if tg - SESSION.last_report >= interval then
+            SESSION.last_report = tg
+            report("periodic", WINDOW, true)
+        end
+        return result
+    end
+
+    local orig_close = inv.Close
+    inv.Close = function(self, ...)
+        if SESSION.active and SESSION.ui == self then finish_session("close") end
+        return orig_close(self, ...)
+    end
+
+    wrap_method(inv, "UpdateInfo", "update_info", is_trade_ui)
+    wrap_method(inv, "UpdateItems", "update_items", is_trade_ui)
+    wrap_method(inv, "TMode_RefreshInventories", "refresh_inventories", is_trade_ui)
+    wrap_method(inv, "TMode_ResetInventories", "reset_inventories", is_trade_ui)
+    wrap_method(inv, "TMode_UpdatePrice", "update_price", is_trade_ui)
+    -- Count the returned inventory table. The third argument is only a
+    -- boolean request for an id-keyed result.
+    local orig_parse_inventory = inv.ParseInventory
+    if type(orig_parse_inventory) == "function" then
+        inv.ParseInventory = function(self, ...)
+            local profile = SESSION.active and diag_on()
+                and safe_predicate(is_trade_ui, self, ...)
+            if not profile then return orig_parse_inventory(self, ...) end
+
+            local t0 = now()
+            local result = orig_parse_inventory(self, ...)
+            record("parse_inventory", now() - t0, count_entries(result))
+            return result
+        end
+    else
+        log("WARNING missing method ParseInventory")
+    end
+
+    wrap_method(cc, "Reinit", "container_reinit", container_is_trade, function(self, t)
+        return count_entries(t)
+    end)
+    wrap_method(cc, "Update", "container_update", container_is_trade, nil, true)
+    wrap_method(cc, "GetCellCost", "cell_cost", container_is_trade, nil, true)
+    wrap_method(cc, "AddItem", "add_item", container_is_trade, nil, true)
+    wrap_method(cc, "RemoveItem", "remove_item", container_is_trade)
+    wrap_method(cc, "RemoveItem_byID", "remove_item", container_is_trade)
+    wrap_method(cc, "Scroll_Reinit", "scroll_reinit", container_is_trade)
+
+    wrap_method(ci, "Update", "cell_item_update", cell_is_trade, nil, true)
+    wrap_method(ci, "Check_TradeMode", "trade_status", cell_is_trade, nil, true)
+    wrap_method(ii, "Update", "tooltip_update", function(self)
+        return self and self.owner and self.owner.mode == "trade"
+    end)
+
+    log("diagnostics installed | type_guards=true normal_path=no_session")
+    return true
+end
+
+local function retry_install()
+    RETRY_ARMED = false
+    if install() then
+        if diag_on() then install_diag() end
+        return false
+    end
+    log("WARNING UI classes still unavailable; profiler disabled for this launch")
+    return false
+end
+
+-- "on_game_end" is a regular callback, not an auto-called script entry point
+-- (unlike on_game_start), so it has to be registered like any other. The method
+-- wrappers themselves are deliberately left in place: they are idempotent and
+-- reinstalling them on every load would stack a new layer each time.
+local function on_game_end()
+    if SESSION.active then finish_session("game_end") end
+    clear_table(highlighted)
+    if UnregisterScriptCallback and CALLBACKS then
+        CALLBACKS = false
+        UnregisterScriptCallback("on_option_change", refresh_opts)
+        UnregisterScriptCallback("on_game_end", on_game_end)
+    end
+end
+
+function on_game_start()
+    refresh_opts()
+
+    -- Патч откладывается на следующий тик через таймер вместо синхронного
+    -- вызова install() здесь. Раньше "патчим последним, снаружи Seamless/
+    -- Antifreeze" обеспечивалось только префиксом "zzzzzzz_" в имени файла
+    -- (больше z => позже грузится => на момент патча профайлера чужие
+    -- обёртки CC.Update/TMode_Init уже на месте, и наша обёртка их
+    -- окружает). Это ломается, если у кого-то ещё окажется имя файла
+    -- с не меньшим числом z. Таймер с задержкой 0 гарантирует то же самое
+    -- свойство (профайлер патчит строго ПОСЛЕ того, как отработают все
+    -- on_game_start остальных скриптов в этот же тик), но не зависит от
+    -- имени файла вообще.
+    if CreateTimeEvent and not RETRY_ARMED then
+        RETRY_ARMED = true
+        CreateTimeEvent("trade_ui_profiler", "deferred_install", 0, function()
+            RETRY_ARMED = false
+            if install() then
+                if diag_on() then install_diag() end
+                return true
+            end
+            -- Целевые классы UI ещё не готовы (например, не тот момент
+            -- загрузки) - повторим попытку ещё через секунду.
+            RETRY_ARMED = true
+            CreateTimeEvent("trade_ui_profiler", "late_install", 1, retry_install)
+            return true
+        end)
+    end
+
+    if RegisterScriptCallback and not CALLBACKS then
+        CALLBACKS = true
+        RegisterScriptCallback("on_option_change", refresh_opts)
+        RegisterScriptCallback("on_game_end", on_game_end)
+    end
+end

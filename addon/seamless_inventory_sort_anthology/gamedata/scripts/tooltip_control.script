@@ -1,0 +1,330 @@
+--[[
+	Item Info Tooltip controlled appearance.
+	11/11/2022
+	This work is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+	Author: Flueno
+
+	Anthology 2.1 adaptation: one-time hooks, safe delay restoration,
+	duplicate GUI callback handling for the integrated UI Performance Core,
+	and delay pushes now respect each window's own enable flag (a window
+	disabled via MCM, e.g. tt_details=false for UIItemSheet, is skipped
+	instead of still getting its tooltip delay overwritten).
+--]]
+
+
+local enabled = true
+
+local mod_hold_to_hide = 1
+local mod_hold_or_click_to_show = 4
+local default_mod = mod_hold_to_hide
+
+local mod 	= mod_hold_to_hide -- current mod, could be change at runtime
+local hold_key = DIK_keys.DIK_LMENU
+local trigger_key = DIK_keys.DIK_LMENU -- DIK_LMENU /  DIK_LCONTROL /  DIK_SPACE /  DIK_CAPITAL
+local use_alternative_key_listener = not (hold_key == DIK_keys.DIK_LMENU or hold_key == DIK_keys.DIK_LCONTROL)
+local toggle_mode = false
+local no_clicks = false
+
+local enabled_delay_control = false
+local default_delay = 350
+local delay = default_delay
+local delay_short = 110
+local delay_on_gui_show = 1100
+local delay_was_patched = {} -- delay patching (cached) for unconventional gui instances
+local original_delays = setmetatable({}, { __mode = "k" })
+local callbacks_registered = false
+local hooks_installed = false
+
+--- Implementation relies on the fact that only UIInventory may be overlapped by other GUIs.
+-- when overlapped gui is still participates in update loop  - need to ignore for proper item selection tracking
+local alter_tooltip_at = { -- keys for delays, flags for mod alterations
+	["UIInventory"] 	= enabled,
+	["UIWorkshop"] 		= true,
+	["UIItemSheet"] 	= true, -- details ui (shows on top of inv UI)
+	["UIRepair"] 		= true, -- (repair + af-melter shows on top of inv UI)
+	["UIMutantLoot"] 	= true,
+	["UICook"] 			= true,
+	["UIRecipe"] 		= true,
+	["UICompanionInv"] 	= true, -- ?
+
+}
+
+local click_tracker
+local gui_state
+local function getId(t)
+	if t and not t._pid then t._pid = string.format("%p", t) end
+	return t and t._pid
+end
+
+function is_click_to_show_mod() return mod_hold_or_click_to_show == mod and not no_clicks end
+
+local base_pass = utils_ui.UIInfoItem.Pass
+function utils_ui.UIInfoItem:Pass(obj, sec)
+	if not gui_state or not click_tracker then return base_pass(self, obj, sec) end
+	if enabled_delay_control then set_delay_if_not_patched(self.owner) end
+	if not enabled or not alter_tooltip_at[gui_state.last_gui_shown_name] 	then return base_pass(self, obj, sec) end
+	if is_click_to_show_mod() and gui_state:isGuiOverlayed(self.owner) 		then return base_pass(self, obj, sec) end
+
+	-- binding inside :update call in order to react on forbidden in on_key_press keys
+	if use_alternative_key_listener and toggle_mode then click_tracker:on_key_clicked(trigger_key, "UI", flip_modes) end
+
+	local tt_candidate_id = obj and obj:id() or sec
+
+	--- updating selection even if nothing is hovered (in order to reset selection if tt delay weren't reached)
+	if is_click_to_show_mod() then click_tracker:updateSelectionToNewHoveredItem(tt_candidate_id) end
+
+	if not (obj or sec) then return base_pass(self, obj, sec) end --- stop if nothing is even hovered
+
+	------------------------ something is definitely hovered over ---------------------
+	--------- listen to clicks while we are hovering over anything (but not in main inv)
+	if is_click_to_show_mod() and not gui_state:isInventoryActive() then
+		click_tracker:listen_to_mouse_click(tt_candidate_id)
+	end
+
+	local is_base_passed = base_pass(self, obj, sec)
+	if not is_base_passed then return false end
+
+	--------------------- something is definitely hovered over & delay passed ---------------------
+	local hold_key_pressed = (key_state(hold_key) == 1)
+	if mod_hold_to_hide == mod then
+		if hold_key_pressed or not first_show_delay_passed() then
+			self:Reset()
+			return false
+		else
+			return true
+		end
+	elseif mod_hold_or_click_to_show == mod then
+		if hold_key_pressed or click_tracker:isClickedOver(tt_candidate_id) then
+			return true
+		else
+			self:Reset()
+			return false
+		end
+	end
+end
+
+local function refreshClickListenerEnabledState(flag)
+	if not click_tracker then return end
+	click_tracker:enableInventoryItemKbEventListener((flag == nil or flag) and is_click_to_show_mod())
+end
+
+-- Forward declaration is required: flip_modes is defined before the delay
+-- helper, and without this declaration Lua resolves it as a global.
+local get_contextual_delay
+
+---- tootlip modes toggling -----
+---------------------------------
+
+function flip_modes()
+	if not (enabled and toggle_mode and gui_state) then return end
+	if not gui_state:is_any_displayed(alter_tooltip_at) then return end
+
+	delay_was_patched = {}
+	if mod_hold_to_hide == mod then
+		mod = mod_hold_or_click_to_show
+		for name, _f in pairs(alter_tooltip_at) do if _f then set_delay_at(name, delay_short) end end
+	elseif mod_hold_or_click_to_show == mod then
+		mod = mod_hold_to_hide
+		for name, _f in pairs(alter_tooltip_at) do if _f then set_delay_at(name, delay) end end
+	end
+
+	refreshClickListenerEnabledState()
+	if enabled_delay_control and get_contextual_delay then
+		force_set_all_delays(get_contextual_delay())
+	end
+end
+
+function on_key_press(key)-- flip_modes; only Alt Ctrl Shift
+	if enabled and toggle_mode and not use_alternative_key_listener and (trigger_key == key) and ui_mcm then
+		ui_mcm.simple_press("tt_control", trigger_key, function() flip_modes() end)
+	end
+end
+
+---- small initial tt delay -------
+-----------------------------------
+
+function first_show_delay_passed()
+	local now = time_global()
+	return delay_on_gui_show == 0
+			or not gui_state:isInventoryActive()
+			or (now > gui_state.last_gui_shown_ts + delay_on_gui_show)
+end
+
+
+---- tt delay alteration and state cleanups -----
+-------------------------------------------------
+
+get_contextual_delay = function()
+	local contextual_delay = (mod_hold_or_click_to_show == mod) and delay_short or delay
+	if not gui_state then return contextual_delay end
+	return alter_tooltip_at[gui_state.last_gui_shown_name] and contextual_delay or delay
+end
+
+function on_GUI_show(name, path)
+	if not (enabled_delay_control or enabled) then return end
+	--printf("show %s %s %s", name, path or 'nopath?', getId(gui_state:get_gui_ref(name)))
+	gui_state:trackShown(name, path)
+
+	if gui_state.is_overlayed then
+		--printf("/// overlaying")
+	elseif alter_tooltip_at[name] then
+		mod = default_mod -- reset tt--mod on ui open
+	end
+	force_set_all_delays(get_contextual_delay())
+	click_tracker:reset_item_selection()
+	refreshClickListenerEnabledState(name == "UIInventory")
+end
+
+function on_GUI_hide(name, path)
+	if not (enabled_delay_control or enabled) then return end
+	--printf("hide %s %s %s", name, path or 'nopath?', getId(gui_state:get_gui_ref(name)))
+	gui_state:trackHidden(name, path, function() force_set_all_delays(get_contextual_delay()) end)
+
+	click_tracker:reset_item_selection()
+	refreshClickListenerEnabledState(gui_state:is_displayed("UIInventory"))
+end
+
+local tooltip_owner_names = {"item_info", "upgr_info", "hint_wnd"}
+function set_delay_at(name, delay)
+	if not enabled_delay_control then return end
+	set_delay_at_ref(gui_state:get_gui_ref(name), delay)
+end
+
+function set_delay_at_ref(gui_ref, delay)
+	if enabled_delay_control and gui_ref then
+		for _i,t_name in pairs(tooltip_owner_names) do
+			local owner = gui_ref[t_name]
+			if owner then
+				if original_delays[owner] == nil then original_delays[owner] = owner.delay end
+				owner.delay = delay
+			end
+		end
+	end
+end
+
+local function restore_all_delays()
+	for owner, original in pairs(original_delays) do
+		if owner and original ~= nil then owner.delay = original end
+	end
+	delay_was_patched = {}
+end
+
+function force_set_all_delays(delay)
+	if not enabled_delay_control then return end
+	delay_was_patched = {}
+	for name, _f in pairs(alter_tooltip_at) do if _f then set_delay_at(name, delay) end end
+end
+
+function set_delay_if_not_patched(gui_ref)
+	local gui_id = getId(gui_ref)
+	if not delay_was_patched[gui_id] then
+		set_delay_at_ref(gui_ref, get_contextual_delay())
+		delay_was_patched[gui_id] = true
+	end
+end
+
+
+-------------------------------------------------
+
+function on_option_change()
+	if ui_mcm then
+		enabled = ui_mcm.get("tooltip_control/enabled")
+		mod = ui_mcm.get("tooltip_control/tcontrol_mode") or mod_hold_to_hide
+		hold_key = ui_mcm.get("tooltip_control/hold_key") or DIK_keys.DIK_LMENU
+		trigger_key = ui_mcm.get("tooltip_control/trigger_key") or DIK_keys.DIK_LMENU
+		toggle_mode = ui_mcm.get("tooltip_control/toggle_mode") or false
+		use_alternative_key_listener = not (trigger_key == DIK_keys.DIK_LMENU or trigger_key == DIK_keys.DIK_LCONTROL)
+		default_mod = mod
+		no_clicks = ui_mcm.get("tooltip_control/no_clicks")
+		local wasEnabledBeforeChange = enabled_delay_control
+		local newDelayControl = ui_mcm.get("tooltip_control/enabled_delay") or false
+		delay_on_gui_show = ui_mcm.get("tooltip_control/tooltip_gui_show_delay") or delay_on_gui_show
+		delay = ui_mcm.get("tooltip_control/tooltip_delay") or default_delay
+		delay_short = ui_mcm.get("tooltip_control/tooltip_click_delay") or 110
+		if wasEnabledBeforeChange and not newDelayControl then restore_all_delays() end
+		enabled_delay_control = newDelayControl
+
+		alter_tooltip_at["UIItemSheet"] = ui_mcm.get("tooltip_control/tt_details")
+		--alter_tooltip_at["UIWorkshop"] 	= ui_mcm.get("tooltip_control/tt_workshop")
+		--alter_tooltip_at["UIRepair"] 	= ui_mcm.get("tooltip_control/tt_repair")
+		--alter_tooltip_at["UIMutantLoot"]= ui_mcm.get("tooltip_control/tt_mutant_loot")
+		--alter_tooltip_at["UICook"] 		= ui_mcm.get("tooltip_control/tt_cook")
+		--alter_tooltip_at["UIRecipe"] 	= ui_mcm.get("tooltip_control/tt_recipe")
+
+		refreshClickListenerEnabledState()
+		if enabled_delay_control then force_set_all_delays(get_contextual_delay()) end
+	end
+end
+
+
+-- Regular callback, not an auto-called script entry point. The Pass/OnKeyboard/
+-- Show hooks stay installed (they are one-time and guarded); only the tooltip
+-- delays we overwrote are handed back to their owners.
+function on_game_end()
+	restore_all_delays()
+	if not (UnregisterScriptCallback and callbacks_registered) then return end
+	callbacks_registered = false
+	UnregisterScriptCallback("on_option_change", on_option_change)
+	UnregisterScriptCallback("GUI_on_show", on_GUI_show)
+	UnregisterScriptCallback("GUI_on_hide", on_GUI_hide)
+	UnregisterScriptCallback("on_key_press", on_key_press)
+	UnregisterScriptCallback("on_game_end", on_game_end)
+end
+
+function on_game_start()
+	local utils = tooltip_control_utils
+	if not click_tracker then click_tracker = utils.ClickTracker(enabled and is_click_to_show_mod()) end
+	if not gui_state then gui_state = utils.GuiState() end
+
+	if not hooks_installed then
+		utils_ui.UICellContainer.OnKeyboard = click_tracker:hook_InventoryItemKbEvent(utils_ui.UICellContainer.OnKeyboard)
+		utils_ui.UIInfoItem.Show = click_tracker:hook_OnTooltipShow(utils_ui.UIInfoItem.Show)
+		hooks_installed = true
+	end
+
+	if not callbacks_registered then
+		RegisterScriptCallback("on_option_change", on_option_change)
+		RegisterScriptCallback("GUI_on_show", on_GUI_show)
+		RegisterScriptCallback("GUI_on_hide", on_GUI_hide)
+		RegisterScriptCallback("on_key_press", on_key_press)
+		RegisterScriptCallback("on_game_end", on_game_end)
+		callbacks_registered = true
+	end
+
+	on_option_change()
+	if printf then printf("[Tooltip Control / Anthology UI Core 1.4.1-hotfix] initialized | hooks=once callbacks=once delay_helper=local") end
+end
+
+--[[
+local base_upgr_pass = utils_ui.UIInfoUpgr.Pass
+function utils_ui.UIInfoUpgr:Pass(sec)
+	if not enabled then return base_upgr_pass(self, sec) end
+
+	if not sec then return base_upgr_pass(self, sec) end
+
+	if is_click_to_show_mod() then click_tracker:updateSelectionToNewHoveredItem(sec) end
+	if is_click_to_show_mod() and not gui_state:isInventoryActive() then
+		click_tracker:listen_to_mouse_click(sec)
+	end
+
+	local is_base_passed = base_upgr_pass(self, sec)
+	if not is_base_passed then return false end
+	--------------------- something is definitely hovered over & delay passed ---------------------
+	local hold_key_pressed = (key_state(hold_key) == 1)
+	if mod_hold_to_hide == mod then
+		if hold_key_pressed then
+			self:Reset()
+			return false
+		else
+			return true
+		end
+	elseif mod_hold_or_click_to_show == mod then
+		if hold_key_pressed or click_tracker:isClickedOver(sec) then
+			return true
+		else
+			self:Reset()
+			return false
+		end
+	end
+end
+--]]
