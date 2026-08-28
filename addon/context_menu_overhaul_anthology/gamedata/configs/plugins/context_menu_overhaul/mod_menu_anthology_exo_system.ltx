@@ -1,0 +1,15 @@
+; Anomaly Anthology 2.1 - Exo System context-menu presentation.
+; Confirmed runtime labels against the real [BS] Exo System - new_system
+; archive: item_exo_device.script wires both check_install_psu (returns
+; "st_install_psu") and check_remove_psu (returns "st_remove_psu") via
+; use2_functor on items_exo_devices.ltx. The BETA build only covered
+; st_remove_psu — st_install_psu had no icon/group assigned even though
+; it's the same action's counterpart. Added below.
+
+![label_icons]
+st_install_psu = ui_cmo_battery
+st_remove_psu = ui_cmo_battery
+
+![groups]
+st_install_psu = 3
+st_remove_psu = 3

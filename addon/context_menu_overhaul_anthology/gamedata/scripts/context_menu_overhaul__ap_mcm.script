@@ -1,0 +1,70 @@
+-- This script was generated with Anomaly Packer v0.4.0 (https://github.com/piscopancer/anomaly-packer)
+-- Author: piscopancer
+-- Version: 1.4.2
+-- Created at: 27.07.2026
+-- Source: https://github.com/piscopancer/stalker-anomaly-context-menu-overhaul
+
+-- Anomaly Packer - MCM option builder runtime.
+-- Copied into the build automatically when a script imports 'anomaly-packer/mcm',
+-- under the per-addon name <addonId>__ap_mcm.script. Anomaly Packer rewrites that
+-- import to reach these functions as <addonId>__ap_mcm.track(...), .check(...), etc.
+-- Each builder just stamps the fields the engine expects onto the passed table.
+
+function track(props)
+    props.type = "track"
+    props.val = 2
+    return props
+end
+
+function check(props)
+    props.type = "check"
+    props.val = 1
+    return props
+end
+
+function title(props)
+    props.type = "title"
+    return props
+end
+
+function list(props)
+    props.type = "list"
+    props.val = 0
+    return props
+end
+
+function desc(props)
+    props.type = "desc"
+    return props
+end
+
+function slide(props)
+    props.type = "slide"
+    return props
+end
+
+function keyBind(props)
+    props.type = "key_bind"
+    props.val = 2
+    return props
+end
+
+-- The type comes off MCM itself: `kb_mod_radio` is an alias for its horizontal radio
+-- ("radio_h"), not a type name of its own, and an unknown type is skipped without a word.
+function kbModRadio(props)
+    props.type = ui_mcm.kb_mod_radio
+    props.val = 2
+    return props
+end
+
+function group(props)
+    if props.sh == nil then props.sh = true end
+    return props
+end
+
+function menu(props)
+    if props.sh == nil then props.sh = true end
+    return props
+end
+
+line = { type = "line" }

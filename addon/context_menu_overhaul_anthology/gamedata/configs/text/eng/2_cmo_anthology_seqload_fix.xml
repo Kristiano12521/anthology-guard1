@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!--
+  Context Menu Overhaul — Anthology 2.1 adaptation, safety-net fix.
+
+  mod_menu_anthology_2_1.ltx references the label id "st_seqload_menu" for the
+  Mags Redux sequential-loading submenu (used in [label_icons]/[groups]/[chevrons]
+  to attach an icon and chevron to that row). That id is only ever used as a
+  LOOKUP KEY there — it does not define the on-screen text. If R.A.K Mags Redux
+  does not itself ship a translation for exactly this id, the engine has
+  nothing to render and falls back to printing the raw string id
+  ("st_seqload_menu") as the row's label.
+
+  This file defines that string as a fallback. Prefix "2_" makes it load after
+  Mags Redux's own text files (alphabetically after "0_"/"1_"-prefixed base
+  files most packs use) so if Mags Redux already defines "st_seqload_menu"
+  correctly, that definition is simply overwritten by an identical-intent
+  string here — harmless either way.
+
+  If the row still shows raw text in game after installing this, Mags Redux is
+  using a DIFFERENT id for that row (typo/rename on its side) — check its own
+  text xml for the real id and update [label_icons]/[groups]/[chevrons] in
+  mod_menu_anthology_2_1.ltx to match it instead.
+-->
+<string_table>
+    <string id="st_seqload_menu">
+        <text>Sequential loading</text>
+    </string>
+</string_table>

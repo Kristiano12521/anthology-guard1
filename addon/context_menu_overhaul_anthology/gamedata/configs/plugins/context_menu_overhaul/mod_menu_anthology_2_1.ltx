@@ -1,0 +1,64 @@
+; Context Menu Overhaul 1.4.2 - Anomaly Anthology 2.1 compatibility
+; Profiles verified against:
+; - R.A.K Weapon Pack Adaptation Global A.N.T.H.O.L.O.G.Y Mags Redux d2026.6.1
+; - SYS Radioactive Air / Toxic Air Rework d2026.5.5
+;
+; DLTX extension: this file adds entries without replacing the original menu.ltx.
+
+![functor_icons]
+; Mags Redux dynamic custom functors.
+dynamic.mags_load                                                       = ui_cmo_magazine
+dynamic.seqload_magazine                                                = ui_cmo_magazine
+dynamic.mags_retool_context_fallback                                    = ui_cmo_magazine
+
+; Mags Redux LTX functors.
+magazines.unload_ammo                                                   = ui_cmo_magazine
+magazines.loadout_precondition                                          = ui_cmo_magazine
+magazines.retool_mag_precondition                                       = ui_cmo_magazine
+
+; Toxic Air consumable and refill actions.
+toxic_air.menu_filters_install                                          = ui_cmo_filter
+zzz_cxv_toxic_air_tank_filter_replenish_on_drag.menu_refilling_tank    = ui\ui_cmo_o2tank
+
+![label_icons]
+; Mags Redux.
+st_mag_eject_magazine       = ui_cmo_magazine
+st_mag_unload_ammo          = ui_cmo_magazine
+st_mag_loadout_add          = ui_cmo_magazine
+st_mag_loadout_remove       = ui_cmo_magazine
+st_mag_retool               = ui_cmo_magazine
+st_seqload_menu             = ui_cmo_magazine
+
+; Toxic Air.
+st_install_filter           = ui_cmo_filter
+st_remove_filter            = ui_cmo_filter
+; Custom icon (gamedata/textures/ui/ui_cmo_o2tank.dds) instead of the generic
+; ui_cmo_tank - a single cylinder with valve and rising bubbles, referenced
+; directly by file path per CMO's own "path to a dds file" option, so it
+; doesn't touch the shared cmo_icons.dds atlas at all.
+st_refilling_tank_on_belt   = ui\ui_cmo_o2tank
+; st_tank_equip / st_tank_remove are not real Toxic Air string ids.
+
+![groups]
+; Keep magazine/filter utility actions with other item-use actions.
+dynamic.mags_load                                                       = 3
+dynamic.seqload_magazine                                                = 3
+dynamic.mags_retool_context_fallback                                    = 3
+magazines.unload_ammo                                                   = 3
+magazines.loadout_precondition                                          = 3
+magazines.retool_mag_precondition                                       = 3
+st_mag_eject_magazine                                                   = 3
+st_mag_unload_ammo                                                      = 3
+st_mag_loadout_add                                                      = 3
+st_mag_loadout_remove                                                   = 3
+st_mag_retool                                                           = 3
+st_seqload_menu                                                         = 3
+toxic_air.menu_filters_install                                          = 3
+zzz_cxv_toxic_air_tank_filter_replenish_on_drag.menu_refilling_tank    = 3
+st_install_filter                                                       = 3
+st_remove_filter                                                        = 3
+st_refilling_tank_on_belt                                               = 3
+
+![chevrons]
+; Sequential magazine loading opens its own selection interface.
+st_seqload_menu = ui_cmo_chevron

@@ -1,0 +1,38 @@
+<string_table>
+  <string id="ui_mcm_menu_context_menu_overhaul">
+    <text>Переработка контекстного меню</text>
+  </string>
+  <string id="ui_mcm_menu_cmo_base">
+    <text>Базовые</text>
+  </string>
+  <string id="ui_mcm_menu_cmo_compat">
+    <text>Совместимость</text>
+  </string>
+  <string id="ui_mcm_menu_cmo_wpo">
+    <text>Weapon Parts Overhaul</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_base_group_related_actions">
+    <text>Группировать похожие действия</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_base_use_colors">
+    <text>Использовать цвета</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_base_show_separators">
+    <text>Разделители</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_base_details_shows_item_name">
+    <text>Опция «Подробнее» показывает название предмета</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_base_capitalize_labels">
+    <text>Опции с заглавной буквы</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_base_hide_gift">
+    <text>Скрывать опцию «Подарить»</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_compat_cmo_wpo_field_strip_icons">
+    <text>При снятии деталей оружия показывать их как иконки</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_compat_cmo_wpo_maintenance_icons">
+    <text>При обслуживании оружия показывать детали как иконки</text>
+  </string>
+</string_table>

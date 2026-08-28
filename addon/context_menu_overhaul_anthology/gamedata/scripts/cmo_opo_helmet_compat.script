@@ -1,0 +1,209 @@
+--[[
+    Context Menu Overhaul 1.4.2 Anthology - integrated OPO helmet compatibility
+
+    Outfit Parts Overhaul reserves fixed custom slot 3 for integrated helmet
+    repair. Exoskeleton systems can occupy the same fixed slot with their own
+    power-module action. This bridge registers the helmet repair as a separate
+    dynamic custom functor only when the fixed slot is occupied by another
+    action or returns nothing.
+
+    No UIRepair handlers are replaced and no existing script is overwritten.
+--]]
+
+local VERSION = "1.0.0"
+local PREFIX = "[OPOHelmetMenuCompat " .. VERSION .. "]"
+local FUNCTOR_NAME = "opo_integrated_helmet_repair"
+
+local fixed_name_custom = nil
+local registered = false
+local announced = {}
+
+local function log(message)
+    if type(printf) == "function" then
+        printf(PREFIX .. " " .. tostring(message))
+    end
+end
+
+local function safe_section(obj)
+    if not obj then return "nil" end
+    local ok, value = pcall(function() return obj:section() end)
+    return ok and tostring(value) or "<section-error>"
+end
+
+local function safe_id(obj)
+    if not obj then return "nil" end
+    local ok, value = pcall(function() return obj:id() end)
+    return ok and tostring(value) or "<id-error>"
+end
+
+local function repair_label()
+    return game.translate_string("ui_inv_repair") .. " " .. game.translate_string("st_type_1")
+end
+
+local function get_helmet_state(obj, damaged_only)
+    if not obj or type(IsOutfit) ~= "function" or not IsOutfit(obj) then
+        return nil
+    end
+
+    if not arti_outfits
+    or type(arti_outfits.has_parts) ~= "function"
+    or type(arti_outfits.is_helmet) ~= "function"
+    or not item_parts
+    or type(item_parts.get_parts_con) ~= "function" then
+        return nil
+    end
+
+    local ok_has, has_parts = pcall(arti_outfits.has_parts, obj)
+    if not ok_has or not has_parts then
+        return nil
+    end
+
+    local ok_parts, parts = pcall(item_parts.get_parts_con, obj, nil, true)
+    if not ok_parts or type(parts) ~= "table" then
+        return nil
+    end
+
+    local selected_section = nil
+    local selected_condition = nil
+
+    for section, condition in pairs(parts) do
+        if type(condition) == "number" then
+            local ok_helmet, is_helmet = pcall(arti_outfits.is_helmet, section)
+            if ok_helmet and is_helmet and (not damaged_only or condition < 99) then
+                if selected_condition == nil or condition < selected_condition then
+                    selected_section = section
+                    selected_condition = condition
+                end
+            end
+        end
+    end
+
+    return selected_section, selected_condition
+end
+
+local function get_kit()
+    if not db or not db.actor then return nil end
+    local ok, kit = pcall(function()
+        return db.actor:object("helmet_repair_kit")
+    end)
+    return ok and kit or nil
+end
+
+local function fixed_slot_label(obj, bag, mode)
+    if type(fixed_name_custom) ~= "function" then
+        return nil
+    end
+
+    local screen = ui_inventory and ui_inventory.GUI or nil
+    if not screen then
+        return nil
+    end
+
+    local ok, value = pcall(fixed_name_custom, screen, obj, bag, mode, 3)
+    return ok and value or nil
+end
+
+local function should_show(obj, bag, mode)
+    local helmet_section, helmet_condition = get_helmet_state(obj, true)
+    if not helmet_section or not get_kit() then
+        return false
+    end
+
+    local expected = repair_label()
+    local occupied = fixed_slot_label(obj, bag, mode)
+
+    -- OPO's original custom_3 already works for this outfit: avoid a duplicate.
+    if occupied == expected then
+        return false
+    end
+
+    local id = safe_id(obj)
+    if not announced[id] then
+        announced[id] = true
+        log(
+            "dynamic fallback available item=" .. safe_section(obj)
+            .. " id=" .. id
+            .. " helmet=" .. tostring(helmet_section)
+            .. " condition=" .. tostring(helmet_condition)
+            .. " fixed_custom_3=" .. tostring(occupied)
+        )
+    end
+
+    return true
+end
+
+local function action_name(obj, bag, mode)
+    if should_show(obj, bag, mode) then
+        return repair_label()
+    end
+    return nil
+end
+
+local function repair_action(obj, bag, mode)
+    local helmet_section, before = get_helmet_state(obj, true)
+    local kit = get_kit()
+
+    if not helmet_section or not kit then
+        log("repair cancelled: item, damaged helmet or helmet_repair_kit is unavailable")
+        return
+    end
+
+    if not arti_outfits or type(arti_outfits.repair_helmet) ~= "function" then
+        log("repair cancelled: arti_outfits.repair_helmet is unavailable")
+        return
+    end
+
+    local ok, err = pcall(arti_outfits.repair_helmet, obj, kit)
+    if not ok then
+        log("repair failed item=" .. safe_section(obj) .. " error=" .. tostring(err))
+        return
+    end
+
+    local _, after = get_helmet_state(obj, false)
+    log(
+        "repair applied item=" .. safe_section(obj)
+        .. " id=" .. safe_id(obj)
+        .. " helmet=" .. tostring(helmet_section)
+        .. " before=" .. tostring(before)
+        .. " after=" .. tostring(after)
+    )
+end
+
+local function register_functor()
+    if registered then return true end
+
+    if not custom_functor_autoinject
+    or type(custom_functor_autoinject.add_functor) ~= "function"
+    or not ui_inventory
+    or not ui_inventory.UIInventory then
+        return false
+    end
+
+    -- Capture the complete pre-existing custom-slot chain before adding our
+    -- dynamic action. Calling it with slot 3 tells us whether OPO's original
+    -- helmet action is visible or another addon has occupied that slot.
+    fixed_name_custom = ui_inventory.UIInventory.Name_Custom
+
+    custom_functor_autoinject.add_functor(
+        FUNCTOR_NAME,
+        should_show,
+        action_name,
+        nil,
+        repair_action,
+        false
+    )
+
+    registered = true
+    log("registered dynamic integrated-helmet repair fallback")
+    return true
+end
+
+function on_game_start()
+    if not register_functor() then
+        log("registration delayed: required OPO/custom-functor API is unavailable")
+    end
+end
+
+function on_game_load()
+    register_functor()
+end

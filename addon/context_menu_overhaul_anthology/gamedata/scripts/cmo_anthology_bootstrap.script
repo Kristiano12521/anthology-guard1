@@ -1,0 +1,95 @@
+-- Context Menu Overhaul 1.4.2 — Anthology 2.1 compatibility bootstrap
+--
+-- FIX: this replaces zzzzzzzzzz_context_menu_overhaul_anthology.script.
+-- The old file depended on its "zzzzzzzzzz_" filename prefix to be loaded
+-- (alphabetically) after context_menu_overhaul.script, so that its
+-- on_game_start()/on_game_load() would run only once the base mod's own
+-- hooks/globals already existed. That's fragile: any other addon using an
+-- equal-or-later "zzzz..." prefix can load after this file and break the
+-- ordering assumption silently, with no error.
+--
+-- Instead, this file registers a single actor_on_first_update callback.
+-- The engine fires actor_on_first_update only after every loaded script's
+-- own on_game_start/on_game_load has already run — the same guarantee the
+-- zzz-prefix was trying to buy, but based on an actual engine callback
+-- instead of file sort order.
+--
+-- DELETE the old zzzzzzzzzz_context_menu_overhaul_anthology.script when
+-- installing this file — both define the same global function names
+-- (install_cmo_anthology_hooks, schedule_cmo_qaw, on_game_start, on_game_load)
+-- and having both loaded would let one silently overwrite the other.
+
+local cmo_anthology_hook_registered = false
+local cmo_anthology_stage = "game_start"
+
+--- Installs (or re-chains) Context Menu Overhaul's UI hooks for this session.
+-- Safe to call more than once: context_menu_overhaul.install_hooks() already
+-- checks its own hooks_installed flag and re-chains cleanly if another addon
+-- replaced the methods after the first install.
+function install_cmo_anthology_hooks()
+  local cmo = context_menu_overhaul
+  if not (cmo and type(cmo.install_hooks) == "function") then
+    if type(printf) == "function" then
+      printf("[CMO Anthology] late install blocked: context_menu_overhaul.install_hooks is unavailable")
+    end
+    return false
+  end
+
+  if type(cmo.load_settings) == "function" then
+    pcall(cmo.load_settings)
+  end
+
+  local ok, result = pcall(cmo.install_hooks)
+  if ok and result then
+    return true
+  end
+
+  if type(printf) == "function" then
+    printf("[CMO Anthology] late install failed: %s", tostring(result))
+  end
+  return false
+end
+
+function schedule_cmo_qaw(stage)
+  local cmo = context_menu_overhaul
+  if cmo and type(cmo.cmo_qaw_schedule_late_registration) == "function" then
+    local ok, err = pcall(cmo.cmo_qaw_schedule_late_registration, stage)
+    if not ok and type(printf) == "function" then
+      printf("[CMO Anthology] QAW late schedule failed at %s: %s", tostring(stage), tostring(err))
+    end
+  end
+end
+
+--- Fires once per session, after all on_game_start/on_game_load calls across
+-- every loaded mod have already completed.
+function cmo_anthology_bootstrap()
+  install_cmo_anthology_hooks()
+  schedule_cmo_qaw(cmo_anthology_stage)
+end
+
+--- Registers the callback exactly once per session, whichever entry point
+-- (new game or save load) fires first. The guard also protects against a
+-- stray double require of this script re-running on_game_start.
+local function register_cmo_anthology_bootstrap(stage)
+  cmo_anthology_stage = stage
+  if cmo_anthology_hook_registered then
+    return
+  end
+  cmo_anthology_hook_registered = true
+  RegisterScriptCallback("actor_on_first_update", cmo_anthology_bootstrap)
+end
+
+function on_game_start()
+  register_cmo_anthology_bootstrap("game_start")
+end
+
+function on_game_load()
+  register_cmo_anthology_bootstrap("game_load")
+end
+
+function on_game_end()
+  if cmo_anthology_hook_registered and type(UnregisterScriptCallback) == "function" then
+    UnregisterScriptCallback("actor_on_first_update", cmo_anthology_bootstrap)
+  end
+  cmo_anthology_hook_registered = false
+end

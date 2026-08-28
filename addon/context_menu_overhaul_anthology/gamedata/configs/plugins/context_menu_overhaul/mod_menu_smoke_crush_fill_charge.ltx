@@ -1,0 +1,25 @@
+; Language-independent keys. Functors verified in:
+;   arti_ball_crusher.script (arti_crush -> st_crush)
+;   haruka_fill.script (haruka_fill -> st_haruka_fill)
+;   items_fillable.ltx (haruka_fill.menu_fill)
+;   items_exo_devices.ltx (item_exo_device.menu_battery -> st_charge_exo)
+
+![functor_icons]
+dynamic.arti_crush           = ui\ui_cmo_grater
+dynamic.haruka_fill          = ui\ui_cmo_fillflask
+haruka_fill.menu_fill        = ui\ui_cmo_fillflask
+item_exo_device.menu_battery = ui_cmo_battery
+
+![label_icons]
+st_crush      = ui\ui_cmo_grater
+st_haruka_fill = ui\ui_cmo_fillflask
+st_charge_exo = ui_cmo_battery
+
+![groups]
+dynamic.arti_crush           = 3
+dynamic.haruka_fill          = 3
+haruka_fill.menu_fill        = 3
+item_exo_device.menu_battery = 3
+st_crush                     = 3
+st_haruka_fill               = 3
+st_charge_exo                = 3

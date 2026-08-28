@@ -1,0 +1,50 @@
+<w>
+  <file name="ui\ui_icon_equipment">
+    <texture id="ui_cmo_battery" x="0" y="1300" width="50" height="50"/>
+  </file>
+  <file name="ui\cmo_icons">
+    <texture id="ui_cmo_placeholder" x="0" y="0" width="64" height="64"/>
+    <texture id="ui_cmo_vest" x="64" y="0" width="64" height="64"/>
+    <texture id="ui_cmo_cell" x="128" y="0" width="64" height="64"/>
+    <texture id="ui_cmo_info" x="192" y="0" width="64" height="64"/>
+    <texture id="ui_cmo_tools" x="0" y="64" width="64" height="64"/>
+    <texture id="ui_cmo_bullets" x="64" y="64" width="64" height="64"/>
+    <texture id="ui_cmo_gift" x="128" y="64" width="64" height="64"/>
+    <texture id="ui_cmo_book" x="192" y="64" width="64" height="64"/>
+    <texture id="ui_cmo_backpack" x="0" y="128" width="64" height="64"/>
+    <texture id="ui_cmo_star" x="64" y="128" width="64" height="64"/>
+    <texture id="ui_cmo_unstar" x="128" y="128" width="64" height="64"/>
+    <texture id="ui_cmo_arrows" x="192" y="128" width="64" height="64"/>
+    <texture id="ui_cmo_utensils" x="0" y="192" width="64" height="64"/>
+    <texture id="ui_cmo_arrow_down" x="64" y="192" width="64" height="64"/>
+    <texture id="ui_cmo_saw" x="128" y="192" width="64" height="64"/>
+    <texture id="ui_cmo_divide" x="192" y="192" width="64" height="64"/>
+    <texture id="ui_cmo_trashbin" x="0" y="256" width="64" height="64"/>
+    <texture id="ui_cmo_untrashbin" x="64" y="256" width="64" height="64"/>
+    <texture id="ui_cmo_helmet" x="128" y="256" width="64" height="64"/>
+    <texture id="ui_cmo_silencer" x="192" y="256" width="64" height="64"/>
+    <texture id="ui_cmo_gl" x="0" y="320" width="64" height="64"/>
+    <texture id="ui_cmo_scope" x="64" y="320" width="64" height="64"/>
+    <texture id="ui_cmo_patch" x="128" y="320" width="64" height="64"/>
+    <texture id="ui_cmo_unpack" x="192" y="320" width="64" height="64"/>
+    <texture id="ui_cmo_pie" x="0" y="384" width="64" height="64"/>
+    <texture id="ui_cmo_screwdriver" x="64" y="384" width="64" height="64"/>
+    <texture id="ui_cmo_components_star" x="128" y="384" width="64" height="64"/>
+    <texture id="ui_cmo_oil" x="192" y="384" width="64" height="64"/>
+    <texture id="ui_cmo_eye" x="0" y="448" width="64" height="64"/>
+    <texture id="ui_cmo_magazine" x="64" y="448" width="64" height="64"/>
+    <texture id="ui_cmo_health" x="128" y="448" width="64" height="64"/>
+    <texture id="ui_cmo_water" x="192" y="448" width="64" height="64"/>
+    <texture id="ui_cmo_hands" x="0" y="512" width="64" height="64"/>
+    <texture id="ui_cmo_cigarette" x="64" y="512" width="64" height="64"/>
+    <texture id="ui_cmo_lockpick" x="128" y="512" width="64" height="64"/>
+    <texture id="ui_cmo_filter" x="192" y="512" width="64" height="64"/>
+    <texture id="ui_cmo_plant" x="0" y="576" width="64" height="64"/>
+    <texture id="ui_cmo_cross" x="64" y="576" width="64" height="64"/>
+    <texture id="ui_cmo_tank" x="128" y="576" width="64" height="64"/>
+    <texture id="ui_cmo_toolkit" x="192" y="576" width="64" height="64"/>
+    <texture id="ui_cmo_merge" x="0" y="640" width="64" height="64"/>
+    <texture id="ui_cmo_chevron" x="64" y="640" width="64" height="64"/>
+    <texture id="ui_cmo_pouch" x="128" y="640" width="64" height="64"/>
+  </file>
+</w>

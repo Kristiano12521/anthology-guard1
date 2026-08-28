@@ -1,0 +1,500 @@
+-- This script was generated with Anomaly Packer v0.4.0 (https://github.com/piscopancer/anomaly-packer)
+-- Author: piscopancer
+-- Version: 1.4.2
+-- Created at: 27.07.2026
+-- Source: https://github.com/piscopancer/stalker-anomaly-context-menu-overhaul
+-- Anthology adaptation: guarded WPO integration and text fallback
+-- Adaptation version: 1.2.1 BETA
+
+function part_sec(p)
+  return p[2]
+end
+function part_cond(p)
+  local wpn = p and level.object_by_id(p[1])
+  if not wpn then
+    return 100
+  end
+  if not (item_parts and type(item_parts.get_parts_con) == "function") then
+    return 100
+  end
+  local ok, con = pcall(item_parts.get_parts_con, wpn)
+  if not ok or type(con) ~= "table" then
+    return 100
+  end
+  return con[part_sec(p)] or 100
+end
+function make_part_proxy(sec, cond)
+  local cond01 = cond > 1 and cond / 100 or cond
+  local overrides = {
+    section = function() return sec end,
+    name = function() return sec end,
+    condition = function() return cond01 end
+  }
+  local proxy = setmetatable(
+    overrides,
+    {__index = function() return proxy_stub end}
+  )
+  return proxy
+end
+function recolor_condition(item, cond)
+  local text = safe_index(item, "cond_text")
+  local get_color = utils_xml and safe_index(utils_xml, "get_color_con")
+  if not text or type(get_color) ~= "function" then
+    return
+  end
+  local ok, color = pcall(get_color, cond, true)
+  if ok and type(color) == "number" then
+    pcall(function() return text:SetTextColor(color) end)
+  end
+end
+--- Hides the cells of a previous opening; the pool keeps their instances for reuse. Also drops the UI registration so the inventory below is only suppressed while a strip is actually shown.
+function clear(widget)
+  local old = widget.cmo_strip
+  if old then
+    for ____, cell in ipairs(old) do
+      pcall(function() return cell.item.cell:Show(false) end)
+    end
+  end
+  widget.cmo_strip = nil
+  widget.cmo_row = nil
+  if widget.cmo_registered then
+    if type(Unregister_UI) == "function" then
+      pcall(Unregister_UI, STRIP_UI_NAME)
+    end
+    widget.cmo_registered = nil
+  end
+end
+function build(widget, parts, remove_all)
+  local cells = widget.cmo_strip
+  if not cells then
+    return
+  end
+  local pool = widget.cmo_pool or ({})
+  widget.cmo_pool = pool
+  local container = {
+    path = "container",
+    xml = utils_ui.get_utils_xml(),
+    grid_size = STRIP_CELL
+  }
+  local x = 0
+  do
+    local i = 0
+    while i < #parts do
+      do
+        local p = parts[i + 1].params
+        if not pool[i + 1] then
+          pool[i + 1] = utils_ui.UICellItem(container, {path = "container:st", base = widget.form}, 0, false)
+        end
+        local item = pool[i + 1]
+        if not item:Set(make_part_proxy(
+          part_sec(p),
+          part_cond(p)
+        )) then
+          item.cell:Show(false)
+          goto __continue60
+        end
+        recolor_condition(
+          item,
+          part_cond(p)
+        )
+        item.cell:SetWndPos(vec(STRIP_PAD + x, STRIP_PAD))
+        item.cell:Show(true)
+        cells[#cells + 1] = {item = item, params = p}
+        x = x + item.cell:GetWidth() + STRIP_GAP
+      end
+      ::__continue60::
+      i = i + 1
+    end
+  end
+  do
+    local i = #parts
+    while i < #pool do
+      pool[i + 1].cell:Show(false)
+      i = i + 1
+    end
+  end
+  local strip_w = x > 0 and x - STRIP_GAP or 0
+  local content_w = strip_w
+  local content_h = strip_w > 0 and STRIP_CELL or 0
+  if remove_all then
+    local divider
+    local div_h = 0
+    if strip_w > 0 and settings.show_separators then
+      vanilla_add_item(widget, 1, "")
+      local div = widget.list_box:GetItemByIndex(0)
+      if div then
+        divider = draw_divider(div)
+        div_h = div:GetHeight()
+      end
+    end
+    local row_index = div_h > 0 and 2 or 1
+    vanilla_add_item(
+      widget,
+      row_index,
+      row_label(remove_all.name),
+      remove_all.action,
+      remove_all.params
+    )
+    local row = widget.list_box:GetItemByIndex(div_h > 0 and 1 or 0)
+    if row then
+      local row_h = row:GetHeight()
+      local column = reserve_column(row)
+      local text = row:GetTextItem()
+      local row_w = (text and text:GetWidth() + column or row:GetWidth()) + widget.PDW
+      content_w = math.max(content_w, row_w)
+      local list_y = STRIP_PAD + (strip_w > 0 and STRIP_CELL + STRIP_GAP or 0)
+      widget.list_box:SetWndPos(vec(STRIP_PAD, list_y))
+      widget.list_box:SetWndSize(vec(content_w, div_h + row_h))
+      row:SetWndSize(vec(content_w, row_h))
+      if divider then
+        divider:SetWndSize(vec(content_w, DIVIDER_LINE_H))
+      end
+      draw_icon(row, STRIP_REMOVE_ALL_ICON)
+      content_h = list_y - STRIP_PAD + div_h + row_h
+      widget.cmo_row = {
+        item = row,
+        x = STRIP_PAD,
+        y = list_y + div_h,
+        w = content_w,
+        h = row_h
+      }
+    end
+  end
+  widget.W = content_w + STRIP_PAD * 2
+  widget.H = content_h + STRIP_PAD * 2
+  local form = vec(widget.W, widget.H)
+  widget.form:SetWndSize(form)
+  widget.frame:SetWndSize(form)
+  if not remove_all then
+    widget.list_box:SetWndSize(form)
+  end
+  ensure_info(widget)
+end
+function ensure_info(widget)
+  if not widget.cmo_info and can_use_icons() then
+    local ok, info = pcall(utils_ui.UIInfoItem, widget)
+    if ok then
+      widget.cmo_info = info
+    end
+  end
+end
+____context_menu_overhaul_0 = context_menu_overhaul
+settings = ____context_menu_overhaul_0.settings
+row_label = ____context_menu_overhaul_0.row_label
+finish_layout = ____context_menu_overhaul_0.finish_layout
+reserve_column = ____context_menu_overhaul_0.reserve_column
+draw_icon = ____context_menu_overhaul_0.draw_icon
+draw_divider = ____context_menu_overhaul_0.draw_divider
+vanilla_fill_list = ____context_menu_overhaul_0.vanilla_fill_list
+vanilla_add_item = ____context_menu_overhaul_0.vanilla_add_item
+UNKNOWN = ____context_menu_overhaul_0.UNKNOWN
+DIVIDER = ____context_menu_overhaul_0.DIVIDER
+DIVIDER_LINE_H = ____context_menu_overhaul_0.DIVIDER_LINE_H
+safe_index = ____context_menu_overhaul_0.safe_index
+____context_menu_overhaul_utils_1 = context_menu_overhaul_utils
+vec = ____context_menu_overhaul_utils_1.vec
+function set_base_methods(fill, add)
+  if type(fill) == "function" then
+    vanilla_fill_list = fill
+  end
+  if type(add) == "function" then
+    vanilla_add_item = add
+  end
+end
+function can_use_icons()
+  return type(Register_UI) == "function"
+    and type(Unregister_UI) == "function"
+    and type(item_parts) == "table"
+    and type(item_parts.get_parts_con) == "function"
+    and type(utils_ui) == "table"
+    and safe_index(utils_ui, "UICellItem") ~= nil
+    and safe_index(utils_ui, "UIInfoItem") ~= nil
+    and type(safe_index(utils_ui, "get_utils_xml")) == "function"
+    and type(utils_xml) == "table"
+    and type(safe_index(utils_xml, "get_color_con")) == "function"
+end
+--- WPO's action string on every field-strip row; a menu whose rows all carry it is the field strip.
+FIELD_STRIP_ACTION = "remove_part"
+--- WPO's two maintenance actions; a menu whose rows all carry one is the "replace parts" menu.
+REPLACE_PART_ACTION = "replace_part"
+CLEAN_PART_ACTION = "clean_part"
+--- Label id whose icon every field-strip row inherits — the same `[label_icons]` entry the "field strip" menu entry uses.
+FIELD_STRIP_LABEL = "st_field_strip"
+--- Label id whose icon the maintenance rows inherit — the "replace parts" entry's oil can.
+MAINTENANCE_LABEL = "st_wpo_replace_parts"
+STRIP_CELL = 40
+STRIP_GAP = 4
+STRIP_PAD = 8
+STRIP_UI_NAME = "cmo_field_strip"
+STRIP_REMOVE_ALL_ICON = "ui_cmo_screwdriver"
+--- Strips STALKER `%c[r,g,b,a]` colour escapes some WPO maintenance rows embed, which the menu's plain text control would otherwise render literally.
+function clean_label(name)
+  local clean = string.gsub(name, "%%c%[.-%]", "")
+  return clean
+end
+--- Whether every row carries the field-strip action; an empty list is not a strip.
+function is_field_strip(action_list)
+  if #action_list == 0 then
+    return false
+  end
+  do
+    local i = 0
+    while i < #action_list do
+      if action_list[i + 1] ~= FIELD_STRIP_ACTION then
+        return false
+      end
+      i = i + 1
+    end
+  end
+  return true
+end
+--- Whether every row carries a maintenance action; an empty list is not a maintenance menu.
+function is_maintenance(action_list)
+  if #action_list == 0 then
+    return false
+  end
+  do
+    local i = 0
+    while i < #action_list do
+      if action_list[i + 1] ~= REPLACE_PART_ACTION and action_list[i + 1] ~= CLEAN_PART_ACTION then
+        return false
+      end
+      i = i + 1
+    end
+  end
+  return true
+end
+--- Item UI Improvements, when installed, draws a condition dot per part on the weapon's own
+-- inventory icon and orders them by its `parts_sort` — a fixed part-name order (barrel, trigger,
+-- bolt, bolt carrier, …). The menu WPO hands over is ordered by whatever comparator the installed
+-- field-strip builder happens to use (in GAMMA, `utils_ui.sort_by_sizekind`, i.e. by inventory grid
+-- size), so the rows do not line up with the dots the player just read off the icon. Returns the
+-- dot comparator when that mod is present, and nothing when it is not — without it there are no
+-- dots to match and the order WPO gave is kept.
+function dot_order()
+  if type(z_item_icon_info) ~= "table" then
+    return nil
+  end
+  local sorter = safe_index(z_item_icon_info, "parts_sort")
+  return type(sorter) == "function" and sorter or nil
+end
+--- Reorders the part rows to match the icon's condition dots. A comparator over a set it was not written for can be inconsistent, which makes `table.sort` raise; on any failure the rows are left in the order WPO gave.
+function sort_by_dots(parts)
+  local sorter = dot_order()
+  if not sorter or #parts < 2 then
+    return
+  end
+  local conditions = {}
+  for ____, row in ipairs(parts) do
+    conditions[part_sec(row.params)] = part_cond(row.params)
+  end
+  local before = {unpack(parts)}
+  local ok = pcall(function() return table.sort(
+    parts,
+    function(a, b) return sorter(
+      conditions,
+      part_sec(a.params),
+      part_sec(b.params)
+    ) end
+  ) end)
+  if not ok then
+    do
+      local i = 0
+      while i < #before do
+        parts[i + 1] = before[i + 1]
+        i = i + 1
+      end
+    end
+  end
+end
+--- Splits a field strip into its part rows (each carries a section) and WPO's section-less "remove all", which its own loop vars have gone out of scope by.
+function split_strip(action_list, name_list, params_list)
+  local parts = {}
+  local remove_all
+  do
+    local i = 0
+    while i < #params_list do
+      do
+        local p = params_list[i + 1]
+        if not p then
+          goto __continue30
+        end
+        local row = {action = action_list[i + 1], name = name_list[i + 1], params = p}
+        if p[2] then
+          parts[#parts + 1] = row
+        elseif not remove_all then
+          remove_all = row
+        end
+      end
+      ::__continue30::
+      i = i + 1
+    end
+  end
+  sort_by_dots(parts)
+  return {parts = parts, remove_all = remove_all}
+end
+proxy_stub = function() return 0 end
+--- Rebuilds the field strip as the horizontal icon strip; the caller has already checked the icon option is on.
+function fill_icons(widget, action_list, name_list, params_list)
+  if not can_use_icons() then
+    return false
+  end
+  local ____split_strip_result_2 = split_strip(action_list, name_list, params_list)
+  local parts = ____split_strip_result_2.parts
+  local remove_all = ____split_strip_result_2.remove_all
+  clear(widget)
+  widget.cmo_strip = {}
+  if not widget.cmo_registered then
+    Register_UI(STRIP_UI_NAME)
+    widget.cmo_registered = true
+  end
+  widget.list_box:RemoveAll()
+  build(widget, parts, remove_all)
+  return true
+end
+--- Fills the field strip as an ordinary text menu (icon option off), routed through the main row builder so every row carries the field-strip icon and a separator is drawn above "remove all".
+function fill_text(widget, action_list, name_list, params_list)
+  local ____split_strip_result_3 = split_strip(action_list, name_list, params_list)
+  local parts = ____split_strip_result_3.parts
+  local remove_all = ____split_strip_result_3.remove_all
+  local keys = {}
+  local labels = {}
+  local actions = {}
+  local names = {}
+  local params = {}
+  local icon_label = action_list[1] == FIELD_STRIP_ACTION and FIELD_STRIP_LABEL or MAINTENANCE_LABEL
+  local function push_row(row)
+    keys[#keys + 1] = UNKNOWN
+    labels[#labels + 1] = icon_label
+    actions[#actions + 1] = row.action
+    names[#names + 1] = row_label(clean_label(row.name))
+    params[#params + 1] = row.params
+  end
+  for ____, part in ipairs(parts) do
+    push_row(part)
+  end
+  if remove_all then
+    if settings.show_separators and #keys > 0 then
+      keys[#keys + 1] = DIVIDER
+      labels[#labels + 1] = ""
+      actions[#actions + 1] = false
+      names[#names + 1] = ""
+      params[#params + 1] = false
+    end
+    push_row(remove_all)
+  end
+  widget.cmo_keys = keys
+  widget.cmo_labels = labels
+  widget.cmo_dividers = {}
+  widget.cmo_inert_rows = {}
+  widget.cmo_strip_text = true
+  vanilla_fill_list(widget, actions, names, params)
+  widget.cmo_strip_text = nil
+  widget.cmo_keys = nil
+  widget.cmo_labels = nil
+  finish_layout(widget)
+end
+--- Highlights the cell under the cursor and shows the game's item-info window for its part. Returns whether this is a strip.
+function highlight(widget)
+  local cells = widget.cmo_strip
+  if not cells then
+    return false
+  end
+  local info = widget.cmo_info
+  for ____, cell in ipairs(cells) do
+    local c = cell and cell.item and cell.item.cell
+    if c and c:IsCursorOverWindow() then
+      widget.highlight:SetWndPos(c:GetWndPos())
+      widget.highlight:SetWndSize(vec(
+        c:GetWidth(),
+        c:GetHeight()
+      ))
+      widget.highlight:Show(true)
+      if info then
+        info:Update(
+          nil,
+          part_sec(cell.params)
+        )
+      end
+      return true
+    end
+  end
+  local row = widget.cmo_row
+  if row and row.item:IsCursorOverWindow() then
+    widget.highlight:SetWndPos(vec(row.x, row.y))
+    widget.highlight:SetWndSize(vec(row.w, row.h))
+    widget.highlight:Show(true)
+  else
+    widget.highlight:Show(false)
+  end
+  if info then
+    info:Update()
+  end
+  return true
+end
+--- Dispatches a click on the strip cell under the cursor through WPO's functor and closes the menu. Returns false when the cursor is over no icon, so a click on the "remove all" text row falls through to the class's own list-item handling instead of being swallowed here.
+function try_click(widget)
+  local cells = widget.cmo_strip
+  if not cells then
+    return false
+  end
+  local functor = widget.functor
+  for ____, cell in ipairs(cells) do
+    local c = cell and cell.item and cell.item.cell
+    if c and c:IsCursorOverWindow() then
+      if functor then
+        pcall(
+          functor,
+          unpack(cell.params)
+        )
+      end
+      if widget.cmo_info then
+        widget.cmo_info:Update()
+      end
+      if widget:IsShown() then
+        widget:OnHide()
+      end
+      return true
+    end
+  end
+  return false
+end
+--- Routes a left click to the part icon under the cursor. The icons are drawn on the form, not added to the list box, so the class's own `OnListItemDbClicked` never fires for them; the click is caught here, where the class already handles `MOUSE_1`. The "remove all" text row is a real list item, so it is left to the class's list-item handling.
+function on_keyboard(self, dik, action)
+  if action == ui_events.WINDOW_KEY_PRESSED and dik == DIK_keys.MOUSE_1 and self.cmo_strip and self.form:IsCursorOverWindow() and try_click(self) then
+    return true
+  end
+  local orig = self.cmo_orig_keyboard
+  if type(orig) == "function" then
+    local ok, result = pcall(orig, self, dik, action)
+    if ok then
+      return result
+    end
+  end
+  return true
+end
+--- Drops the strip's UI registration when the menu closes, then runs the class's own hide.
+function on_hide(self)
+  clear(self)
+  local orig = self.cmo_orig_hide
+  if type(orig) == "function" then
+    pcall(orig, self)
+  end
+end
+--- Captures a subclass's own key and hide handlers so a strip click and close route through this addon.
+function patch(cls)
+  if safe_index(cls, "cmo_wpo_patched") then
+    return
+  end
+  local keyboard = safe_index(cls, "OnKeyboard")
+  if type(keyboard) == "function" and keyboard ~= on_keyboard then
+    cls.cmo_orig_keyboard = keyboard
+    cls.OnKeyboard = on_keyboard
+  end
+  local hide = safe_index(cls, "OnHide")
+  if type(hide) == "function" and hide ~= on_hide then
+    cls.cmo_orig_hide = hide
+    cls.OnHide = on_hide
+  end
+  pcall(function() cls.cmo_wpo_patched = true end)
+end

@@ -1,0 +1,310 @@
+CONTEXT MENU OVERHAUL 1.4.2 — ANTHOLOGY 2.1 ADAPTATION
+
+v1.2.2 — 29.08.2026
+------------------------------------------------
+Неофициальный локальный фикс поверх v1.2.1 BETA + v13.
+
+Иконки:
+- Закрыты пропуски по реальным функторам сборки (гитара, деньги, мины,
+  camelbak, autodoc, анмар, пластина FDDA, refill SOIP, pinup, ammo maker,
+  кипячение воды, люцифер, western goods, soulslike notes, workshop, PSU).
+- Новая иконка ui_cmo_music.dds для «Играть» (гитара/гармошка).
+- Русские текстовые ключи (поджарить/сжечь/наполнить/создать тайник)
+  заменены на id строк и функторы — работают и на EN.
+
+Фиксы:
+- DLTX иконки OPO-шлема никогда не применялся: файл назывался
+  mod_opo_*.ltx вместо mod_menu_*.ltx. Переименован в mod_menu_opo_helmet.ltx.
+- DLTX retool магазинов никогда не применялся: файл назывался
+  mod_mags_retool_*.ltx вместо mod_weapon_magazines_*.ltx. Переименован в
+  mod_weapon_magazines_retool_context.ltx — патч [tch_mag_base] теперь
+  реально накладывается на weapon_magazines.ltx.
+
+Оптимизация:
+- label_key больше не делает collect_section + translate_string на каждую
+  строку меню: обратный индекс строится один раз при открытии.
+- Разовый лог, если pending_keys разъехался с name_list (иначе иконки
+  тихо падают на functor/label).
+- UnregisterScriptCallback в on_game_end у bootstrap / enjoy-cigs /
+  mags retool / основного скрипта.
+
+v1.2.1 BETA + локальный фикс v13 — 27.08.2026
+------------------------------------------------
+Три подтверждённых по log.txt пропуска (RESULT=nil):
+
+  Создать тайник (аном. рюкзак)  -> custom_1, label="создать тайник",
+                                      anomalous_stash.menu_stash
+                                      (native item_backpack.menu_stash уже
+                                      покрыт официально; это отдельный
+                                      функтор от другого мода рюкзака,
+                                      добит по тому же тексту метки)
+  Снять/установить каркас        -> custom_2/3, st_install_frame/
+                                      st_remove_frame, arti_frames_control /
+                                      itm_backpack
+
+Новая иконка: ui_cmo_backpack_frame.dds — прямые направляющие с полным
+X-крестом по всей высоте (вариант "2" из 10 предложенных). Одна и та же
+иконка на install и remove, по аналогии с батарейкой для PSU.
+"создать тайник" переиспользует существующий ванильный
+ui_inGame2_PDA_icon_backpackstash (уже используется официальным CMO для
+обычных рюкзаков).
+
+Новый файл: mod_menu_frames_stash.ltx (CP1251).
+
+MANIFEST_SHA256.txt пересчитан.
+
+v1.2.1 BETA + локальный фикс v12 — 26.08.2026
+------------------------------------------------
+Полная сверка всего пака на соответствие правилам оптимизации/чистоты кода:
+
+НАЙДЕНО И ИСПРАВЛЕНО:
+- zzzzzzzzzzzzz_opo_integrated_helmet_context_menu_compat.script и
+  zzzzzzzzzzzzzz_mags_retool_context_compat.script — два последних
+  оставшихся файла с запрещённым zzzzzz-префиксом (мы ещё в начале сессии
+  подтвердили, что оба самодостаточны и от порядка загрузки не зависят, но
+  так и не переименовали). Переименованы в cmo_opo_helmet_compat.script и
+  cmo_mags_retool_compat.script. Единственная ссылка на старое имя
+  (use7_functor/use7_action_functor в mod_mags_retool_context_compat.ltx)
+  обновлена синхронно. OPO-скрипт нигде по имени файла не упоминался
+  (работает через dynamic.*-регистрацию), правка безопасна.
+- Попутно исправлена собственная ошибка: при синхронизации ссылки
+  mod_mags_retool_context_compat.ltx был случайно перекодирован в CP1251,
+  хотя изначально был в UTF-8 и кириллических label-ключей не содержит —
+  испортилось тире в комментарии (не влияло на игру, косметика). Возвращён
+  в чистый UTF-8.
+
+ПРОВЕРЕНО, НАРУШЕНИЙ НЕ НАЙДЕНО:
+- on_update/actor_on_update: единственное определение — метод Update()
+  UI-виджета меню (работает только пока меню открыто, ограниченный цикл по
+  видимым строкам), не глобальный game-tick хук.
+- math.pow — не используется нигде.
+- Конкатенация строк через ".." внутри циклов — только в одноразовых
+  операциях (построение индекса при actor_on_first_update) или в
+  debug-логах за printf, не в горячих путях.
+- get_console()/db.actor — единичные вызовы, не в циклах, кэшировать
+  нечего.
+- Временные таблицы в частых функциях (WPO highlight/try_click, вызываются
+  каждый кадр только пока открыта WPO-полоска) — не создаются, только
+  переиспользуемые cell-объекты и векторы позиционирования.
+- Таймеры/колбэки — все построены через RegisterScriptCallback или
+  одноразовый CreateTimeEvent с self-removal (return true), висящих
+  подписок нет.
+- DLTX-разметка (![section]) — везде на месте, включая новые файлы этой
+  сессии.
+
+MANIFEST_SHA256.txt пересчитан.
+
+v1.2.1 BETA + локальный фикс v11 — 26.08.2026
+------------------------------------------------
+Все 6 кастомных иконок этой сессии (ui_cmo_o2tank, ui_cmo_campfire_burn,
+ui_cmo_stew_roast, ui_cmo_transmute_alchemy, ui_cmo_fillflask,
+ui_cmo_grater) приведены к единому стандарту размера и центровки — сверено
+с реальным атласом cmo_icons.dds (42 непустые ячейки замерены: средний
+силуэт ~46x43px в клетке 64x64, центр строго (31-32,31-32), разброс
+35-59px по длинной стороне).
+
+Было:
+  ui_cmo_o2tank            смещён от центра на +7.5px по X
+  ui_cmo_campfire_burn     28px по длинной стороне — заметно мельче
+                            остальных иконок
+  ui_cmo_stew_roast        смещён от центра на +11.5px по Y ("криво вниз")
+  ui_cmo_fillflask         31-37px, мельче среднего, смещён на (+2.5,+4.5)
+  ui_cmo_grater            смещён на -1.5px по X
+
+Стало: все шесть — длинная сторона ровно 48px (середина официального
+диапазона), центр (31-31.5, 31.5) у каждой. ui_cmo_transmute_alchemy уже
+была в норме (60x60, центр точный) — уменьшена до 48px для единообразия
+с остальными.
+
+MANIFEST_SHA256.txt пересчитан.
+
+v1.2.1 BETA + локальный фикс v10 — 26.08.2026
+------------------------------------------------
+"Покурить" (custom_29, st_enjoy_cigs) убран из контекстного меню по запросу
+пользователя — дублирует "Использовать".
+
+Источник найден в интернете: [MODDED EXES] Enjoy Cigarettes v2.0.0 (Tosox,
+moddb.com/mods/stalker-anomaly/addons/dltx-enjoy-cigarettes, CC BY-NC-SA
+4.0). Регистрирует пункт меню через demonized'овский
+custom_functor_autoinject.script — тот же общий helper, что уже используют
+Mags Redux/OPO/PBA-трансмутация в этом же паке.
+
+Новый файл: gamedata/scripts/cmo_remove_enjoy_cigs.script. Использует
+ОФИЦИАЛЬНЫЙ custom_functor_autoinject.remove_functor("enjoy_cigs") —
+не monkey-patch dynamic.enjoy_cigs, так что само действие при клике на
+"Использовать" (отдельный ванильный use-функтор) не затронуто вообще.
+Вызов отложен на один тик через CreateTimeEvent(...,0,...), чтобы не
+зависеть от порядка, в котором загрузятся Enjoy Cigarettes и этот файл.
+
+Подтверждено в игре: "Покурить" пропал из меню, "Использовать" остался
+рабочим — значит имя регистрации "enjoy_cigs" угадано верно.
+
+v1.2.1 BETA + локальный фикс v9 — 26.08.2026
+----------------------------------------------
+Три подтверждённых по log.txt пропуска (RESULT=nil), найдены диагностикой:
+
+  Измельчить на кусочки  -> custom_21, label="измельчить на кусочки",
+                              dynamic.arti_crush (af_cristall)
+  Наполнить              -> custom_15, label="наполнить",
+                              dynamic.haruka_fill (empty_canteen)
+  Зарядить костюм        -> custom_2, label=st_charge_exo,
+                              item_exo_device.menu_battery (batteries_exo)
+
+Новые иконки: ui_cmo_grater.dds (тёрка с кристаллическими осколками —
+для артефакта, не еды), ui_cmo_fillflask.dds (фляга с каплей).
+"Зарядить костюм" переиспользует существующий официальный ui_cmo_battery.
+
+"Покурить" (custom_29, st_enjoy_cigs) НЕ тронут — это дубль уже
+существующего действия "Использовать", по факту лишний пункт меню, а не
+пропущенная иконка. Решение по нему отдельно (требует либо исходник мода
+с курением, либо monkey-patch вслепую — не сделано, ждёт).
+
+Новый файл: mod_menu_smoke_crush_fill_charge.ltx (CP1251).
+
+MANIFEST_SHA256.txt пересчитан.
+
+v1.2.1 BETA + локальный фикс v8 — 26.08.2026
+----------------------------------------------
+Подтверждено диагностикой (RESULT в логе): поиск по label работал верно
+после фикса кодировки (v7), но значения в [label_icons] были без префикса
+пути "ui\" — движок пытался найти их как id в textures_descr (которого для
+новых кастомных иконок не существует), а не как путь к файлу. Добавлен
+префикс "ui\" для ui_cmo_stew_roast / ui_cmo_campfire_burn /
+ui_cmo_transmute_alchemy (как уже было сделано для ui_cmo_o2tank раньше).
+st_move_on_belt = ui_cmo_cell оставлен без префикса — это настоящий id из
+официального атласа cmo_icons.dds, не отдельный файл.
+
+MANIFEST_SHA256.txt пересчитан.
+
+v1.2.1 BETA + локальный фикс v7 — 26.08.2026
+----------------------------------------------
+Фикс кодировки: mod_menu_haruka_burnshit_pba.ltx был сохранён в UTF-8, а
+движок читает кириллицу в .ltx как Windows-1251 (как и весь остальной пак).
+Из-за этого "Сжечь"/"Сжечь все"/"поджарить"/"поджарить всё" не совпадали
+с реальными label на уровне байт, хотя текст выглядел одинаково. Файл
+перекодирован в CP1251, содержимое не менялось.
+
+v1.2.1 BETA + локальный фикс v6 — 26.08.2026
+----------------------------------------------
+Подключены реальные, проверенные по log.txt (через cmo_label_diagnostic.script)
+id для готовки/сжигания/трансмутации — не угаданные:
+
+  поджарить / поджарить всё   -> custom_11/12, dynamic.haruka_roast(_all)
+  Сжечь / Сжечь все           -> custom_13/14, dynamic.burnshit_burn(_all)
+  Закрепить на поясе          -> to_slot, label=st_move_on_belt (реальный
+                                   id перевода, не сырой текст — просто нигде
+                                   не был покрыт иконкой, даже в официальном
+                                   CMO нет to_slot@artefact)
+  Трансмутировать             -> custom_18, label=st_pba_transmutate,
+                                   dynamic.pba_bat
+
+Новый файл: mod_menu_haruka_burnshit_pba.ltx. Иконки: ui_cmo_stew_roast
+(поджарка), ui_cmo_campfire_burn (сжигание), ui_cmo_transmute_alchemy
+(трансмутация), ui_cmo_cell (пояс — переиспользован официальный generic-значок
+слота, т.к. действие относится ко всем артефактам одинаково).
+
+MANIFEST_SHA256.txt пересчитан.
+
+v1.2.1 BETA + локальный фикс v5 — 25.08.2026
+----------------------------------------------
+- ui_cmo_o2tank.dds пересобран как DXT5 без цепочки мипмапов (был несжатый
+  RGBA8 с 7 уровнями мипмапов) — формат теперь совпадает с общим атласом
+  cmo_icons.dds. Размер файла 21972 → 4224 байта, визуально идентично.
+
+v1.2.1 BETA + локальный фикс v4 — 25.08.2026
+----------------------------------------------
+- Новая иконка для дозаправки кислородного баллона на поясе
+  (st_refilling_tank_on_belt): одиночный баллон с вентилем и пузырьками
+  воздуха вместо общей ui_cmo_tank. Файл: gamedata/textures/ui/ui_cmo_o2tank.dds
+  (64x64, тот же плоский однотонный стиль, что и остальные иконки CMO).
+  Подключена напрямую по пути к файлу (как описано в разделе "For addon
+  makers" самого CMO), общий атлас cmo_icons.dds не тронут.
+- MANIFEST_SHA256.txt пересчитан.
+
+v1.2.1 BETA + локальный фикс v3 — 25.08.2026
+----------------------------------------------
+Сверено с реальными архивами: [OUT] Outfit Parts Overhaul, [HARD] SYS
+radioactive_air_toxic_air_rework, [BS] Exo System - new_system.
+
+- OPO (шлем): логика zzzzzzzzzzzzz_opo_integrated_helmet_context_menu_compat
+  сверена построчно с arti_outfits.script (precond_repair/repair_helmet/
+  has_parts/is_helmet/item_parts.get_parts_con). Полное совпадение сигнатур
+  и условий (helmet_repair_kit, condition < 99, метка "Ремонт Тип 1"). Правок
+  не потребовалось.
+
+- Toxic Air: menu_filters_install и menu_refilling_tank, а также
+  st_install_filter/st_remove_filter/st_refilling_tank_on_belt — подтверждены
+  как реальные функторы/строки. А вот st_tank_equip и st_tank_remove в
+  mod_menu_anthology_2_1.ltx НЕ существуют нигде в реальном моде (ни строки,
+  ни функтора) — мёртвые записи, никогда не сопоставлялись ни с чем. Удалены
+  из [label_icons]/[groups] с комментарием.
+
+- Exo System: st_remove_psu подтверждён, но st_install_psu (та же пара
+  install/remove PSU, item_exo_device.script) не была покрыта иконкой в
+  BETA-сборке. Добавлена в mod_menu_anthology_exo_system.ltx.
+
+- MANIFEST_SHA256.txt пересчитан.
+
+v1.2.1 BETA + локальный фикс v2 — 25.08.2026
+----------------------------------------------
+Сверено с реальным архивом R.A.K Weapon Pack Adaptation Global A.N.T.H.O.L.O.G.Y
+Mags Redux (ЗБТ). Два вывода:
+
+- "st_seqload_menu" — ЛОЖНАЯ ТРЕВОГА. Реальный Mags Redux определяет эту
+  строку сам (gamedata/configs/text/{eng,rus}/ui_st_field_mag_loading.xml,
+  "Load sequentially" / "Зарядить последовательно"), оба XML валидны.
+  Подстраховочный fallback из прошлой правки (2_cmo_anthology_seqload_fix.xml)
+  оставлен как безвредный no-op — он загружается раньше файла Mags Redux и
+  перекрывается им, реального эффекта не имеет.
+
+- НАЙДЕНА РЕАЛЬНАЯ ПРОБЛЕМА: gamedata/configs/items/weapons/
+  mod_mags_retool_context_compat.ltx расширял use7_modes/use7_containers
+  действия "Retool" до "trade"/actor_trade_bag/actor_trade. У самого Mags
+  Redux (weapon_magazines.ltx, [tch_mag_base]) это действие ограничено
+  inventory/loot — trade туда никогда не входил. Retool создаёт новый предмет
+  и уничтожает старый через alife_create_item/alife_release от obj:parent(),
+  а во время торговли parent() — не гарантированно инвентарь актёра. Область
+  действия возвращена к нативной (inventory, loot / actor_bag, actor_equ,
+  actor_belt, npc_bag) — риск дублирования/рассинхрона предметов через
+  торговый экран устранён.
+
+- MANIFEST_SHA256.txt пересчитан.
+
+v1.2.1 BETA + локальный фикс — 25.08.2026
+------------------------------------------
+НЕОФИЦИАЛЬНАЯ правка поверх v1.2.1 BETA, сделана не автором этой адаптации.
+Ничего из логики v1.2.1 BETA не удалено и не переписано, только:
+
+- Добавлен fallback-перевод для "st_seqload_menu" (label подменю
+  последовательной зарядки магазина, Mags Redux): раньше в игре без перевода
+  от самого Mags Redux строка показывалась как сырой id "st_seqload_menu"
+  вместо текста. См. gamedata/configs/text/{eng,rus}/2_cmo_anthology_seqload_fix.xml.
+- zzzzzzzzzz_context_menu_overhaul_anthology.script заменён на
+  cmo_anthology_bootstrap.script: старый файл полагался на алфавитный
+  порядок загрузки файлов (имя с "zzzzzzzzzz_"), чтобы гарантированно
+  выполниться после context_menu_overhaul.script — это могло молча
+  сломаться при наличии другого мода с ещё более поздним по алфавиту
+  префиксом. Новый файл вешается на колбэк actor_on_first_update вместо
+  зависимости от имени файла; логика install_hooks/QAW-регистрации не
+  менялась.
+- MANIFEST_SHA256.txt пересчитан под изменённый состав файлов.
+
+v1.2.1 BETA — 06.08.2026
+-------------------------
+- Integrated Quick Action Wheel support directly into Context Menu Overhaul.
+- Added one native-labelled Add to wheel context action.
+- Manual tabs receive items directly.
+- Dynamic tabs route additions to an enabled manual tab.
+- The action is hidden for full tabs and duplicate items.
+- QAW remains responsible for item-class support.
+- Registration is performed after QAW initialization.
+- Temporary startup callbacks are removed after successful registration.
+- Removed verbose per-item QAW predicate logging.
+
+v1.2.0 BETA — 02.08.2026
+-------------------------
+- Updated the bundled Context Menu Overhaul base to 1.4.2.
+- Added the universal R.A.K Mags Redux magazine retool resolver.
+- Added OPO, Exo System, Toxic Air and WPO compatibility.
+- Restored fixed action grouping from menu.ltx and compatibility profiles.
+- Enabled the Gift action by default.

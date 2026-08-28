@@ -1,0 +1,38 @@
+<string_table>
+  <string id="ui_mcm_menu_context_menu_overhaul">
+    <text>Context Menu Overhaul</text>
+  </string>
+  <string id="ui_mcm_menu_cmo_base">
+    <text>Base</text>
+  </string>
+  <string id="ui_mcm_menu_cmo_compat">
+    <text>Compatibility</text>
+  </string>
+  <string id="ui_mcm_menu_cmo_wpo">
+    <text>Weapon Parts Overhaul</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_base_group_related_actions">
+    <text>Group related actions</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_base_use_colors">
+    <text>Use colors</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_base_show_separators">
+    <text>Show separators</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_base_details_shows_item_name">
+    <text>Details option shows item&apos;s name</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_base_capitalize_labels">
+    <text>Capitalize options</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_base_hide_gift">
+    <text>Hide the &quot;gift&quot; option</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_compat_cmo_wpo_field_strip_icons">
+    <text>Show weapon parts as icons when field-stripping</text>
+  </string>
+  <string id="ui_mcm_context_menu_overhaul_cmo_compat_cmo_wpo_maintenance_icons">
+    <text>Show weapon parts as icons when maintaining</text>
+  </string>
+</string_table>

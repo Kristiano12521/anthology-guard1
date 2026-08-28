@@ -1,0 +1,1388 @@
+-- This script was generated with Anomaly Packer v0.4.0 (https://github.com/piscopancer/anomaly-packer)
+-- Author: piscopancer
+-- Version: 1.4.2
+-- Created at: 27.07.2026
+-- Source: https://github.com/piscopancer/stalker-anomaly-context-menu-overhaul
+-- Anthology adaptation: compatibility/safety patch for Anomaly Anthology 2.1
+-- Adaptation version: 1.2.1 BETA
+-- Adaptation updated: 06.08.2026
+-- Supported compatibility profiles: R.A.K Anthology Mags Redux d2026.6.1,
+-- SYS Radioactive/Toxic Air Rework d2026.5.5
+
+--- Widens the menu by the icon column and squares up its rows; shared with submenus, which get the geometry only.
+function finish_layout(widget)
+  local extra = 0
+  if widget.cmo_column then
+    extra = extra + widget.cmo_column
+  end
+  if widget.cmo_column_right then
+    extra = extra + widget.cmo_column_right
+  end
+  if extra > 0 then
+    widget.W = widget.W + extra
+    local size = vec(widget.W, widget.H)
+    widget.form:SetWndSize(size)
+    widget.frame:SetWndSize(size)
+    widget.list_box:SetWndSize(size)
+  end
+  if widget.cmo_list_x == nil then
+    widget.cmo_list_x = widget.list_box:GetWndPos().x
+  end
+  if widget.cmo_list_y == nil then
+    widget.cmo_list_y = widget.list_box:GetWndPos().y
+  end
+  widget.list_box:SetWndPos(vec(widget.cmo_list_x + LIST_SHIFT, widget.cmo_list_y))
+  do
+    local i = 0
+    while i < widget.list_box:GetSize() do
+      local item = widget.list_box:GetItemByIndex(i)
+      if item then
+        item:SetWndSize(vec(
+          widget.W - widget.PDW,
+          item:GetHeight()
+        ))
+      end
+      i = i + 1
+    end
+  end
+  local dividers = widget.cmo_dividers
+  if dividers then
+    do
+      local i = 0
+      while i < #dividers do
+        dividers[i + 1]:SetWndSize(vec(widget.W - widget.PDW, DIVIDER_LINE_H))
+        i = i + 1
+      end
+    end
+  end
+  widget.cmo_dividers = nil
+  local chevrons = widget.cmo_chevrons
+  if chevrons and widget.cmo_column_right then
+    local x = widget.W - widget.PDW - widget.cmo_column_right + ICON_GAP
+    do
+      local i = 0
+      while i < #chevrons do
+        chevrons[i + 1]:SetWndPos(vec(x, ICON_INSET))
+        i = i + 1
+      end
+    end
+  end
+  widget.cmo_chevrons = nil
+end
+LIST_SHIFT = -6
+ICON_GAP = 2
+ICON_INSET = 1
+--- Divider row height, and the line drawn inside it.
+DIVIDER_H = 7
+DIVIDER_LINE_H = 2
+--- A horizontal line from vanilla's pda textures, used as the divider.
+DIVIDER_TEXTURE = "ui_pda2_split_e"
+--- Stands in for a row whose property key could not be resolved.
+UNKNOWN = "__cmo_unknown"
+--- Marks the divider rows this addon inserts.
+DIVIDER = "__cmo_divider"
+--- The "details" entry, whose label the item's own name can replace.
+DETAILS_FUNCTOR = "ui_itm_details.menu_details"
+--- The "gift" row; visibility is controlled by MCM and it is shown by default in the Anthology adaptation.
+GIFT = "donate"
+--- `[groups]` key for a row the config does not name.
+DEFAULT_GROUP_KEY = "default"
+--- Fallback when `[groups] default` is missing.
+DEFAULT_GROUP = 2
+--- `UIInventory.properties` key prefix marking an addon-owned custom slot.
+CUSTOM_PREFIX = "custom_"
+ini = ini_file_ex("plugins\\context_menu_overhaul\\menu.ltx")
+____context_menu_overhaul_utils_0 = context_menu_overhaul_utils
+vec = ____context_menu_overhaul_utils_0.vec
+parse_hex = ____context_menu_overhaul_utils_0.parse_hex
+capitalize = ____context_menu_overhaul_utils_0.capitalize
+--- MCM options, cached because a menu re-reads them for every row of every opening.
+settings = {
+  group_related_actions = context_menu_overhaul_mcm.defaultConfig.group_related_actions,
+  use_colors = context_menu_overhaul_mcm.defaultConfig.use_colors,
+  show_separators = context_menu_overhaul_mcm.defaultConfig.show_separators,
+  details_shows_item_name = context_menu_overhaul_mcm.defaultConfig.details_shows_item_name,
+  capitalize_labels = context_menu_overhaul_mcm.defaultConfig.capitalize_labels,
+  hide_gift = context_menu_overhaul_mcm.defaultConfig.hide_gift,
+  field_strip_icons = context_menu_overhaul_mcm.defaultConfig.field_strip_icons,
+  maintenance_icons = context_menu_overhaul_mcm.defaultConfig.maintenance_icons
+}
+--- Anthology compatibility state.
+option_callback_registered = false
+hooks_installed = false
+predicate_error_once = {}
+wpo_fallback_logged = false
+initial_inventory_class = ui_inventory and ui_inventory.UIInventory
+initial_cell_properties = utils_ui and utils_ui.UICellProperties
+initial_init_properties = initial_inventory_class and initial_inventory_class.InitProperties
+initial_fill_list = initial_cell_properties and initial_cell_properties.FillList
+initial_add_item = initial_cell_properties and initial_cell_properties.AddItemToList
+initial_update = initial_cell_properties and initial_cell_properties.Update
+active_inventory_screen = nil
+
+function cmo_log(fmt, ...)
+  if type(printf) == "function" then
+    printf("[CMO Anthology] " .. fmt, ...)
+  end
+end
+--- Re-read on `on_option_change`; enough, since the menu is rebuilt each time it opens. One loop over the keys keeps this in step with `McmConfig` on its own.
+function load_settings()
+  local defaults = context_menu_overhaul_mcm.defaultConfig
+  if not (ui_mcm and type(ui_mcm.get) == "function") then
+    for key in pairs(settings) do
+      if defaults[key] ~= nil then
+        settings[key] = defaults[key]
+      end
+    end
+    return
+  end
+
+  local groups = context_menu_overhaul_mcm.optionGroup
+  for key in pairs(settings) do
+    local path = (("context_menu_overhaul/" .. groups[key]) .. "/") .. key
+    local ok, value = pcall(ui_mcm.get, path)
+    if ok and value ~= nil then
+      settings[key] = value
+    elseif defaults[key] ~= nil then
+      settings[key] = defaults[key]
+    end
+  end
+
+  rebuild_label_lookup()
+end
+--- Reverse index of [label_icons]/[groups]/[chevrons]/[colors]: raw key and
+--- translated text both map to the config key. Built once on first menu open
+--- instead of collect_section + translate_string per row per section.
+label_lookup = {}
+function rebuild_label_lookup()
+  label_lookup = {}
+end
+--- The keys a row can be configured under, most specific first; label first since it alone reflects state.
+function row_keys(property_id, label, functor)
+  return {label, property_id, functor}
+end
+--- First non-empty `read` over the row's keys, or `null` when the config names none.
+function resolve(keys, read)
+  do
+    local i = 0
+    while i < #keys do
+      local key = keys[i + 1]
+      if key then
+        local value = read(key)
+        if value then
+          return value
+        end
+      end
+      i = i + 1
+    end
+  end
+  return nil
+end
+--- The key naming this row in `section`: the label, or a translation id that renders to it (some addons hand the menu finished text, so comparing translations lets it be named by id in any language).
+function label_key(section, label)
+  if not label then
+    return nil
+  end
+  local lookup = label_lookup[section]
+  if not lookup then
+    lookup = {}
+    local entries = ini:collect_section(section)
+    if entries then
+      for key in pairs(entries) do
+        lookup[key] = key
+        local translated = game.translate_string(key)
+        if translated and translated ~= key and lookup[translated] == nil then
+          lookup[translated] = key
+        end
+      end
+    end
+    label_lookup[section] = lookup
+  end
+  return lookup[label] or label
+end
+--- The item class an entry acts on (mirrors `UIInventory:Name_Equip`), so `to_slot` and `use` can carry a per-class icon.
+function get_variant(obj)
+  local clsid = obj:clsid()
+  local sec = obj:section()
+  if IsOutfit(nil, clsid) then
+    return "outfit"
+  end
+  if IsHeadgear(nil, clsid) then
+    return "helmet"
+  end
+  if IsItem("backpack", sec) then
+    return "backpack"
+  end
+  if IsArtefact(nil, clsid) then
+    return "artefact"
+  end
+  if IsItem("sil", sec) then
+    return "sil"
+  end
+  if IsItem("scope", sec) then
+    return "scope"
+  end
+  if IsItem("gl", sec) then
+    return "gl"
+  end
+  local kind = SYS_GetParam(0, sec, "kind")
+  if kind == "i_drink" then
+    return SYS_GetParam(0, sec, "required_tool") and "smoke" or "drink"
+  end
+  if kind == "i_food" or kind == "i_mutant_cooked" or kind == "i_mutant_raw" then
+    return "food"
+  end
+  if kind == "i_medical" then
+    return "medkit"
+  end
+  return nil
+end
+--- The icon for a menu entry, or `null` when the config declares none.
+function get_icon(property_id, label, obj, functor)
+  if label then
+    local by_label = ini:r_string_ex(
+      "label_icons",
+      label_key("label_icons", label)
+    )
+    if by_label then
+      return by_label
+    end
+  end
+  local ____obj_1
+  if obj then
+    ____obj_1 = get_variant(obj)
+  else
+    ____obj_1 = nil
+  end
+  local variant = ____obj_1
+  if variant then
+    local by_variant = ini:r_string_ex("icons", (property_id .. "@") .. variant)
+    if by_variant then
+      return by_variant
+    end
+  end
+  local direct = ini:r_string_ex("icons", property_id)
+  if direct then
+    return direct
+  end
+  local ____functor_2
+  if functor then
+    ____functor_2 = ini:r_string_ex("functor_icons", functor)
+  else
+    ____functor_2 = nil
+  end
+  return ____functor_2
+end
+--- The row's group; rows are ordered by the fixed defaults in menu.ltx and a divider is drawn where the group changes.
+function get_group(property_id, label, functor)
+  return resolve(
+    row_keys(
+      property_id,
+      label and label_key("groups", label),
+      functor
+    ),
+    function(key) return ini:r_float_ex("groups", key) end
+  ) or ini:r_float_ex("groups", DEFAULT_GROUP_KEY) or DEFAULT_GROUP
+end
+--- The chevron glyph for a row that opens a further menu, or `null` when the config marks none.
+function get_chevron(property_id, label, functor)
+  return resolve(
+    row_keys(
+      property_id,
+      label and label_key("chevrons", label),
+      functor
+    ),
+    function(key) return ini:r_string_ex("chevrons", key) end
+  )
+end
+--- The row's icon tint as argb, or `null` to leave the texture as authored.
+function get_color(property_id, label, functor)
+  return resolve(
+    row_keys(
+      property_id,
+      label and label_key("colors", label),
+      functor
+    ),
+    function(key)
+      local hex = ini:r_string_ex("colors", key)
+      local ____hex_3
+      if hex then
+        ____hex_3 = parse_hex(trim(hex))
+      else
+        ____hex_3 = nil
+      end
+      return ____hex_3
+    end
+  )
+end
+--- Whether a line has the `<script>.<function>` shape used by ordinary LTX functors.
+function is_functor_key(line)
+  return type(line) == "string" and string.find(line, ".", 1, true) ~= nil
+end
+--- Stable identity of a dynamically injected custom functor.
+--- custom_functor_autoinject stores its registration name on the live inventory screen,
+--- while there is no useN_functor line to read from the item's LTX.
+function get_dynamic_functor(screen, slot)
+  local owner = active_inventory_screen
+  if not owner and ui_inventory then
+    owner = safe_index(ui_inventory, "GUI")
+  end
+  if not owner then
+    owner = screen
+  end
+  local registry = safe_index(owner, "custom_functor")
+  if type(registry) ~= "table" then
+    return nil
+  end
+  local entry = registry[tonumber(slot)]
+  local name = entry and safe_index(entry, "name")
+  if type(name) == "string" and name ~= "" then
+    return "dynamic." .. name
+  end
+  return nil
+end
+--- The functor identity of a `custom_N` slot. Dynamic registrations are checked first,
+--- then the ordinary useN_functor from the item's LTX.
+function get_custom_functor(key, obj, screen)
+  if type(key) ~= "string" or string.sub(
+    key,
+    1,
+    string.len(CUSTOM_PREFIX)
+  ) ~= CUSTOM_PREFIX then
+    return nil
+  end
+  local slot = string.sub(
+    key,
+    string.len(CUSTOM_PREFIX) + 1
+  )
+  local dynamic = get_dynamic_functor(screen, slot)
+  if dynamic then
+    return dynamic
+  end
+  local line = SYS_GetParam(
+    0,
+    obj:section(),
+    ("use" .. slot) .. "_functor"
+  )
+  if not line then
+    return nil
+  end
+  local functor = trim(line)
+  return is_functor_key(functor) and functor or nil
+end
+--- The label as drawn; translated here since capitalising needs the display text, not the id.
+function row_label(str_id)
+  local text = game.translate_string(str_id)
+  if not settings.capitalize_labels then
+    return text
+  end
+  return capitalize(text)
+end
+--- The item a row acts on, and the functor identifying it when the row is a custom slot.
+function row_identity(screen, key, params)
+  local ____params_4
+  if params then
+    ____params_4 = level.object_by_id(params[1])
+  else
+    ____params_4 = nil
+  end
+  local obj = ____params_4
+  local ____obj_5
+  if obj then
+    ____obj_5 = get_custom_functor(key, obj, screen)
+  else
+    ____obj_5 = nil
+  end
+  local functor = ____obj_5
+  return {obj = obj or nil, functor = functor or nil}
+end
+--- The screen as the string-keyed table it is in Lua, where a callback is named by a string.
+function methods_of(screen)
+  return screen
+end
+--- Whether the screen defines the method a call names; never answered by invoking it.
+function has_method(screen, call)
+  return type(methods_of(screen)[call[1]]) == "function"
+end
+--- Invokes a predicate call as vanilla does, forwarding the tuple after `(self, obj, bag)`.
+function call_predicate(screen, call, obj, bag)
+  local method = methods_of(screen)[call[1]]
+  if type(method) ~= "function" then
+    return false
+  end
+  local ok, result = pcall(
+    method,
+    screen,
+    obj,
+    bag,
+    unpack(call)
+  )
+  if not ok then
+    local key = tostring(call[1])
+    if not predicate_error_once[key] then
+      predicate_error_once[key] = true
+      cmo_log("predicate failed: %s | %s", key, tostring(result))
+    end
+    return false
+  end
+  return not not result
+end
+--- Property keys of the menu being built, handed from `InitProperties` to `FillList`.
+pending_keys = {}
+pending_keys_mismatch_logged = false
+vanilla_init_properties = ui_inventory.UIInventory.InitProperties
+--- Reimplements vanilla's filter loop to also collect each row's property key ? its one stable identity, which vanilla never passes on.
+function init_properties(self, obj, bag)
+  active_inventory_screen = self
+  if not (obj and bag) then
+    return vanilla_init_properties(self, obj, bag)
+  end
+  local keys = {}
+  for key, props in spairs(self.properties, ui_inventory.func_index) do
+    do
+      local bag_allowed = true
+      if props.cont_func and has_method(self, props.cont_func) then
+        bag_allowed = call_predicate(self, props.cont_func, obj, bag)
+      elseif props.cont then
+        bag_allowed = props.cont[bag] == true
+      end
+      local mode_allowed = true
+      if props.mode_func and has_method(self, props.mode_func) then
+        mode_allowed = call_predicate(self, props.mode_func, obj, bag)
+      elseif props.mode then
+        mode_allowed = props.mode[self.mode] == true
+      end
+      if not (mode_allowed and bag_allowed) then
+        goto __continue51
+      end
+      local cond = true
+      local k = 1
+      while cond do
+        local precond = props["precondition" .. tostring(k)]
+        if not precond then
+          break
+        end
+        cond = call_predicate(self, precond, obj, bag)
+        k = k + 1
+      end
+      if cond then
+        keys[#keys + 1] = key
+      end
+    end
+    ::__continue51::
+  end
+  pending_keys = keys
+  vanilla_init_properties(self, obj, bag)
+  pending_keys = {}
+end
+cell_properties = utils_ui.UICellProperties
+--- Vanilla `FillList`, captured before `on_game_start` swaps in the addon's; the field strip runs it directly to draw a plain list.
+vanilla_fill_list = cell_properties.FillList
+--- Regroups the rows, inserts dividers, and parks their keys on the widget for `AddItemToList`.
+function fill_list(self, action_list, name_list, params_list)
+  local rows = {}
+  local aligned = #pending_keys == #name_list
+  if not aligned and not pending_keys_mismatch_logged then
+    pending_keys_mismatch_logged = true
+    cmo_log(
+      "pending_keys mismatch (keys=%s names=%s); icons fall back to functor/label",
+      tostring(#pending_keys),
+      tostring(#name_list)
+    )
+  end
+  do
+    local i = 0
+    while i < #name_list do
+      do
+        local key = aligned and pending_keys[i + 1] or UNKNOWN
+        if settings.hide_gift and key == GIFT then
+          goto __continue62
+        end
+        local name = name_list[i + 1]
+        local params = params_list[i + 1]
+        local ____row_identity_result_7 = row_identity(self, key, params)
+        local obj = ____row_identity_result_7.obj
+        local functor = ____row_identity_result_7.functor
+        local renamed = settings.details_shows_item_name and functor == DETAILS_FUNCTOR and obj
+        rows[#rows + 1] = {
+          key = key,
+          action = action_list[i + 1],
+          label = name,
+          name = renamed and row_label(ui_item.get_obj_name(obj)) or row_label(name),
+          params = params,
+          group = get_group(key, name, functor)
+        }
+      end
+      ::__continue62::
+      i = i + 1
+    end
+  end
+  if settings.group_related_actions then
+    do
+      local i = 1
+      while i < #rows do
+        local row = rows[i + 1]
+        local j = i - 1
+        while j >= 0 and rows[j + 1].group > row.group do
+          rows[j + 1 + 1] = rows[j + 1]
+          j = j - 1
+        end
+        rows[j + 1 + 1] = row
+        i = i + 1
+      end
+    end
+  end
+  local keys = {}
+  local actions = {}
+  local names = {}
+  local labels = {}
+  local params = {}
+  --- `false` not `nil` for an inserted row: nil truncates the Lua array, false still fails vanilla's `item.func` click guard.
+  local function push_inert(key, name)
+    keys[#keys + 1] = key
+    actions[#actions + 1] = false
+    names[#names + 1] = name
+    labels[#labels + 1] = name
+    params[#params + 1] = false
+  end
+  do
+    local i = 0
+    while i < #rows do
+      if settings.group_related_actions and settings.show_separators and i > 0 and rows[i + 1].group ~= rows[i].group then
+        push_inert(DIVIDER, "")
+      end
+      keys[#keys + 1] = rows[i + 1].key
+      actions[#actions + 1] = rows[i + 1].action
+      names[#names + 1] = rows[i + 1].name
+      labels[#labels + 1] = rows[i + 1].label
+      params[#params + 1] = rows[i + 1].params
+      i = i + 1
+    end
+  end
+  self.cmo_keys = keys
+  self.cmo_labels = labels
+  self.cmo_column = nil
+  self.cmo_column_right = nil
+  self.cmo_chevrons = {}
+  self.cmo_dividers = {}
+  self.cmo_inert_rows = {}
+  vanilla_fill_list(self, actions, names, params)
+  self.cmo_keys = nil
+  self.cmo_labels = nil
+  finish_layout(self)
+end
+function icon_size(item)
+  return item:GetHeight() - ICON_INSET * 2
+end
+--- Narrowed by the screen ratio, since the ui is authored in a stretched 1024x768 space.
+function icon_width(item)
+  return icon_size(item) * utils_xml.screen_ratio()
+end
+function column_width(item)
+  return icon_width(item) + ICON_GAP
+end
+function indent_row(item, text, column)
+  text:SetWndPos(vec(column, 0))
+  item:SetWndSize(vec(
+    item:GetWidth() + column,
+    item:GetHeight()
+  ))
+end
+--- Reserves the icon column on a row and shifts its label clear of it, returning the column width (0 when the row has no text) so the menu can be widened to match.
+function reserve_column(item)
+  local text = item:GetTextItem()
+  if not text then
+    return 0
+  end
+  local column = column_width(item)
+  indent_row(item, text, column)
+  return column
+end
+--- Draws a texture in a row's reserved icon column, tinted when a colour is given.
+function draw_icon(item, texture, color)
+  local width = icon_width(item)
+  local icon = item:AddIconField(width)
+  if not icon then
+    return
+  end
+  icon:InitTexture(texture)
+  icon:SetStretchTexture(true)
+  icon:SetWndPos(vec(0, ICON_INSET))
+  icon:SetWndSize(vec(
+    width,
+    icon_size(item)
+  ))
+  if color then
+    icon:SetTextureColor(color)
+  end
+end
+--- Draws a chevron into a row's own space; positioned by {@link finish_layout} once the menu width, and so the row's right edge, is final.
+function draw_chevron(item, texture)
+  local width = icon_width(item)
+  local icon = item:AddIconField(width)
+  if not icon then
+    return nil
+  end
+  icon:InitTexture(texture)
+  icon:SetStretchTexture(true)
+  icon:SetWndSize(vec(
+    width,
+    icon_size(item)
+  ))
+  return icon
+end
+--- Turns a row into a separator ? collapses its text, sets the divider height, draws the line ? and returns the line so its width can be stretched once the menu is sized.
+function draw_divider(item)
+  local text = item:GetTextItem()
+  if text then
+    text:SetWndSize(vec(0, 0))
+  end
+  item:SetWndSize(vec(
+    item:GetWidth(),
+    DIVIDER_H
+  ))
+  local line = item:AddIconField(DIVIDER_LINE_H)
+  if not line then
+    return nil
+  end
+  line:InitTexture(DIVIDER_TEXTURE)
+  line:SetStretchTexture(true)
+  line:SetWndPos(vec(0, (DIVIDER_H - DIVIDER_LINE_H) / 2))
+  return line
+end
+--- Remembers a row `Update` must not highlight, since it carries no action.
+function mark_inert(widget, index)
+  local rows = widget.cmo_inert_rows
+  if rows then
+    rows[#rows + 1] = index
+  end
+end
+--- Vanilla `AddItemToList`, captured before the swap; the field strip adds its own rows through it.
+vanilla_add_item = cell_properties.AddItemToList
+--- Draws this addon's own rows and adds the icon to the game's, once vanilla has sized the row.
+function add_item_to_list(self, index, str_id, func, params)
+  vanilla_add_item(
+    self,
+    index,
+    str_id,
+    func,
+    params
+  )
+  local item = self.list_box:GetItemByIndex(self.list_box:GetSize() - 1)
+  if not item then
+    return
+  end
+  local text = item:GetTextItem()
+  if not text then
+    return
+  end
+  local keys = self.cmo_keys
+  if not keys then
+    return
+  end
+  local key = keys[index]
+  if not key then
+    return
+  end
+  local row = index - 1
+  if key == DIVIDER then
+    self.H = self.H - (self.file_item_fn_sz.y - DIVIDER_H)
+    local line = draw_divider(item)
+    local dividers = self.cmo_dividers
+    if line and dividers then
+      dividers[#dividers + 1] = line
+    end
+    mark_inert(self, row)
+    return
+  end
+  self.cmo_column = reserve_column(item)
+  local ____row_identity_result_8 = row_identity(self, key, params)
+  local obj = ____row_identity_result_8.obj
+  local functor = ____row_identity_result_8.functor
+  local labels = self.cmo_labels
+  local label = labels and labels[row + 1] or str_id
+  local ____settings_use_colors_9
+  if settings.use_colors then
+    ____settings_use_colors_9 = get_color(key, label, functor)
+  else
+    ____settings_use_colors_9 = nil
+  end
+  local color = ____settings_use_colors_9
+  if color then
+    text:SetTextColor(color)
+  end
+  local texture = get_icon(key, label, obj, functor)
+  if texture then
+    draw_icon(item, texture, color)
+  end
+  local chevron = get_chevron(key, label, functor)
+  if chevron then
+    local drawn = draw_chevron(item, chevron)
+    if drawn then
+      self.cmo_column_right = column_width(item)
+      local chevrons = self.cmo_chevrons
+      if chevrons then
+        chevrons[#chevrons + 1] = drawn
+      end
+    end
+  end
+end
+--- Whether the row at `index` is one this addon inserted rather than a menu entry.
+function is_inert_row(widget, index)
+  local rows = widget.cmo_inert_rows
+  if not rows then
+    return false
+  end
+  do
+    local i = 0
+    while i < #rows do
+      if rows[i + 1] == index then
+        return true
+      end
+      i = i + 1
+    end
+  end
+  return false
+end
+vanilla_update = cell_properties.Update
+--- Re-sizes the hover strip, which vanilla takes from the text control and which no longer spans the row.
+function update(self)
+  vanilla_update(self)
+  local wpo = context_menu_overhaul_wpo
+  if wpo and type(wpo.highlight) == "function" then
+    local ok, claimed = pcall(wpo.highlight, self)
+    if ok and claimed then
+      return
+    elseif not ok and not wpo_fallback_logged then
+      wpo_fallback_logged = true
+      cmo_log("WPO highlight disabled after error: %s", tostring(claimed))
+    end
+  end
+  if not self.highlight:IsShown() then
+    return
+  end
+  do
+    local i = 0
+    while i < self.list_box:GetSize() do
+      local item = self.list_box:GetItemByIndex(i)
+      if item and item:IsCursorOverWindow() then
+        if is_inert_row(self, i) then
+          self.highlight:Show(false)
+          return
+        end
+        self.highlight:SetWndSize(vec(
+          self.form:GetWidth() - self.PDH,
+          item:GetHeight()
+        ))
+        return
+      end
+      i = i + 1
+    end
+  end
+end
+--- Layout twin of {@link fill_list} for the submenus addons open on their own subclass: geometry only, since those rows carry no property id, functor or config key. Weapon Parts Overhaul's field strip is the one exception, handed off to {@link strip_try_fill }.
+function sub_fill_list(self, action_list, name_list, params_list)
+  local wpo = context_menu_overhaul_wpo
+  self.cmo_column = nil
+  if self.cmo_list_y == nil then
+    self.cmo_list_y = self.list_box:GetWndPos().y
+  end
+
+  local is_fs = false
+  local is_maintenance = false
+  if wpo then
+    if type(wpo.is_field_strip) == "function" then
+      local ok, value = pcall(wpo.is_field_strip, action_list)
+      is_fs = ok and value or false
+    end
+    if not is_fs and type(wpo.is_maintenance) == "function" then
+      local ok, value = pcall(wpo.is_maintenance, action_list)
+      is_maintenance = ok and value or false
+    end
+  end
+
+  if is_fs or is_maintenance then
+    local icons_enabled = is_fs and settings.field_strip_icons or settings.maintenance_icons
+    local icons_available = false
+    if icons_enabled and wpo and type(wpo.can_use_icons) == "function" then
+      local ok, value = pcall(wpo.can_use_icons)
+      icons_available = ok and value or false
+    end
+
+    if icons_available and type(wpo.fill_icons) == "function" then
+      local ok, result = pcall(wpo.fill_icons, self, action_list, name_list, params_list)
+      if ok and result then
+        return
+      end
+      if not wpo_fallback_logged then
+        wpo_fallback_logged = true
+        cmo_log("WPO icon menu failed; using text fallback: %s", tostring(result))
+      end
+    end
+
+    if wpo and type(wpo.clear) == "function" then
+      pcall(wpo.clear, self)
+    end
+    if wpo and type(wpo.fill_text) == "function" then
+      local ok, err = pcall(wpo.fill_text, self, action_list, name_list, params_list)
+      if ok then
+        return
+      end
+      if not wpo_fallback_logged then
+        wpo_fallback_logged = true
+        cmo_log("WPO text menu failed; using vanilla submenu: %s", tostring(err))
+      end
+    end
+  elseif wpo and type(wpo.clear) == "function" then
+    pcall(wpo.clear, self)
+  end
+
+  vanilla_fill_list(self, action_list, name_list, params_list)
+  finish_layout(self)
+end
+--- Layout twin of {@link add_item_to_list}: reserves the submenu's icon column, unless a field strip claims the row.
+function sub_add_item_to_list(self, index, str_id, func, params)
+  if self.cmo_strip_text then
+    add_item_to_list(
+      self,
+      index,
+      str_id,
+      func,
+      params
+    )
+    return
+  end
+  vanilla_add_item(
+    self,
+    index,
+    str_id,
+    func,
+    params
+  )
+  local item = self.list_box:GetItemByIndex(self.list_box:GetSize() - 1)
+  if item then
+    self.cmo_column = reserve_column(item)
+  end
+end
+--- Reads `key` off a value that may be a luabind class, where indexing a missing key can raise.
+function safe_index(value, key)
+  local ok, result = pcall(function() return value[key] end)
+  local ____ok_11
+  if ok then
+    ____ok_11 = result
+  else
+    ____ok_11 = nil
+  end
+  return ____ok_11
+end
+--- Applies the layout to every subclass of the widget, found rather than named. Anomaly's
+-- `class "X" (Y)` copies the base's methods into the subclass when defined ? before
+-- `on_game_start` ? so assigning onto the base never reaches one; each is recognised instead
+-- by still holding the vanilla methods. The base and any deliberately-overridden subclass no
+-- longer match and are skipped.
+function namespace_may_hold_ui(name)
+  if type(name) ~= "string" then
+    return false
+  end
+  local lower = string.lower(name)
+  return lower == "utils_ui"
+    or lower == "utils_ui_custom"
+    or string.find(lower, "ui", 1, true) ~= nil
+    or string.find(lower, "item", 1, true) ~= nil
+    or string.find(lower, "weapon", 1, true) ~= nil
+    or string.find(lower, "repair", 1, true) ~= nil
+    or string.find(lower, "wpo", 1, true) ~= nil
+end
+function method_matches(value, key, current, initial)
+  local method = safe_index(value, key)
+  return method == current or method == initial
+end
+--- Applies geometry wrappers only to UI-related subclasses that still carry the
+--- base FillList/AddItemToList pair. A marker prevents duplicate wrapping.
+function patch_subclasses()
+  local patched = 0
+  local globals = _G
+  for name, namespace in pairs(globals) do
+    do
+      if name == "_G" or type(namespace) ~= "table" or not namespace_may_hold_ui(name) then
+        goto __continue138
+      end
+      for class_name, value in pairs(namespace) do
+        do
+          if type(value) == "function" then
+            goto __continue140
+          end
+          local already_patched = safe_index(value, "cmo_anthology_patched")
+            and safe_index(value, "FillList") == sub_fill_list
+            and safe_index(value, "AddItemToList") == sub_add_item_to_list
+            and safe_index(value, "Update") == update
+          if already_patched then
+            goto __continue140
+          end
+          if not method_matches(value, "FillList", vanilla_fill_list, initial_fill_list)
+            or not method_matches(value, "AddItemToList", vanilla_add_item, initial_add_item)
+            or not method_matches(value, "Update", vanilla_update, initial_update) then
+            goto __continue140
+          end
+          local cls = value
+          local ok = pcall(function()
+            cls.FillList = sub_fill_list
+            cls.AddItemToList = sub_add_item_to_list
+            cls.Update = update
+            cls.cmo_anthology_patched = true
+          end)
+          if not ok then
+            goto __continue140
+          end
+          local wpo = context_menu_overhaul_wpo
+          if wpo and type(wpo.patch) == "function" then
+            pcall(wpo.patch, cls)
+          end
+          patched = patched + 1
+          cmo_log("patched submenu class: %s.%s", tostring(name), tostring(class_name))
+        end
+        ::__continue140::
+      end
+    end
+    ::__continue138::
+  end
+  return patched
+end
+function install_hooks()
+  local inventory_class = ui_inventory and ui_inventory.UIInventory
+  local current_cells = utils_ui and utils_ui.UICellProperties
+  if not (inventory_class and current_cells) then
+    cmo_log("installation blocked: UIInventory or UICellProperties is unavailable")
+    return false
+  end
+
+  local current_init = safe_index(inventory_class, "InitProperties")
+  local current_fill = safe_index(current_cells, "FillList")
+  local current_add = safe_index(current_cells, "AddItemToList")
+  local current_update = safe_index(current_cells, "Update")
+  if hooks_installed
+    and current_init == init_properties
+    and current_fill == fill_list
+    and current_add == add_item_to_list
+    and current_update == update then
+    patch_subclasses()
+    return true
+  elseif hooks_installed then
+    cmo_log("a later addon replaced one or more hooks; chaining the current methods again")
+  end
+  if type(current_init) ~= "function"
+    or type(current_fill) ~= "function"
+    or type(current_add) ~= "function"
+    or type(current_update) ~= "function" then
+    cmo_log("installation blocked: one or more base UI methods are unavailable")
+    return false
+  end
+
+  if current_init ~= init_properties then
+    vanilla_init_properties = current_init
+  end
+  if current_fill ~= fill_list then
+    vanilla_fill_list = current_fill
+  end
+  if current_add ~= add_item_to_list then
+    vanilla_add_item = current_add
+  end
+  if current_update ~= update then
+    vanilla_update = current_update
+  end
+
+  cell_properties = current_cells
+  local wpo = context_menu_overhaul_wpo
+  if wpo and type(wpo.set_base_methods) == "function" then
+    pcall(wpo.set_base_methods, vanilla_fill_list, vanilla_add_item)
+  end
+
+  inventory_class.InitProperties = init_properties
+  current_cells.FillList = fill_list
+  current_cells.AddItemToList = add_item_to_list
+  current_cells.Update = update
+  pcall(function() current_cells.cmo_anthology_patched = true end)
+
+  local subclasses = patch_subclasses()
+  local wpo_icons = false
+  if wpo and type(wpo.can_use_icons) == "function" then
+    local ok, value = pcall(wpo.can_use_icons)
+    wpo_icons = ok and value or false
+  end
+  hooks_installed = true
+  cmo_log(
+    "installed late | subclasses=%s | mags_redux=%s | toxic_air=%s | wpo_icons=%s",
+    tostring(subclasses),
+    tostring(type(magazines) == "table"),
+    tostring(type(toxic_air) == "table"),
+    tostring(wpo_icons)
+  )
+  return true
+end
+--- Quick Action Wheel integration.
+--- * Keeps one original-labelled context action.
+--- * Uses the currently selected manual tab when possible.
+--- * Routes dynamic-tab additions to an enabled manual tab.
+--- * Registers after QAW initialization and removes its temporary callback.
+cmo_qaw_first_update_registered = false
+cmo_qaw_update_registered = false
+cmo_qaw_retry_count = 0
+cmo_qaw_max_retries = 120
+cmo_qaw_log_once = {}
+
+function cmo_qaw_log(key, fmt, ...)
+  if cmo_qaw_log_once[key] then
+    return
+  end
+  cmo_qaw_log_once[key] = true
+  cmo_log("QAW integration | " .. fmt, ...)
+end
+
+function cmo_qaw_module()
+  return haru_quick_action_wheel_mcm
+end
+
+function cmo_qaw_manager()
+  local mod = cmo_qaw_module()
+  return mod and mod.TAB_MANAGER or nil
+end
+
+function cmo_qaw_current_tab()
+  local mgr = cmo_qaw_manager()
+  if not mgr then
+    return nil, nil
+  end
+
+  local tab = mgr.temp_tab or mgr.current_tab
+  local category = mgr.dynamic_tabs and mgr.dynamic_tabs[tab] or "manual"
+  return tab, category
+end
+
+function cmo_qaw_valid_manual_tab(mgr, tab)
+  return type(tab) == "number"
+    and type(mgr.tabs) == "table"
+    and type(mgr.tabs[tab]) == "table"
+    and not (mgr.dynamic_tabs and mgr.dynamic_tabs[tab])
+end
+
+function cmo_qaw_target_tab()
+  local mod = cmo_qaw_module()
+  local mgr = cmo_qaw_manager()
+  if not mod or not mgr then
+    return nil, "not_ready"
+  end
+
+  local current = cmo_qaw_current_tab()
+  if cmo_qaw_valid_manual_tab(mgr, current) then
+    return current, "current_manual"
+  end
+
+  local cfg = mod.MCM_SETTINGS or {}
+
+  if cfg.manual_1_enabled ~= false
+    and cmo_qaw_valid_manual_tab(mgr, cfg.manual_1_tab) then
+    return cfg.manual_1_tab, "primary_manual"
+  end
+
+  if cfg.manual_2_enabled ~= false
+    and cmo_qaw_valid_manual_tab(mgr, cfg.manual_2_tab) then
+    return cfg.manual_2_tab, "secondary_manual"
+  end
+
+  local count = mgr.tab_count or #mgr.tabs
+  for i = 1, count do
+    if cmo_qaw_valid_manual_tab(mgr, i) then
+      return i, "fallback_manual"
+    end
+  end
+
+  return nil, "no_manual_tab"
+end
+
+function cmo_qaw_get_class(obj)
+  local mgr = cmo_qaw_manager()
+  if not mgr or not obj or type(mgr.CanAddItem) ~= "function" then
+    return nil
+  end
+
+  local ok, result = pcall(mgr.CanAddItem, mgr, obj, obj:section())
+  if not ok then
+    cmo_qaw_log(
+      "can_add_error_" .. tostring(obj:section()),
+      "CanAddItem failed for section=%s | %s",
+      tostring(obj:section()),
+      tostring(result)
+    )
+    return nil
+  end
+
+  return result or nil
+end
+
+function cmo_qaw_is_duplicate(mgr, tab, obj, class_name)
+  local tab_data = mgr and mgr.tabs and mgr.tabs[tab] or nil
+  if not tab_data or not obj or not class_name then
+    return false
+  end
+
+  local class_def = mgr.classes and mgr.classes[class_name] or nil
+  if class_def and class_def.is_obj then
+    return tab_data.__ids and tab_data.__ids[obj:id()] == true or false
+  end
+
+  return tab_data.__sections and tab_data.__sections[obj:section()] == true or false
+end
+
+function cmo_qaw_can_add(obj, bag, mode)
+  local mod = cmo_qaw_module()
+  local mgr = cmo_qaw_manager()
+  if not mod or not mgr or not obj then
+    return false
+  end
+
+  local target = cmo_qaw_target_tab()
+  local class_name = cmo_qaw_get_class(obj)
+  if not target or not class_name then
+    return false
+  end
+
+  local limit = (mod.MCM_SETTINGS and mod.MCM_SETTINGS.tab_slot) or 10
+  local count = mgr.tabs[target] and #mgr.tabs[target] or limit
+  if count >= limit then
+    return false
+  end
+
+  return not cmo_qaw_is_duplicate(mgr, target, obj, class_name)
+end
+
+function cmo_qaw_label(obj, bag, mode)
+  return "ui_haru_add_item_to_qaw"
+end
+
+function cmo_qaw_add(obj, bag, mode)
+  local mgr = cmo_qaw_manager()
+  if not mgr or not obj then
+    return
+  end
+
+  local target, route = cmo_qaw_target_tab()
+  local class_name = cmo_qaw_get_class(obj)
+  if not target or not class_name then
+    return
+  end
+
+  mgr:AddItem(target, obj, obj:section())
+
+  local added = cmo_qaw_is_duplicate(mgr, target, obj, class_name)
+  cmo_log(
+    "QAW action | section=%s id=%s target_tab=%s route=%s class=%s added=%s",
+    tostring(obj:section()),
+    tostring(obj:id()),
+    tostring(target),
+    tostring(route),
+    tostring(class_name),
+    tostring(added)
+  )
+end
+
+--- Update the table QAW passes to custom_functor_autoinject.
+function cmo_qaw_patch_source_table()
+  local mod = cmo_qaw_module()
+  local data = mod and mod.add_to_qaw_functor or nil
+  if type(data) ~= "table" then
+    return false
+  end
+
+  data[1] = "add_to_qaw"
+  data[2] = cmo_qaw_can_add
+  data[3] = cmo_qaw_label
+  data[4] = cmo_qaw_can_add
+  data[5] = cmo_qaw_add
+  data[6] = false
+
+  cmo_qaw_log("source_patched", "source functor table patched before/alongside QAW startup")
+  return true
+end
+
+function cmo_qaw_get_live_functor()
+  local injector = custom_functor_autoinject
+  if injector and type(injector.get_functor_by_name) == "function" then
+    local ok, entry, slot = pcall(injector.get_functor_by_name, "add_to_qaw")
+    if ok and entry then
+      return entry, slot
+    end
+  end
+
+  local gui = ui_inventory and ui_inventory.GUI or nil
+  if gui and type(gui.get_functor_by_name) == "function" then
+    local ok, entry, slot = pcall(gui.get_functor_by_name, gui, "add_to_qaw")
+    if ok and entry then
+      return entry, slot
+    end
+  end
+
+  return nil, nil
+end
+
+function cmo_qaw_live_functor_is_ours()
+  local entry, slot = cmo_qaw_get_live_functor()
+  if not entry then
+    return false, slot
+  end
+
+  local verified =
+    entry.cond_name == cmo_qaw_can_add
+    and entry.func_name == cmo_qaw_label
+    and entry.cond_action == cmo_qaw_can_add
+    and entry.func_action == cmo_qaw_add
+
+  return verified, slot
+end
+
+function cmo_qaw_register_live(stage)
+  cmo_qaw_patch_source_table()
+
+  local mod = cmo_qaw_module()
+  local mgr = cmo_qaw_manager()
+  local injector = custom_functor_autoinject
+  if not mod or not mgr
+    or not injector
+    or type(injector.add_functor) ~= "function" then
+    return false
+  end
+
+  local ok, err = pcall(
+    injector.add_functor,
+    "add_to_qaw",
+    cmo_qaw_can_add,
+    cmo_qaw_label,
+    cmo_qaw_can_add,
+    cmo_qaw_add,
+    false
+  )
+
+  if not ok then
+    cmo_qaw_log(
+      "register_error",
+      "live registration failed at stage=%s | %s",
+      tostring(stage),
+      tostring(err)
+    )
+    return false
+  end
+
+  local verified, slot = cmo_qaw_live_functor_is_ours()
+  if not verified then
+    return false
+  end
+
+  local current, category = cmo_qaw_current_tab()
+  local target, route = cmo_qaw_target_tab()
+  cmo_qaw_log(
+    "verified",
+    "live override verified | stage=%s slot=%s current_tab=%s category=%s target_tab=%s route=%s",
+    tostring(stage),
+    tostring(slot),
+    tostring(current),
+    tostring(category),
+    tostring(target),
+    tostring(route)
+  )
+  return true
+end
+
+function cmo_qaw_stop_update_retry()
+  if cmo_qaw_update_registered
+    and type(UnregisterScriptCallback) == "function" then
+    UnregisterScriptCallback("actor_on_update", cmo_qaw_actor_on_update)
+  end
+  cmo_qaw_update_registered = false
+end
+
+function cmo_qaw_actor_on_update(binder, delta)
+  cmo_qaw_retry_count = cmo_qaw_retry_count + 1
+
+  if cmo_qaw_register_live("actor_on_update") then
+    cmo_qaw_stop_update_retry()
+    return
+  end
+
+  if cmo_qaw_retry_count >= cmo_qaw_max_retries then
+    cmo_qaw_stop_update_retry()
+    cmo_qaw_log(
+      "retry_exhausted",
+      "late override was not verified after %s frames",
+      tostring(cmo_qaw_retry_count)
+    )
+  end
+end
+
+function cmo_qaw_schedule_next_frame()
+  cmo_qaw_retry_count = 0
+  if type(RegisterScriptCallback) == "function"
+    and not cmo_qaw_update_registered then
+    RegisterScriptCallback("actor_on_update", cmo_qaw_actor_on_update)
+    cmo_qaw_update_registered = true
+  end
+end
+
+function cmo_qaw_actor_on_first_update(binder, delta)
+  if cmo_qaw_first_update_registered
+    and type(UnregisterScriptCallback) == "function" then
+    UnregisterScriptCallback("actor_on_first_update", cmo_qaw_actor_on_first_update)
+  end
+  cmo_qaw_first_update_registered = false
+
+  --- Register on the following frame after UI functors are initialized.
+  cmo_qaw_schedule_next_frame()
+end
+
+function cmo_qaw_schedule_late_registration(stage)
+  cmo_qaw_patch_source_table()
+
+  if stage == "game_load" then
+    cmo_qaw_schedule_next_frame()
+    return
+  end
+
+  if type(RegisterScriptCallback) == "function"
+    and not cmo_qaw_first_update_registered then
+    RegisterScriptCallback("actor_on_first_update", cmo_qaw_actor_on_first_update)
+    cmo_qaw_first_update_registered = true
+  end
+end
+
+--- The main script loads settings early. A late zzzzzz bootstrap installs the hooks
+--- after inventory/menu addons have finished replacing their own methods.
+function on_game_start()
+  load_settings()
+  rebuild_label_lookup()
+  if not option_callback_registered then
+    RegisterScriptCallback("on_option_change", load_settings)
+    option_callback_registered = true
+  end
+
+  --- Do not register the live functor here: QAW registers the same name later.
+  --- Patch QAW's source table now; the late bootstrap verifies the live slot.
+  cmo_qaw_patch_source_table()
+end
+
+function on_game_load()
+  cmo_qaw_patch_source_table()
+  rebuild_label_lookup()
+end
+
+function on_game_end()
+  if option_callback_registered and type(UnregisterScriptCallback) == "function" then
+    UnregisterScriptCallback("on_option_change", load_settings)
+  end
+  option_callback_registered = false
+  cmo_qaw_stop_update_retry()
+  if cmo_qaw_first_update_registered and type(UnregisterScriptCallback) == "function" then
+    UnregisterScriptCallback("actor_on_first_update", cmo_qaw_actor_on_first_update)
+  end
+  cmo_qaw_first_update_registered = false
+  rebuild_label_lookup()
+  pending_keys_mismatch_logged = false
+end
+

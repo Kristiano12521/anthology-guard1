@@ -1,0 +1,17 @@
+; Context Menu Overhaul + Mags Redux universal retool compatibility.
+; Named mod_weapon_magazines_* so DLTX overlays weapon_magazines.ltx
+; (section [tch_mag_base]). The previous filename mod_mags_retool_* did not
+; match any original in this folder and never applied.
+;
+; Route custom action 7 for every loaded magazine through the universal resolver.
+; Existing explicit retool_group values remain authoritative.
+;
+; use7_modes/use7_containers matches R.A.K Mags Redux native scope
+; (inventory, loot only - no trade). retool_mag_functor calls
+; alife_create_item()/alife_release() on obj:parent(); during trade that
+; parent is not guaranteed to be the actor inventory.
+![tch_mag_base]
+use7_functor        = cmo_mags_retool_compat.retool_mag_precondition
+use7_action_functor = cmo_mags_retool_compat.retool_mag_functor
+use7_modes          = inventory, loot
+use7_containers     = actor_bag, actor_equ, actor_belt, npc_bag

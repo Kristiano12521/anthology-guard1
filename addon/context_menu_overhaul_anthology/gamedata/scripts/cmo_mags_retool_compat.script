@@ -1,0 +1,822 @@
+-- Universal Mags Redux retool compatibility for Context Menu Overhaul.
+-- Supports every loaded magazine family that has a valid calibre counterpart.
+-- Explicit retool_group links remain authoritative; missing links are inferred
+-- from weapon calibre mappings and matching physical magazine families.
+
+local VERSION = "1.2.1 BETA"
+local TAG = "[MagsUniversalRetool " .. VERSION .. "]"
+
+local index_ready = false
+local rebuilding = false
+local callback_registered = false
+
+local native_get_retool_section = nil
+local mag_info = {}
+local mags_by_base = {}
+local mags_by_group = {}
+local target_by_section = {}
+local target_source = {}
+local weapon_families = {}
+local root_families = {}
+local eligible_roots = {}
+
+local stats = {
+    magazines = 0,
+    explicit_targets = 0,
+    inferred_targets = 0,
+    weapon_families = 0,
+    root_families = 0,
+    unresolved = 0,
+}
+
+local CALIBER_TOKENS = {
+    "14.5x114", "12.7x108", "12.7x99", "12.7x55", "11.43x23",
+    "9.3x64", "7.92x57", "7.92x33", "7.62x54", "7.62x51",
+    "7.62x39", "7.62x25", "6.8x51", "5.7x28", "5.56x45",
+    "5.45x39", "4.6x30", "10x25", "9x39", "9x21", "9x19",
+    "9x18", "12x76", "12x70", "338_federal", "338", "3006",
+    "300", "50ae", "45acp", "357", "54r",
+}
+
+local GENERIC_STYLE = {
+    default = true,
+    alt = true,
+    std = true,
+    standard = true,
+    bas = true,
+}
+
+local STYLE_WORDS = {
+    "drum", "extended", "ext", "fast", "modern", "casket",
+    "short", "compact", "sniper", "long", "default", "standard",
+    "std", "bas", "alt",
+}
+
+local PLACEHOLDER_VISUAL = "dynamics\\devices\\dev_harmonica\\dev_harmonica.ogf"
+
+local function log(fmt, ...)
+    if type(printf) == "function" then
+        printf(TAG .. " " .. fmt, ...)
+    end
+end
+
+local function trim(value)
+    if value == nil then
+        return nil
+    end
+    local text = tostring(value)
+    text = string.gsub(text, "^%s+", "")
+    text = string.gsub(text, "%s+$", "")
+    return text
+end
+
+local function lower(value)
+    return string.lower(trim(value) or "")
+end
+
+local function safe_param(kind, section, key, default)
+    if not (section and key and type(SYS_GetParam) == "function") then
+        return default
+    end
+    local ok, value = pcall(SYS_GetParam, kind, section, key, default)
+    if ok and value ~= nil then
+        return value
+    end
+    return default
+end
+
+local function split_csv(value)
+    local result = {}
+    local seen = {}
+    local text = tostring(value or "")
+    for token in string.gmatch(text, "[^,]+") do
+        token = trim(token)
+        if token and token ~= "" and not seen[token] then
+            seen[token] = true
+            result[#result + 1] = token
+        end
+    end
+    return result
+end
+
+local function table_add_unique(tbl, value)
+    if not value or value == "" then
+        return
+    end
+    for i = 1, #tbl do
+        if tbl[i] == value then
+            return
+        end
+    end
+    tbl[#tbl + 1] = value
+end
+
+local function section_of(value)
+    if type(value) == "string" then
+        return value
+    end
+    if not value then
+        return nil
+    end
+    if type(value.section) == "function" then
+        local ok, section = pcall(value.section, value)
+        if ok and section then
+            return section
+        end
+    end
+    if type(value.section_name) == "function" then
+        local ok, section = pcall(value.section_name, value)
+        if ok and section then
+            return section
+        end
+    end
+    return nil
+end
+
+local function normalize_separators(value)
+    local text = lower(value)
+    text = string.gsub(text, "[%.%-]+", "_")
+    text = string.gsub(text, "_+", "_")
+    text = string.gsub(text, "^_+", "")
+    text = string.gsub(text, "_+$", "")
+    return text
+end
+
+local function remove_calibers(value)
+    local text = normalize_separators(value)
+    for i = 1, #CALIBER_TOKENS do
+        local token = normalize_separators(CALIBER_TOKENS[i])
+        text = string.gsub(text, token, "_")
+    end
+    text = string.gsub(text, "_762_", "_")
+    text = string.gsub(text, "_556_", "_")
+    text = string.gsub(text, "_545_", "_")
+    text = string.gsub(text, "_919_", "_")
+    text = string.gsub(text, "_918_", "_")
+    text = string.gsub(text, "_12755_", "_")
+    text = string.gsub(text, "_12799_", "_")
+    text = string.gsub(text, "_145114_", "_")
+    text = string.gsub(text, "_+", "_")
+    text = string.gsub(text, "^_+", "")
+    text = string.gsub(text, "_+$", "")
+    return text
+end
+
+local function split_words(value)
+    local result = {}
+    for word in string.gmatch(normalize_separators(value), "[^_]+") do
+        result[#result + 1] = word
+    end
+    return result
+end
+
+local function root_of_base(base_type)
+    local text = remove_calibers(base_type)
+    local words = split_words(text)
+    local kept = {}
+    for i = 1, #words do
+        local word = words[i]
+        if not GENERIC_STYLE[word] then
+            kept[#kept + 1] = word
+        end
+    end
+    return table.concat(kept, "_")
+end
+
+local function family_key(section)
+    local text = remove_calibers(section)
+    text = string.gsub(text, "^mag_", "")
+    local words = split_words(text)
+    local kept = {}
+    for i = 1, #words do
+        local word = words[i]
+        local is_style = false
+        for j = 1, #STYLE_WORDS do
+            if word == STYLE_WORDS[j] then
+                is_style = true
+                break
+            end
+        end
+        if not is_style then
+            kept[#kept + 1] = word
+        end
+    end
+    return table.concat(kept, "_")
+end
+
+local function variant_key(section)
+    local text = remove_calibers(section)
+    text = string.gsub(text, "^mag_", "")
+    local words = split_words(text)
+    local kept = {}
+    for i = 1, #words do
+        local word = words[i]
+        if not GENERIC_STYLE[word] then
+            kept[#kept + 1] = word
+        end
+    end
+    return table.concat(kept, "_")
+end
+
+local function style_of(section)
+    local text = "_" .. normalize_separators(section) .. "_"
+    for i = 1, #STYLE_WORDS do
+        local style = STYLE_WORDS[i]
+        if string.find(text, "_" .. style .. "_", 1, true) then
+            if GENERIC_STYLE[style] then
+                return "default"
+            end
+            return style
+        end
+    end
+    return "default"
+end
+
+local function is_real_visual(value)
+    local visual = lower(value)
+    return visual ~= "" and visual ~= lower(PLACEHOLDER_VISUAL)
+end
+
+local function magazine_score(source, candidate)
+    local a = mag_info[source]
+    local b = mag_info[candidate]
+    if not (a and b) then
+        return -100000
+    end
+
+    local score = 0
+
+    if a.family_key ~= "" and a.family_key == b.family_key then
+        score = score + 1200
+    end
+    if a.variant_key ~= "" and a.variant_key == b.variant_key then
+        score = score + 800
+    end
+    if is_real_visual(a.visual) and lower(a.visual) == lower(b.visual) then
+        score = score + 700
+    end
+
+    if a.capacity == b.capacity then
+        score = score + 400
+    else
+        local difference = math.abs((a.capacity or 0) - (b.capacity or 0))
+        score = score - math.min(difference * 5, 250)
+    end
+
+    if a.style == b.style then
+        score = score + 250
+    elseif a.style == "default" or b.style == "default" then
+        score = score + 40
+    else
+        score = score - 80
+    end
+
+    if a.mag_size ~= "" and a.mag_size == b.mag_size then
+        score = score + 30
+    end
+
+    if a.root ~= "" and a.root == b.root then
+        score = score + 100
+    end
+
+    return score
+end
+
+local function add_mag_to_index(index, key, section)
+    if not key or key == "" then
+        return
+    end
+    if not index[key] then
+        index[key] = {}
+    end
+    table_add_unique(index[key], section)
+end
+
+local function collect_magazine(section)
+    if section == "tch_mag_base" then
+        return false
+    end
+    if not safe_param(1, section, "is_mag", false) then
+        return false
+    end
+    if safe_param(1, section, "old_mag", false) then
+        return false
+    end
+
+    local base_type = trim(safe_param(0, section, "base_type", ""))
+    if not base_type or base_type == "" then
+        return false
+    end
+
+    local group = trim(safe_param(0, section, "retool_group", ""))
+    local visual = trim(safe_param(0, section, "visual", "")) or ""
+    local capacity = tonumber(safe_param(2, section, "max_mag_size", 0)) or 0
+    local mag_size = trim(safe_param(0, section, "mag_size", "")) or ""
+    local root = root_of_base(base_type)
+
+    mag_info[section] = {
+        section = section,
+        base_type = base_type,
+        group = group or "",
+        visual = visual,
+        capacity = capacity,
+        mag_size = mag_size,
+        root = root,
+        family_key = family_key(section),
+        variant_key = variant_key(section),
+        style = style_of(section),
+    }
+
+    add_mag_to_index(mags_by_base, base_type, section)
+    if group and group ~= "" then
+        add_mag_to_index(mags_by_group, group, section)
+        if not eligible_roots[root] then
+            eligible_roots[root] = "explicit_group"
+        end
+    end
+
+    stats.magazines = stats.magazines + 1
+    return true
+end
+
+local function family_signature(base_types)
+    local copy = {}
+    for i = 1, #base_types do
+        copy[i] = base_types[i]
+    end
+    table.sort(copy)
+    return table.concat(copy, "|")
+end
+
+local function add_weapon_family(base_types, weapon_section, signatures)
+    local clean = {}
+    for i = 1, #base_types do
+        local base_type = base_types[i]
+        if mags_by_base[base_type] then
+            table_add_unique(clean, base_type)
+        end
+    end
+    if #clean < 2 then
+        return
+    end
+
+    local signature = family_signature(clean)
+    if signatures[signature] then
+        return
+    end
+    signatures[signature] = true
+
+    weapon_families[#weapon_families + 1] = {
+        kind = "weapon",
+        name = weapon_section,
+        base_types = clean,
+        threshold = 100,
+    }
+    stats.weapon_families = stats.weapon_families + 1
+
+    for i = 1, #clean do
+        local root = root_of_base(clean[i])
+        if root ~= "" then
+            eligible_roots[root] = "weapon_family"
+        end
+    end
+end
+
+local function collect_weapon_family(section, signatures)
+    local default_mag = trim(safe_param(0, section, "default_mag", ""))
+    if not default_mag or default_mag == "" or not mag_info[default_mag] then
+        return
+    end
+
+    local base_types = {}
+    table_add_unique(base_types, mag_info[default_mag].base_type)
+
+    local improved_mag = trim(safe_param(0, section, "improved_mag", ""))
+    if improved_mag and mag_info[improved_mag] then
+        table_add_unique(base_types, mag_info[improved_mag].base_type)
+    end
+
+    local ammo_class = split_csv(safe_param(0, section, "ammo_class", ""))
+    for i = 1, #ammo_class do
+        local mapped = trim(safe_param(0, section, ammo_class[i], ""))
+        if mapped and mapped ~= "" and mags_by_base[mapped] then
+            table_add_unique(base_types, mapped)
+        end
+    end
+
+    add_weapon_family(base_types, section, signatures)
+end
+
+local function build_root_families()
+    local by_root = {}
+    for base_type, _ in pairs(mags_by_base) do
+        local root = root_of_base(base_type)
+        if root ~= "" then
+            if not by_root[root] then
+                by_root[root] = {}
+            end
+            table_add_unique(by_root[root], base_type)
+        end
+    end
+
+    local roots = {}
+    for root, base_types in pairs(by_root) do
+        if #base_types >= 2 and eligible_roots[root] then
+            roots[#roots + 1] = root
+        end
+    end
+    table.sort(roots)
+
+    for i = 1, #roots do
+        local root = roots[i]
+        local base_types = by_root[root]
+        table.sort(base_types)
+        root_families[#root_families + 1] = {
+            kind = "root",
+            name = root,
+            base_types = base_types,
+            threshold = 900,
+        }
+        stats.root_families = stats.root_families + 1
+    end
+end
+
+local function next_base_candidates(family, source_base)
+    local result = {}
+    local index = nil
+    for i = 1, #family.base_types do
+        if family.base_types[i] == source_base then
+            index = i
+            break
+        end
+    end
+    if not index then
+        return result
+    end
+
+    for offset = 1, #family.base_types - 1 do
+        local pos = ((index - 1 + offset) % #family.base_types) + 1
+        result[#result + 1] = family.base_types[pos]
+    end
+    return result
+end
+
+local function best_candidate_for_family(section, family)
+    local info = mag_info[section]
+    if not info then
+        return nil, -100000
+    end
+
+    local target_bases = next_base_candidates(family, info.base_type)
+    local best = nil
+    local best_score = -100000
+
+    for i = 1, #target_bases do
+        local candidates = mags_by_base[target_bases[i]] or {}
+        for j = 1, #candidates do
+            local candidate = candidates[j]
+            if candidate ~= section then
+                local score = magazine_score(section, candidate)
+                score = score - ((i - 1) * 50)
+                if score > best_score then
+                    best = candidate
+                    best_score = score
+                end
+            end
+        end
+        if best and best_score >= family.threshold then
+            break
+        end
+    end
+
+    if best_score < family.threshold then
+        return nil, best_score
+    end
+    return best, best_score
+end
+
+local function build_explicit_targets()
+    local group_names = {}
+    for group, sections in pairs(mags_by_group) do
+        if #sections > 1 then
+            group_names[#group_names + 1] = group
+        end
+    end
+    table.sort(group_names)
+
+    for i = 1, #group_names do
+        local group = group_names[i]
+        local sections = mags_by_group[group]
+        table.sort(sections)
+        for j = 1, #sections do
+            local source = sections[j]
+            local target = sections[(j < #sections) and (j + 1) or 1]
+            target_by_section[source] = target
+            target_source[source] = "explicit:" .. group
+            stats.explicit_targets = stats.explicit_targets + 1
+        end
+    end
+end
+
+local function family_contains(family, base_type)
+    for i = 1, #family.base_types do
+        if family.base_types[i] == base_type then
+            return true
+        end
+    end
+    return false
+end
+
+local function infer_target(section)
+    local info = mag_info[section]
+    if not info then
+        return nil, nil
+    end
+
+    local best = nil
+    local best_score = -100000
+    local best_source = nil
+    local best_size = 0
+
+    local function consider(family)
+        if not family_contains(family, info.base_type) then
+            return
+        end
+        local candidate, score = best_candidate_for_family(section, family)
+        if not candidate then
+            return
+        end
+
+        local family_size = #family.base_types
+        local weighted = score + (family_size * 25)
+        if family.kind == "root" then
+            weighted = weighted + 100
+        end
+
+        if weighted > best_score or
+            (weighted == best_score and family_size > best_size) then
+            best = candidate
+            best_score = weighted
+            best_source = family.kind .. ":" .. family.name
+            best_size = family_size
+        end
+    end
+
+    for i = 1, #root_families do
+        consider(root_families[i])
+    end
+    for i = 1, #weapon_families do
+        consider(weapon_families[i])
+    end
+
+    return best, best_source
+end
+
+local function build_inferred_targets()
+    local sections = {}
+    for section, _ in pairs(mag_info) do
+        sections[#sections + 1] = section
+    end
+    table.sort(sections)
+
+    for i = 1, #sections do
+        local section = sections[i]
+        if not target_by_section[section] then
+            local target, source = infer_target(section)
+            if target then
+                target_by_section[section] = target
+                target_source[section] = source
+                stats.inferred_targets = stats.inferred_targets + 1
+            else
+                stats.unresolved = stats.unresolved + 1
+            end
+        end
+    end
+end
+
+local function reset_index()
+    mag_info = {}
+    mags_by_base = {}
+    mags_by_group = {}
+    target_by_section = {}
+    target_source = {}
+    weapon_families = {}
+    root_families = {}
+    eligible_roots = {}
+    stats = {
+        magazines = 0,
+        explicit_targets = 0,
+        inferred_targets = 0,
+        weapon_families = 0,
+        root_families = 0,
+        unresolved = 0,
+    }
+end
+
+local function build_index()
+    if rebuilding then
+        return false
+    end
+    rebuilding = true
+    reset_index()
+
+    local weapon_sections = {}
+    local ok, error_text = pcall(function()
+        ini_sys:section_for_each(function(section)
+            if not collect_magazine(section) then
+                local default_mag = trim(safe_param(0, section, "default_mag", ""))
+                if default_mag and default_mag ~= "" then
+                    weapon_sections[#weapon_sections + 1] = section
+                end
+            end
+        end)
+    end)
+
+    if not ok then
+        rebuilding = false
+        index_ready = false
+        log("index build failed while scanning sections: %s", tostring(error_text))
+        return false
+    end
+
+    local signatures = {}
+    for i = 1, #weapon_sections do
+        collect_weapon_family(weapon_sections[i], signatures)
+    end
+
+    build_root_families()
+    build_explicit_targets()
+    build_inferred_targets()
+
+    rebuilding = false
+    index_ready = true
+
+    log(
+        "index built | magazines=%d | explicit=%d | inferred=%d | weapon_families=%d | root_families=%d | without_target=%d",
+        stats.magazines,
+        stats.explicit_targets,
+        stats.inferred_targets,
+        stats.weapon_families,
+        stats.root_families,
+        stats.unresolved
+    )
+    return true
+end
+
+local function ensure_index()
+    if index_ready then
+        return true
+    end
+    return build_index()
+end
+
+local function native_target(value)
+    if type(native_get_retool_section) ~= "function" then
+        return nil
+    end
+    local ok, target = pcall(native_get_retool_section, value)
+    if ok and type(target) == "string" and target ~= "" then
+        return target
+    end
+    return nil
+end
+
+function get_retool_section(value)
+    local section = section_of(value)
+    if not section then
+        return nil
+    end
+
+    local target = native_target(value)
+    if target then
+        return target
+    end
+
+    if not ensure_index() then
+        return nil
+    end
+    return target_by_section[section]
+end
+
+function retool_mag_precondition(obj)
+    local section = section_of(obj)
+    if not section or not safe_param(1, section, "is_mag", false) then
+        return nil
+    end
+
+    local target = get_retool_section(obj)
+    if not target then
+        return nil
+    end
+
+    return game.translate_string("st_mag_retool")
+end
+
+local function refresh_inventory()
+    if magazines and type(magazines.timed_refresh) == "function" then
+        magazines.timed_refresh()
+        return
+    end
+    if magazines and type(magazines.inventory_refresh) == "function" then
+        magazines.inventory_refresh(2)
+    end
+end
+
+function retool_mag_functor(obj)
+    local section = section_of(obj)
+    local target = get_retool_section(obj)
+    if not (section and target) then
+        log("action rejected: no target | source=%s", tostring(section))
+        return
+    end
+
+    local mag_data = nil
+    if magazine_binder and type(magazine_binder.get_data) == "function" then
+        local ok, value = pcall(magazine_binder.get_data, obj:id())
+        if ok then
+            mag_data = value
+        end
+    end
+
+    if mag_data and mag_data.loaded and #mag_data.loaded > 0 then
+        actor_menu.set_item_news("fail", "detail", "st_mag_err_retool")
+        return
+    end
+
+    local tool = db.actor and db.actor:object("leatherman_tool") or nil
+    if not tool then
+        actor_menu.set_item_news("fail", "weapon", "st_dis_text_3", " ")
+        return
+    end
+
+    local parent = obj:parent()
+    local new_obj = alife_create_item(target, parent)
+    if not new_obj then
+        log("creation failed | source=%s | target=%s", tostring(section), tostring(target))
+        return
+    end
+
+    log(
+        "retool applied | %s -> %s | route=%s",
+        tostring(section),
+        tostring(target),
+        tostring(target_source[section] or "native")
+    )
+
+    alife_release(obj)
+    if utils_item and type(utils_item.degrade) == "function" then
+        utils_item.degrade(tool, 0)
+    end
+    refresh_inventory()
+end
+
+local function install_getter_bridge()
+    if not (magazine_binder and type(magazine_binder) == "table") then
+        return false
+    end
+
+    if magazine_binder.get_retool_section ~= get_retool_section then
+        if type(magazine_binder.get_retool_section) == "function" then
+            native_get_retool_section = magazine_binder.get_retool_section
+        end
+        magazine_binder.get_retool_section = get_retool_section
+    end
+
+    if magazines and type(magazines) == "table" then
+        magazines.get_retool_section = get_retool_section
+    end
+    return true
+end
+
+function rebuild_index()
+    index_ready = false
+    return build_index()
+end
+
+function actor_on_first_update()
+    install_getter_bridge()
+    ensure_index()
+end
+
+function on_game_start()
+    install_getter_bridge()
+    index_ready = false
+    if not callback_registered then
+        RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+        callback_registered = true
+    end
+end
+
+function on_game_load()
+    install_getter_bridge()
+    index_ready = false
+    ensure_index()
+end
+
+function on_game_end()
+    if callback_registered and type(UnregisterScriptCallback) == "function" then
+        UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+    end
+    callback_registered = false
+    index_ready = false
+end

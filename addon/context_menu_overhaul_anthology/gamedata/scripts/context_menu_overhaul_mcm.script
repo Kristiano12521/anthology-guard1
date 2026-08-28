@@ -1,0 +1,65 @@
+-- Context Menu Overhaul 1.4.2
+-- Anthology adaptation 1.2.1 BETA
+
+mcm = context_menu_overhaul__ap_mcm
+addonId = "context_menu_overhaul"
+
+defaultConfig = {
+  group_related_actions = true,
+  use_colors = false,
+  show_separators = true,
+  details_shows_item_name = true,
+  capitalize_labels = true,
+  hide_gift = false,
+  field_strip_icons = true,
+  maintenance_icons = true
+}
+
+BASE = "cmo_base"
+COMPAT = "cmo_compat"
+WPO = "cmo_wpo"
+
+base_options = {
+  "group_related_actions",
+  "use_colors",
+  "show_separators",
+  "details_shows_item_name",
+  "capitalize_labels",
+  "hide_gift"
+}
+wpo_options = {"field_strip_icons", "maintenance_icons"}
+
+optionGroup = {}
+for _, id in ipairs(base_options) do
+  optionGroup[id] = BASE
+end
+for _, id in ipairs(wpo_options) do
+  optionGroup[id] = COMPAT .. "/" .. WPO
+end
+
+function option(id)
+  return mcm.check({id = id, def = defaultConfig[id]})
+end
+
+function options_of(ids)
+  local list = {}
+  for _, id in ipairs(ids) do
+    list[#list + 1] = option(id)
+  end
+  return list
+end
+
+function on_mcm_load()
+  return mcm.menu({
+    id = addonId,
+    sh = false,
+    gr = {
+      mcm.group({id = BASE, sh = true, gr = options_of(base_options)}),
+      mcm.group({
+        id = COMPAT,
+        sh = false,
+        gr = {mcm.group({id = WPO, sh = true, gr = options_of(wpo_options)})}
+      })
+    }
+  })
+end

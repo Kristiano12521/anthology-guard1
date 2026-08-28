@@ -1,0 +1,67 @@
+-- This script was generated with Anomaly Packer v0.4.0 (https://github.com/piscopancer/anomaly-packer)
+-- Author: piscopancer
+-- Version: 1.4.2
+-- Created at: 27.07.2026
+-- Source: https://github.com/piscopancer/stalker-anomaly-context-menu-overhaul
+
+--- Generic helpers with no knowledge of the context menu, shared through the addon's `context_menu_overhaul_utils` namespace.
+function vec(x, y) return vector2():set(x, y) end
+--- `#rrggbb` or `#rrggbbaa` as argb, `null` when malformed so a typo means "no colour" rather than an arbitrary one.
+function parse_hex(hex)
+  local digits = string.match(hex, "^#(%x+)$")
+  if not digits or string.len(digits) ~= 6 and string.len(digits) ~= 8 then
+    return nil
+  end
+  local function channel(at)
+    return tonumber(
+      string.sub(digits, at, at + 1),
+      16
+    ) or 255
+  end
+  local alpha = string.len(digits) == 8 and channel(7) or 255
+  return GetARGB(
+    alpha,
+    channel(1),
+    channel(3),
+    channel(5)
+  )
+end
+--- Lower-case `à`-`ÿ` in windows-1251, the encoding Anomaly's localization files use; their upper-case forms sit 32 bytes below.
+CP1251_A = 224
+CP1251_YA = 255
+CP1251_CASE_GAP = 32
+--- Lower-case `¸`, which sits outside the contiguous range and pairs with `¨`.
+CP1251_YO = 184
+CP1251_YO_UPPER = 168
+--- A UTF-8 multibyte sequence: a lead byte `0xC2`-`0xF4` followed by a continuation byte
+-- `0x80`-`0xBF`. The CP1251 case logic below reads a byte as a whole letter, so a CJK
+-- localization (Chinese, Korean, Japanese) — whose glyphs are UTF-8, and whose 3-byte lead
+-- bytes `0xE0`-`0xEF` land inside the Cyrillic range — would have its first byte rewritten
+-- and the sequence corrupted, dropping the label entirely. CP1251 Cyrillic is unaffected:
+-- its second letter byte is `>= 0xC0`, never a `0x80`-`0xBF` continuation byte.
+UTF8_LEAD_MIN = 194
+UTF8_LEAD_MAX = 244
+UTF8_CONT_MIN = 128
+UTF8_CONT_MAX = 191
+function is_utf8_multibyte(text)
+  local lead, cont = string.byte(text, 1, 2)
+  return lead ~= nil and cont ~= nil and lead >= UTF8_LEAD_MIN and lead <= UTF8_LEAD_MAX and cont >= UTF8_CONT_MIN and cont <= UTF8_CONT_MAX
+end
+--- Upper-cases the first character, leaving the rest as authored so an acronym like "PDA" survives.
+function capitalize(text)
+  local rest = string.sub(text, 2)
+  local first = string.byte(text)
+  if not first then
+    return text
+  end
+  if is_utf8_multibyte(text) then
+    return text
+  end
+  if first >= CP1251_A and first <= CP1251_YA then
+    return string.char(first - CP1251_CASE_GAP) .. rest
+  end
+  if first == CP1251_YO then
+    return string.char(CP1251_YO_UPPER) .. rest
+  end
+  return string.upper(string.sub(text, 1, 1)) .. rest
+end

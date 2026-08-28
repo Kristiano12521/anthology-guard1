@@ -1,0 +1,55 @@
+UNIVERSAL MAGS RETOOL COVERAGE
+Generated from the supplied R.A.K Weapon Pack Adaptation Global Anthology Mags Redux archive.
+
+Magazine sections scanned offline: 237
+Routes already provided by explicit retool_group families: 97
+Additional routes inferred by universal resolver: 37
+Magazine sections with a conversion target in this supplied build: 134
+Sections without another valid calibre counterpart: 103
+
+Important:
+- 'Without target' does not mean unsupported by the menu.
+- It means the supplied configuration has no second detachable-magazine section
+  that can serve as a real conversion result.
+- Tube-fed shotguns, revolvers, internal magazines and fixed-calibre families
+  are intentionally not given a fake Retool action.
+
+ADDITIONAL INFERRED ROUTES
+--------------------------
+mag_agram2000_9x18_std -> mag_agram2000_9x19_std  [root:agram2000]
+mag_agram2000_9x19_std -> mag_agram2000_9x18_std  [root:agram2000]
+mag_ak_5.45x39_default -> mag_ak_5.56x45_default  [root:ak]
+mag_ak_5.45x39_extended -> mag_ak_5.56x45_default  [root:ak]
+mag_ak_5.45x39_fast -> mag_ak_5.56x45_default  [root:ak]
+mag_ak_5.56x45_default -> mag_ak_7.62x39_default  [root:ak]
+mag_ak_7.62x39_default -> mag_ak_5.45x39_default  [root:ak]
+mag_ak_7.62x39_fast -> mag_ak_5.45x39_fast  [root:ak]
+mag_akalfa_5.56x45_bas -> mag_ak_5.45x39_default  [weapon:wpn_ak107_chaser107]
+mag_colt1911_extended -> mag_colt1911_10x25_extended  [root:colt]
+mag_galil_7.62x51_default -> mag_ak_7.62x39_default  [weapon:wpn_galil]
+mag_glock_10x25_default -> mag_glock_9x18_alt  [root:glock]
+mag_glock_10x25_drum -> mag_glock_9x18_alt  [root:glock]
+mag_glock_10x25_extended -> mag_glock_9x18_alt  [root:glock]
+mag_mac10_11.43x23_alt -> mag_mac10_9x19_standard  [root:mac10]
+mag_mac10_11.43x23_default -> mag_mac10_9x19_standard  [root:mac10]
+mag_mac10_11.43x23_ext_alt -> mag_mac10_9x19_ext  [root:mac10]
+mag_mac10_9x19_ext -> mag_mac10_11.43x23_ext_alt  [root:mac10]
+mag_mac10_9x19_standard -> mag_mac10_11.43x23_default  [root:mac10]
+mag_mp5_10x25_default -> mag_mp5_9x18_alt  [root:mp5]
+mag_mp7_4.6x30_default -> mag_mp7_9x18_alt  [root:mp7]
+mag_mp7_9x18_alt -> mag_mp7_9x19_default  [root:mp7]
+mag_mp7_9x19_default -> mag_mp7_4.6x30_default  [root:mp7]
+mag_mp9_long -> mag_mp9_5.7x28_default  [root:mp9]
+mag_mp9_short -> mag_mp9_5.7x28_default  [root:mp9]
+mag_nato_5.56x45_casket -> mag_nato_5.45x39_alt  [weapon:wpn_l85]
+mag_nato_5.56x45_drum -> mag_nato_5.45x39_alt  [weapon:wpn_l85]
+mag_nato_5.56x45_drum_ext -> mag_nato_5.45x39_alt  [weapon:wpn_l85]
+mag_nato_5.56x45_extended -> mag_nato_5.45x39_alt  [weapon:wpn_l85]
+mag_nato_5.56x45_fast -> mag_nato_5.45x39_alt  [weapon:wpn_l85]
+mag_qbz191_5.56x45_default -> mag_nato_5.45x39_alt  [weapon:wpn_l85]
+mag_qbz191_7.62x39_default -> mag_galil_7.62x51_default  [weapon:wpn_galil]
+mag_rpk_7.62x39_default -> mag_rpk_5.45x39_default  [root:ak]
+mag_saiga9_9x19_default -> mag_vityaz_9x18_alt  [weapon:wpn_vityaz]
+mag_svd_nimble_3006_default -> mag_svd_5.56_extended  [root:svd]
+mag_vz61_9x18_alt -> mag_vz61_9x19_default  [root:vz61]
+mag_vz61_9x19_default -> mag_vz61_9x18_alt  [root:vz61]

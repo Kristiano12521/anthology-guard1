@@ -1,0 +1,59 @@
+-- Removes the "ѕокурить" ("Enjoy Cigarette") context-menu row added by the
+-- [MODDED EXES] Enjoy Cigarettes addon (Tosox, moddb.com/mods/stalker-anomaly/
+-- addons/dltx-enjoy-cigarettes) Ч per user request, it duplicates the
+-- existing "»спользовать" action.
+--
+-- Enjoy Cigarettes registers its row through demonized's
+-- custom_functor_autoinject.script (the same shared helper Mags Redux/OPO/
+-- PBA transmute all use in this modlist) via add_functor(name, ...). That
+-- library also exposes an official remove_functor(name) Ч this uses that
+-- API directly instead of monkey-patching dynamic.enjoy_cigs itself, so the
+-- actual smoking action bound to "»спользовать" (a separate, vanilla `use`
+-- functor per the diagnostic log) is never touched.
+--
+-- Deferred by one tick via CreateTimeEvent: custom_functor_autoinject queues
+-- add/remove calls made before the actor's first update and replays them in
+-- call order at actor_on_first_update. Calling remove_functor from our own
+-- actor_on_first_update would race Enjoy Cigarettes' own registration
+-- (whichever mod's on_game_start happened to run first wins the queue
+-- order). Waiting one extra tick guarantees the queue has already been
+-- flushed and "enjoy_cigs" really exists, so the removal call takes the
+-- library's direct (non-queued) removal path regardless of load order.
+
+local function remove_enjoy_cigs()
+  local lib = custom_functor_autoinject
+  if not (lib and type(lib.remove_functor) == "function") then
+    if type(printf) == "function" then
+      printf("[EnjoyCigsRemove] custom_functor_autoinject.remove_functor unavailable")
+    end
+    return
+  end
+
+  -- Try the conventional name first; a couple of harmless fallbacks in case
+  -- the addon used a different exact string. Removing a name that was never
+  -- registered is a no-op in the library, not an error.
+  for _, name in ipairs({"enjoy_cigs", "enjoy_cigarette", "enjoy_cig"}) do
+    pcall(lib.remove_functor, name)
+  end
+end
+
+local function schedule_removal()
+  CreateTimeEvent("enjoy_cigs_remove", "enjoy_cigs_remove", 0, function()
+    remove_enjoy_cigs()
+    return true -- one-shot
+  end)
+end
+
+function actor_on_first_update()
+  schedule_removal()
+end
+
+function on_game_start()
+  RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+end
+
+function on_game_end()
+  if type(UnregisterScriptCallback) == "function" then
+    UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+  end
+end

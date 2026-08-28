@@ -1,0 +1,39 @@
+; Language-independent keys (string ids + functors). Label lookup still
+; matches translated text via translate_string, so EN/RU both resolve.
+;
+; Functors verified in:
+;   arszi_campfire_roasting.script (haruka_roast / haruka_roast_all;
+;     roast_name_function also returns st_boil / st_boil_all for water)
+;   burnshit.script (burnshit_burn / burnshit_burn_all)
+;   perk_based_artefacts.script (pba_bat -> st_pba_transmutate)
+
+![functor_icons]
+dynamic.haruka_roast      = ui\ui_cmo_stew_roast
+dynamic.haruka_roast_all  = ui\ui_cmo_stew_roast
+dynamic.burnshit_burn     = ui\ui_cmo_campfire_burn
+dynamic.burnshit_burn_all = ui\ui_cmo_campfire_burn
+dynamic.pba_bat           = ui\ui_cmo_transmute_alchemy
+
+![label_icons]
+st_roast              = ui\ui_cmo_stew_roast
+st_roast_all          = ui\ui_cmo_stew_roast
+st_boil               = ui_cmo_water
+st_boil_all           = ui_cmo_water
+st_burnshit_burn      = ui\ui_cmo_campfire_burn
+st_burnshit_burn_all  = ui\ui_cmo_campfire_burn
+st_move_on_belt       = ui_cmo_cell
+st_pba_transmutate    = ui\ui_cmo_transmute_alchemy
+
+![groups]
+dynamic.haruka_roast      = 3
+dynamic.haruka_roast_all  = 3
+dynamic.burnshit_burn     = 3
+dynamic.burnshit_burn_all = 3
+dynamic.pba_bat           = 3
+st_roast                  = 3
+st_roast_all              = 3
+st_boil                   = 3
+st_boil_all               = 3
+st_burnshit_burn          = 3
+st_burnshit_burn_all      = 3
+st_pba_transmutate        = 3
