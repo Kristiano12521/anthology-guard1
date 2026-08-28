@@ -1,0 +1,140 @@
+-- DotMarks dropped-weapon marker fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Interaction Dot Marks records every actor drop in cfg.dropped_items and,
+-- with hide_dropped_items (default true), never shows a marker for it.
+-- NPC death-loot still marks because it never goes through actor_on_item_drop.
+-- Pick up that gun and throw it yourself -> marker gone, vanilla TAKE ITEM stays.
+--
+-- Patch: weapons are removed from dropped_items before the hide branch.
+-- Junk / meds / ammo keep the original hide-dropped behaviour.
+
+local LOG_TAG = "[fix_dotmarks_dropped_weapon]"
+local installed = false
+local orig_setup = nil
+local orig_loop = nil
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function cfg_table()
+	if ui_hud_dotmarks and type(ui_hud_dotmarks.cfg) == "table" then
+		return ui_hud_dotmarks.cfg
+	end
+	if dotmarks_main and type(dotmarks_main.cfg) == "table" then
+		return dotmarks_main.cfg
+	end
+	return nil
+end
+
+local function object_by_id(id)
+	if type(id) ~= "number" then
+		return nil
+	end
+	local ok, obj = pcall(function()
+		return level.object_by_id(id)
+	end)
+	if ok then
+		return obj
+	end
+	return nil
+end
+
+local function is_weapon_obj(obj, mark)
+	if mark and mark.is_weapon then
+		return true
+	end
+	if not obj then
+		return false
+	end
+	local ok, result = pcall(IsWeapon, obj)
+	return ok and result and true or false
+end
+
+local function unhide_dropped_weapon(id, obj, mark)
+	if not is_weapon_obj(obj, mark) then
+		return false
+	end
+
+	local cfg = cfg_table()
+	if cfg and type(cfg.dropped_items) == "table" and id then
+		cfg.dropped_items[id] = nil
+	end
+
+	if mark then
+		if mark.dropped_item then
+			mark.dropped_item = nil
+		end
+		if mark.no_update_loop then
+			mark.no_update_loop = nil
+		end
+	end
+
+	return true
+end
+
+local function patched_setup(id, args)
+	local obj = object_by_id(id)
+	unhide_dropped_weapon(id, obj, nil)
+	return orig_setup(id, args)
+end
+
+local function patched_loop(mark, args)
+	if mark then
+		local obj = mark.id and object_by_id(mark.id) or nil
+		unhide_dropped_weapon(mark.id, obj, mark)
+	end
+	return orig_loop(mark, args)
+end
+
+local function install()
+	if installed then
+		return true
+	end
+	if type(ui_hud_dotmarks) ~= "table" then
+		log("ui_hud_dotmarks not found - guard NOT installed")
+		return false
+	end
+	if type(ui_hud_dotmarks.setup_marker_for_object) ~= "function"
+	or type(ui_hud_dotmarks.main_marker_update_loop) ~= "function" then
+		log("DotMarks marker functions missing - guard NOT installed")
+		return false
+	end
+
+	orig_setup = orig_setup or ui_hud_dotmarks.setup_marker_for_object
+	orig_loop = orig_loop or ui_hud_dotmarks.main_marker_update_loop
+	ui_hud_dotmarks.setup_marker_for_object = patched_setup
+	ui_hud_dotmarks.main_marker_update_loop = patched_loop
+	installed = true
+	log("wrapped setup_marker_for_object and main_marker_update_loop")
+	return true
+end
+
+local function uninstall()
+	if type(ui_hud_dotmarks) == "table" then
+		if orig_setup then
+			ui_hud_dotmarks.setup_marker_for_object = orig_setup
+		end
+		if orig_loop then
+			ui_hud_dotmarks.main_marker_update_loop = orig_loop
+		end
+	end
+	installed = false
+end
+
+function actor_on_first_update()
+	if not installed then
+		install()
+	end
+end
+
+function on_game_start()
+	install()
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+end
+
+function on_game_end()
+	UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	uninstall()
+end
