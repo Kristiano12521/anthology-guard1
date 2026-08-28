@@ -1,0 +1,188 @@
+-- Anthology Busy Hands Stability Fix v0.6.3
+--
+-- v0.6.3: sequential_load_magazine — one gradual load at a time; pcall
+-- ammo_get_count (two jobs shared a released ammo box).
+-- v0.6.2: FDDA loot window — patch functions on liz_fdda_redone_body_search
+-- module table; open loot via LMode_Init, not wrapped ui_inventory.start.
+-- Verify markers via patch-script module tables (env is not always _G).
+--
+-- v0.5.0: architectural rewrite. Vendor files are not replaced except
+-- documented full-file exceptions (mon_sleep, guaranteed_loot,
+-- sequential_load_magazine).
+
+local VERSION = "0.6.3"
+local installed = false
+
+local function safe_object_id(obj)
+	local obj_id
+
+	if type(obj) == "number" then
+		obj_id = math.floor(obj)
+	else
+		if not obj then
+			return nil
+		end
+
+		local ok
+		ok, obj_id = pcall(function()
+			return obj:id()
+		end)
+		if not ok then
+			return nil
+		end
+	end
+
+	if type(obj_id) ~= "number" or obj_id <= 0 or obj_id >= 65535 then
+		return nil
+	end
+
+	if not level.object_by_id(obj_id) then
+		return nil
+	end
+
+	return obj_id
+end
+
+local function log_cancel(source)
+	printf("[BusyHandsFix v%s] %s cancelled: object was nil or destroyed", VERSION, source)
+end
+
+local function install_western_goods_guards()
+	local installed_count = 0
+
+	if western_goods_utils and western_goods_utils.get_real_community then
+		local original_get_real_community = western_goods_utils.get_real_community
+		western_goods_utils.get_real_community = function(npc, default, ...)
+			if not safe_object_id(npc) then
+				log_cancel("western_goods_utils.get_real_community")
+				return default
+			end
+			return original_get_real_community(npc, default, ...)
+		end
+		installed_count = installed_count + 1
+	end
+
+	if western_goods_loot and western_goods_loot.spawn_trader_loot then
+		local original_spawn_trader_loot = western_goods_loot.spawn_trader_loot
+		western_goods_loot.spawn_trader_loot = function(npc, ...)
+			if not safe_object_id(npc) then
+				log_cancel("western_goods_loot.spawn_trader_loot")
+				return
+			end
+			return original_spawn_trader_loot(npc, ...)
+		end
+		installed_count = installed_count + 1
+	end
+
+	return installed_count
+end
+
+-- Markers live on the patch script's env. Read _G first, then the module.
+local function read_marker(key, module)
+	if _G[key] then
+		return _G[key]
+	end
+	if type(module) == "table" and module[key] then
+		return module[key]
+	end
+	return nil
+end
+
+local function verify_crow_spawner_guard()
+	local value = read_marker("ANTHOLOGY_BHS_CROW_PATCH_VERSION", zzzzzz_anthology_bhs_crow_spawner_patch)
+	if value then
+		printf("[BusyHandsFix v%s] Crow spawner guard mode: method-level patch (%s)", VERSION, tostring(value))
+		return 1
+	end
+	printf("[BusyHandsFix v%s] Crow spawner patch marker was not found", VERSION)
+	return 0
+end
+
+local function verify_find_close_cover_guard()
+	local value = read_marker("ANTHOLOGY_BHS_FIND_COVER_PATCH_VERSION", zzzzzz_anthology_bhs_find_close_cover_patch)
+	if value then
+		printf("[BusyHandsFix v%s] find_close_cover guard mode: function-level patch (%s)", VERSION, tostring(value))
+		return 1
+	end
+	printf("[BusyHandsFix v%s] find_close_cover patch marker was not found", VERSION)
+	return 0
+end
+
+local function verify_mon_sleep_guard()
+	local module = mon_sleep
+	if type(module) == "table"
+	and module.ANTHOLOGY_BUSYHANDS_MON_SLEEP_FIX_VERSION then
+		printf("[BusyHandsFix v%s] mon_sleep guard mode: full-file override (documented exception, vendor version %s)", VERSION, tostring(module.ANTHOLOGY_BUSYHANDS_MON_SLEEP_FIX_VERSION))
+		return 1
+	end
+	printf("[BusyHandsFix v%s] Patched mon_sleep core was not detected", VERSION)
+	return 0
+end
+
+local function verify_guaranteed_loot_guard()
+	local module = guaranteed_loot
+	if type(module) == "table"
+	and module.ANTHOLOGY_BUSYHANDS_GUARANTEED_LOOT_FIX_VERSION then
+		printf("[BusyHandsFix v%s] guaranteed_loot guard mode: full-file override (documented exception, vendor version %s)", VERSION, tostring(module.ANTHOLOGY_BUSYHANDS_GUARANTEED_LOOT_FIX_VERSION))
+		return 1
+	end
+	printf("[BusyHandsFix v%s] Patched guaranteed_loot core was not detected", VERSION)
+	return 0
+end
+
+local function verify_seqload_guard()
+	local module = sequential_load_magazine
+	if type(module) == "table"
+	and module.ANTHOLOGY_BUSYHANDS_SEQLOAD_FIX_VERSION then
+		printf("[BusyHandsFix v%s] sequential_load_magazine guard mode: full-file override (documented exception, vendor version %s)", VERSION, tostring(module.ANTHOLOGY_BUSYHANDS_SEQLOAD_FIX_VERSION))
+		return 1
+	end
+	printf("[BusyHandsFix v%s] Patched sequential_load_magazine core was not detected", VERSION)
+	return 0
+end
+
+local function verify_marker(marker_value, label)
+	if marker_value then
+		printf("[BusyHandsFix v%s] %s guard mode: method/function-level patch (%s)", VERSION, label, tostring(marker_value))
+		return 1
+	end
+	printf("[BusyHandsFix v%s] %s patch marker was not found", VERSION, label)
+	return 0
+end
+
+function on_game_start()
+	printf("[BusyHandsFix] Anthology Busy Hands Stability Fix %s loaded", VERSION)
+
+	if installed then
+		return
+	end
+	installed = true
+
+	local guard_count = install_western_goods_guards()
+	local crow_guard_count = verify_crow_spawner_guard()
+	local cover_guard_count = verify_find_close_cover_guard()
+	local trader_autoinject_guard_count = verify_marker(read_marker("ANTHOLOGY_BHS_TRADER_AUTOINJECT_PATCH_VERSION", zzzzzz_anthology_bhs_trader_autoinject_patch), "trader_autoinject")
+	local dotmarks_guard_count = verify_marker(read_marker("ANTHOLOGY_BHS_DOTMARKS_PATCH_VERSION", zzzzzz_anthology_bhs_dotmarks_patch), "DotMarks ui_inventory.start")
+	local sortingplus_guard_count = verify_marker(read_marker("ANTHOLOGY_BHS_SORTINGPLUS_PATCH_VERSION", zzzzzz_anthology_bhs_sortingplus_patch), "SortingPlus LMode_Init")
+	local item_repair_guard_count = verify_marker(read_marker("ANTHOLOGY_BHS_ITEM_REPAIR_PATCH_VERSION", zzzzzz_anthology_bhs_item_repair_patch), "item_repair.UIRepair")
+	local fdda_guard_count = verify_marker(read_marker("ANTHOLOGY_BHS_FDDA_PATCH_VERSION", zzzzzz_anthology_bhs_fdda_patch), "FDDA body search")
+	local mon_sleep_guard_count = verify_mon_sleep_guard()
+	local guaranteed_loot_guard_count = verify_guaranteed_loot_guard()
+	local seqload_guard_count = verify_seqload_guard()
+	local repair_chain_guard_count = verify_marker(read_marker("ANTHOLOGY_BHS_REPAIR_CHAIN_PATCH_VERSION", zzzzzz_anthology_bhs_repair_recursion_fix), "item_repair OnItemSelect recursion")
+	local furniture_distance_count = verify_marker(read_marker("ANTHOLOGY_BHS_TRADER_FURNITURE_DISTANCE_PATCH_VERSION", zzzzzz_anthology_bhs_trader_furniture_distance_patch), "trader furniture distance (optional, not a crash fix)")
+
+	printf("[BusyHandsFix v%s] Western Goods guards installed: %s", VERSION, guard_count)
+	printf("[BusyHandsFix v%s] trader_autoinject guards installed: %s", VERSION, trader_autoinject_guard_count)
+	printf("[BusyHandsFix v%s] Crow spawner guards installed: %s", VERSION, crow_guard_count)
+	printf("[BusyHandsFix v%s] find_close_cover guards installed: %s", VERSION, cover_guard_count)
+	printf("[BusyHandsFix v%s] DotMarks guards installed: %s", VERSION, dotmarks_guard_count)
+	printf("[BusyHandsFix v%s] SortingPlus guards installed: %s", VERSION, sortingplus_guard_count)
+	printf("[BusyHandsFix v%s] item_repair guards installed: %s", VERSION, item_repair_guard_count)
+	printf("[BusyHandsFix v%s] FDDA body search guards installed: %s", VERSION, fdda_guard_count)
+	printf("[BusyHandsFix v%s] mon_sleep guards installed: %s", VERSION, mon_sleep_guard_count)
+	printf("[BusyHandsFix v%s] guaranteed_loot guards installed: %s", VERSION, guaranteed_loot_guard_count)
+	printf("[BusyHandsFix v%s] sequential_load_magazine guards installed: %s", VERSION, seqload_guard_count)
+	printf("[BusyHandsFix v%s] item_repair OnItemSelect recursion fix installed: %s", VERSION, repair_chain_guard_count)
+	printf("[BusyHandsFix v%s] trader furniture distance guards installed: %s", VERSION, furniture_distance_count)
+end

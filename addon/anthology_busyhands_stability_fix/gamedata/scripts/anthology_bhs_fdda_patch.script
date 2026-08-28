@@ -1,0 +1,236 @@
+-- Anthology Busy Hands Stability Fix v0.6.2 - FDDA body search patch
+--
+-- liz_fdda_redone_body_search.script stays vendor. We patch start_body_search
+-- and get_template_action_looting_idle on the MODULE TABLE (same pattern as
+-- utils_obj.find_close_cover). Bare _G.start_body_search is often missing.
+--
+-- Loot window: do NOT call ui_inventory.start. That start is already wrapped
+-- by FDDA, so the idle action re-enters start_body_search and no-ops.
+-- Open loot the same way as vanilla ui_inventory.start("loot", obj):
+-- ui_inventory.script:451-487 / LMode_Init at :3294.
+
+local VERSION = "0.6.2"
+
+local function publish_marker()
+	ANTHOLOGY_BHS_FDDA_PATCH_VERSION = VERSION
+	_G.ANTHOLOGY_BHS_FDDA_PATCH_VERSION = VERSION
+end
+
+local function fdda_mod()
+	if type(liz_fdda_redone_body_search) == "table" then
+		return liz_fdda_redone_body_search
+	end
+	return nil
+end
+
+local function fdda_get(name)
+	local mod = fdda_mod()
+	if mod and type(mod[name]) == "function" then
+		return mod[name]
+	end
+	if type(_G[name]) == "function" then
+		return _G[name]
+	end
+	return nil
+end
+
+local function fdda_set(name, fn)
+	local mod = fdda_mod()
+	if mod then
+		mod[name] = fn
+	end
+	_G[name] = fn
+end
+
+local function busyhands_safe_obj_id(obj)
+	if not obj then
+		return nil
+	end
+	local ok, value = pcall(function()
+		return obj:id()
+	end)
+	return ok and value or nil
+end
+
+local function busyhands_resolve_live_object(obj_id)
+	if not obj_id then
+		return nil
+	end
+	local obj = level.object_by_id(obj_id)
+	if not obj then
+		return nil
+	end
+	return busyhands_safe_obj_id(obj) == obj_id and obj or nil
+end
+
+local function open_vanilla_loot(obj)
+	if not busyhands_safe_obj_id(obj) then
+		printf("[BusyHandsFix v%s] skip loot: target userdata is gone", VERSION)
+		return
+	end
+	if not ui_inventory then
+		return
+	end
+	if not ui_inventory.GUI then
+		if not ui_inventory.UIInventory then
+			printf("[BusyHandsFix v%s] skip loot: UIInventory missing", VERSION)
+			return
+		end
+		ui_inventory.GUI = ui_inventory.UIInventory()
+	end
+	local gui = ui_inventory.GUI
+	if not gui or gui:IsShown() then
+		return
+	end
+	if type(ui_inventory.keybind_pass) == "function" and not ui_inventory.keybind_pass() then
+		return
+	end
+	if type(ui_inventory.change_last_mode) == "function" then
+		ui_inventory.change_last_mode(4)
+	end
+	local ok_init, err_init = pcall(function()
+		gui:LMode_Init(obj)
+	end)
+	if not ok_init then
+		printf("[BusyHandsFix v%s] LMode_Init failed: %s", VERSION, tostring(err_init))
+		return
+	end
+	gui:ShowDialog(true)
+	_GUIs_keyfree["UIInventory"] = true
+	Register_UI("UIInventory", "ui_inventory")
+end
+
+local installed = false
+
+local function install()
+	if installed then
+		return true
+	end
+
+	local original_start_body_search = fdda_get("start_body_search")
+	local original_get_template = fdda_get("get_template_action_looting_idle")
+	if type(original_start_body_search) ~= "function" or type(original_get_template) ~= "function" then
+		printf("[BusyHandsFix v%s] start_body_search / get_template_action_looting_idle were not found - guard NOT installed", VERSION)
+		return false
+	end
+
+	fdda_set("start_body_search", function(obj, show_ui)
+		if lam2 and lam2.get_action_with_tag and lam2.get_action_with_tag("body_search") then
+			open_vanilla_loot(obj)
+			return
+		end
+		local obj_id = busyhands_safe_obj_id(obj)
+		if not obj_id then
+			printf("[BusyHandsFix v%s] FDDA body search cancelled: target is nil or destroyed", VERSION)
+			return
+		end
+		return original_start_body_search(obj, show_ui)
+	end)
+
+	fdda_set("get_template_action_looting_idle", function(obj_id, is_ui_enabled)
+		local a = original_get_template(obj_id, is_ui_enabled)
+		if not a then
+			return a
+		end
+
+		local original_on_enter = a.on_enter
+		a.on_enter = function(self)
+			if original_on_enter then
+				original_on_enter(self)
+			end
+			self.target = busyhands_resolve_live_object(self.obj_id)
+			if not self.target then
+				self.force_close = true
+			end
+		end
+
+		a.on_execute = function(self, time)
+			if lam2.has_queued_actions() or self.force_close then
+				local end_fn = fdda_get("get_template_action_looting_end")
+				if end_fn then
+					lam2.add_action_first(end_fn())
+				end
+				return lam2.states.success
+			end
+
+			if npc_loot_claim and npc_loot_claim.actor_looting_claimed then
+				self.force_close = true
+			end
+
+			if time > self.ui_open_delay then
+				if not self.inv_gui then
+					self.inv_gui = ui_inventory.GUI
+				end
+
+				if not self.is_ui_enabled and (not self.inv_gui or not self.inv_gui:IsShown()) then
+					local live_target = busyhands_resolve_live_object(self.obj_id)
+					if not live_target then
+						printf("[BusyHandsFix v%s] FDDA body search cancelled: target %s was released before UI open", VERSION, tostring(self.obj_id))
+						self.target = nil
+						self.force_close = true
+						local end_fn = fdda_get("get_template_action_looting_end")
+						if end_fn then
+							lam2.add_action_first(end_fn())
+						end
+						return lam2.states.success
+					end
+
+					self.target = live_target
+					self.is_ui_enabled = true
+					local ok_open, open_err = pcall(open_vanilla_loot, live_target)
+					if not ok_open then
+						printf("[BusyHandsFix v%s] FDDA body search UI open cancelled: %s", VERSION, tostring(open_err))
+						self.is_ui_enabled = false
+						self.target = nil
+						self.force_close = true
+						local end_fn = fdda_get("get_template_action_looting_end")
+						if end_fn then
+							lam2.add_action_first(end_fn())
+						end
+						return lam2.states.success
+					end
+
+					self.inv_gui = self.inv_gui or ui_inventory.GUI
+					return lam2.states.running
+				end
+
+				if not self.is_input_enabled then
+					self.is_input_enabled = true
+					if liz_fdda_redone_mcm and liz_fdda_redone_mcm.get_config("body_search/disable_walk") then
+						level.enable_input()
+					end
+				end
+
+				if not self.inv_gui or not self.inv_gui:IsShown() then
+					self.force_close = true
+					return lam2.states.running
+				end
+
+				if haru_skills then
+					local scav = fdda_get("haruka_scavanger_effect")
+					if scav then
+						scav()
+					end
+				end
+			end
+			return lam2.states.running
+		end
+
+		return a
+	end)
+
+	installed = true
+	publish_marker()
+	printf("[BusyHandsFix v%s] start_body_search / get_template_action_looting_idle patched (module-table, liz_fdda_redone_body_search.script untouched)", VERSION)
+	return true
+end
+
+if not install() then
+	-- File-load can race; retry after every script env exists.
+end
+
+function on_game_start()
+	if not installed then
+		install()
+	end
+end
