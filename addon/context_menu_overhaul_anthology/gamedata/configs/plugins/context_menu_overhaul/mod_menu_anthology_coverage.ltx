@@ -1,60 +1,54 @@
 ; Extra Anthology 2.1 context-menu icon coverage.
-; Keys are functors / string ids from the live addons in reference/addons,
-; not translated labels. Label lookup still matches EN/RU via translate_string.
+; Unique standalone DDS per action (ui\ui_cmo_*), not reused atlas glyphs.
 
 ![icons]
 to_slot@artefact = ui_cmo_cell
-DYN_FUNC_pinup_view = ui_cmo_eye
+DYN_FUNC_pinup_view = ui\ui_cmo_pinup
 
 ![functor_icons]
-; Guitar / harmonica.
 itms_manager.menu_play = ui\ui_cmo_music
 
-; Money split.
-txr_money.menu_money_100  = ui_cmo_divide
-txr_money.menu_money_500  = ui_cmo_divide
-txr_money.menu_money_1000 = ui_cmo_divide
-txr_money.menu_money_5000 = ui_cmo_divide
+txr_money.menu_money_100  = ui\ui_cmo_money
+txr_money.menu_money_500  = ui\ui_cmo_money
+txr_money.menu_money_1000 = ui\ui_cmo_money
+txr_money.menu_money_5000 = ui\ui_cmo_money
 
-; Mines.
-txr_mines.str_prox_plant     = ui_cmo_plant
-txr_mines.str_timer_plant_10 = ui_cmo_plant
-txr_mines.str_timer_plant_30 = ui_cmo_plant
+txr_mines.str_prox_plant     = ui\ui_cmo_mine
+txr_mines.str_timer_plant_10 = ui\ui_cmo_mine
+txr_mines.str_timer_plant_30 = ui\ui_cmo_mine
 
-; Drink / inject / read / place.
-camelbak_binder.try_drink = ui_cmo_water
-autodoc_binder.ed_hp      = ui_cmo_health
-autodoc_binder.ed_rads    = ui_cmo_health
-autodoc_binder.ed_dmgres  = ui_cmo_health
-soulslike_note.menu_read  = ui_cmo_book
-item_pinup_collect.menu_pinup = ui_cmo_eye
-western_goods_ui_readable.menu_view      = ui_cmo_eye
-western_goods_ui_readable.menu_tear_page = ui_cmo_divide
-utjan_traits.respec_item_use_str = ui_cmo_star
-workshop_tool.tool_workshop = ui_cmo_toolkit
-item_exo_device.check_install_psu = ui_cmo_battery
-exo_faction_patch.menu_remove_patch = ui_cmo_patch
-vasgen_fairy_quest.menu_place_scanner = ui_icons_newPDA_mark_e
-dialogs_redemption_storyline.redemption_3_menu_place = ui_icons_newPDA_mark_e
+camelbak_binder.try_drink = ui\ui_cmo_camelbak
+autodoc_binder.ed_hp      = ui\ui_cmo_syringe
+autodoc_binder.ed_rads    = ui\ui_cmo_syringe
+autodoc_binder.ed_dmgres  = ui\ui_cmo_syringe
+soulslike_note.menu_read  = ui\ui_cmo_note
+item_pinup_collect.menu_pinup = ui\ui_cmo_pinup
+western_goods_ui_readable.menu_view      = ui\ui_cmo_readable
+western_goods_ui_readable.menu_tear_page = ui\ui_cmo_tearpage
+utjan_traits.respec_item_use_str = ui\ui_cmo_respec
+workshop_tool.tool_workshop = ui\ui_cmo_anvil
+item_exo_device.check_install_psu = ui\ui_cmo_psu
+exo_faction_patch.menu_remove_patch = ui\ui_cmo_unpatch
+vasgen_fairy_quest.menu_place_scanner = ui\ui_cmo_scanner
+dialogs_redemption_storyline.redemption_3_menu_place = ui\ui_cmo_marker
 
-; Dynamic custom functors.
-dynamic.arti_unjam          = ui_cmo_hands
-dynamic.soip_refill         = ui_cmo_oil
-dynamic.add_plate           = ui_cmo_vest
-dynamic.pba_lucifer         = ui\ui_cmo_transmute_alchemy
-dynamic.sort_ammopart       = ui_cmo_saw
-dynamic.sort_ammopart_batch = ui_cmo_saw
-dynamic.mg_link             = ui_cmo_merge
-dynamic.pinup_view          = ui_cmo_eye
+dynamic.arti_unjam          = ui\ui_cmo_unjam
+dynamic.soip_refill         = ui\ui_cmo_oilcan
+dynamic.add_plate           = ui\ui_cmo_plate
+dynamic.pba_lucifer         = ui\ui_cmo_sacrifice
+dynamic.sort_ammopart       = ui\ui_cmo_ammopart
+dynamic.sort_ammopart_batch = ui\ui_cmo_ammopart
+dynamic.mg_link             = ui\ui_cmo_maglink
+dynamic.pinup_view          = ui\ui_cmo_pinup
 
 ![label_icons]
-st_unjam            = ui_cmo_hands
-st_item_disassemble = ui_cmo_saw
-st_link             = ui_cmo_merge
-st_unlink           = ui_cmo_divide
-st_pinup_view       = ui_cmo_eye
-st_pinup_revert     = ui_cmo_patch
-st_pba_sacrifice    = ui\ui_cmo_transmute_alchemy
+st_unjam            = ui\ui_cmo_unjam
+st_item_disassemble = ui\ui_cmo_ammopart
+st_link             = ui\ui_cmo_maglink
+st_unlink           = ui\ui_cmo_magunlink
+st_pinup_view       = ui\ui_cmo_pinup
+st_pinup_revert     = ui\ui_cmo_unpatch
+st_pba_sacrifice    = ui\ui_cmo_sacrifice
 
 ![groups]
 itms_manager.menu_play = 2

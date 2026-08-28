@@ -9,9 +9,9 @@ Date: 2026-08-29
 
 NEW IN 1.2.2
 ------------
-- Icons for rows that still had none in 1.2.1 (play guitar, split money,
-  mines, camelbak, autodoc, unjam, armor plate, oil refill, pinup, boil,
-  ammo breakdown, and others).
+- Unique silhouettes for rows that still had none in 1.2.1 (guitar, money,
+  mines, camelbak, autodoc, unjam, plate, oil, pinup, boil, ammo, PSU,
+  and others).
 - Icon keys are string ids / functors, not Russian literals, so EN works.
 - Two DLTX patches were named so they never overlaid the original file
   (OPO helmet icons, magazine retool). Filenames now match DLTX rules.
