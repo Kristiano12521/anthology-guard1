@@ -1,0 +1,6 @@
+; Lab X-2 gravity room crash fix — keep original condlist
+; Why: ZIP/Kristiano delete the two calls. Restore them; the missing
+;      functor and [duality_circle] are provided by this addon.
+
+![sr_idle]
+on_actor_inside = {+bas_switcher_off} %=run_postprocess(duality_circle) =play_snd(affects\hit_fist) =bas_no_gravity_anomaly% sr_particle@zone

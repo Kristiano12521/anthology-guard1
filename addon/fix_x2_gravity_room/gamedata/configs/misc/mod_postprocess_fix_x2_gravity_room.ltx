@@ -1,0 +1,10 @@
+; Lab X-2 gravity room crash fix — add missing complex effector
+; Why: bas_space_restrictor_0016 calls run_postprocess(duality_circle),
+;      but the section never existed. snd_shock.ppe replaced duality_circle.ppe
+;      in postprocess.ltx; cyclic=0 so the blast does not loop forever
+;      (run_postprocess never calls stop_postprocess).
+
+[duality_circle]
+pp_eff_name     = snd_shock.ppe
+pp_eff_overlap  = true
+pp_eff_cyclic   = 0

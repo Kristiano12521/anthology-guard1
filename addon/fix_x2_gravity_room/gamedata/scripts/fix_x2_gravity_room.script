@@ -1,0 +1,137 @@
+-- Lab X-2 Gravity Room Crash Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- bas_space_restrictor_0016 calls two missing pieces after +bas_switcher_off:
+--   run_postprocess(duality_circle)  -- section absent (abort is non-fatal here)
+--   bas_no_gravity_anomaly           -- functor absent, xr_logic.script:492 CTD
+--
+-- ZIP v1.0.0 BETA / Kristiano replace the whole LTX and delete both calls.
+-- This addon keeps the original condlist: DLTX restores it, this script
+-- implements the missing functor, DLTX adds [duality_circle].
+-- Gravity is a short blast (original has no restore / no on_actor_outside),
+-- then physics_world gravity is put back. Same API as
+-- xr_effects.effect_swiming_true/false.
+
+local LOG_TAG = "[fix_x2_gravity_room]"
+local VERSION = "1.0.0"
+local EVENT_ID = "fix_x2_gravity_room"
+local RESTORE_ACTION = "restore_gravity"
+local PULSE_SECONDS = 6.0
+local FALLBACK_GRAVITY = 19.62
+local PULSE_GRAVITY = 0.01
+
+local callbacks_registered = false
+local saved_gravity = nil
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function physics_world()
+	if not level or type(level.physics_world) ~= "function" then
+		return nil
+	end
+	local ok, world = pcall(function()
+		return level.physics_world()
+	end)
+	if ok then
+		return world
+	end
+	return nil
+end
+
+local function current_gravity(world)
+	if not world or type(world.gravity) ~= "function" then
+		return nil
+	end
+	local ok, value = pcall(world.gravity, world)
+	if ok and type(value) == "number" then
+		return value
+	end
+	return nil
+end
+
+local function apply_gravity(world, value)
+	if not world or type(world.set_gravity) ~= "function" or type(value) ~= "number" then
+		return false
+	end
+	local ok = pcall(world.set_gravity, world, value)
+	return ok and true or false
+end
+
+local function restore_gravity()
+	RemoveTimeEvent(EVENT_ID, RESTORE_ACTION)
+	local world = physics_world()
+	local target = saved_gravity or FALLBACK_GRAVITY
+	saved_gravity = nil
+	if world then
+		apply_gravity(world, target)
+		log("gravity restored to %.2f", target)
+	end
+	return true
+end
+
+local function schedule_restore()
+	RemoveTimeEvent(EVENT_ID, RESTORE_ACTION)
+	CreateTimeEvent(EVENT_ID, RESTORE_ACTION, PULSE_SECONDS, restore_gravity)
+end
+
+local function apply_no_gravity_anomaly(actor, npc, p)
+	local world = physics_world()
+	if not world then
+		log("physics_world missing, skip pulse")
+		return
+	end
+
+	if saved_gravity == nil then
+		saved_gravity = current_gravity(world) or FALLBACK_GRAVITY
+	end
+
+	if apply_gravity(world, PULSE_GRAVITY) then
+		log("gravity pulse %.2f -> %.2f for %.1fs", saved_gravity, PULSE_GRAVITY, PULSE_SECONDS)
+	else
+		log("set_gravity failed")
+		saved_gravity = nil
+		return
+	end
+
+	schedule_restore()
+end
+
+function on_before_level_changing()
+	if saved_gravity ~= nil then
+		restore_gravity()
+	end
+end
+
+function on_game_load()
+	saved_gravity = nil
+	RemoveTimeEvent(EVENT_ID, RESTORE_ACTION)
+end
+
+function on_game_start()
+	if type(xr_effects) == "table" then
+		xr_effects.bas_no_gravity_anomaly = apply_no_gravity_anomaly
+	else
+		log("xr_effects missing, functor not installed")
+	end
+
+	if callbacks_registered then
+		return
+	end
+	RegisterScriptCallback("on_game_load", on_game_load)
+	RegisterScriptCallback("on_before_level_changing", on_before_level_changing)
+	callbacks_registered = true
+	log("loaded v%s", VERSION)
+end
+
+function on_game_end()
+	if saved_gravity ~= nil then
+		restore_gravity()
+	end
+	if callbacks_registered then
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		UnregisterScriptCallback("on_before_level_changing", on_before_level_changing)
+		callbacks_registered = false
+	end
+end
