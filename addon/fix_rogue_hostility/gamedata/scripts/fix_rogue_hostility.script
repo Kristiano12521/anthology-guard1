@@ -1,0 +1,141 @@
+-- LTTZ Rogue Hostility Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- stalker_rogue_squad has no relationship field, unlike pri_a16 / MS / OA
+-- Rogue squads. Skadovsk Rogue then inherits faction goodwill, so
+-- actor_enemy blocks dialog and he melee-attacks in zat_a2_sr_noweap.
+--
+-- relationship is restored by DLTX (create_npc -> set_squad_relation).
+-- This script one-shots already spawned squads on old saves. Does not
+-- poll actor_on_update or scan alife object ids.
+
+local LOG_TAG = "[fix_rogue_hostility]"
+local VERSION = "1.0.0"
+local EVENT_ID = "fix_rogue_hostility"
+local REPAIR_ACTION = "squad"
+local REPAIR_DELAY = 1.0
+local REPAIR_MAX_ATTEMPTS = 10
+local SQUAD_SECTION = "stalker_rogue_squad"
+local SQUAD_STORY_ID = "stalker_rogue"
+local INFO_DIALOG_STARTED = "living_legend_rogue_start"
+local INFO_ROGUE_DEAD = "stalker_rogue_dead"
+
+local callbacks_registered = false
+local repair_attempts = 0
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function squad_section(squad)
+	if not squad then
+		return nil
+	end
+	local ok, section = pcall(function()
+		return squad:section_name()
+	end)
+	if ok then
+		return section
+	end
+	return nil
+end
+
+local function clear_stale_killer(squad)
+	if not (db.actor and db.storage) then
+		return
+	end
+
+	local actor_id = db.actor:id()
+	pcall(function()
+		for member in squad:squad_members() do
+			local st = member and member.id and db.storage[member.id]
+			local npc = st and st.object
+			if npc and npc:alive() and type(st.death) == "table" and st.death.killer == actor_id then
+				st.death.killer = nil
+				log("cleared stale death.killer on living Rogue %s", tostring(member.id))
+			end
+		end
+	end)
+end
+
+-- Returns: "done", "retry".
+local function try_repair()
+	if not db.actor then
+		return "retry"
+	end
+
+	if has_alife_info(INFO_DIALOG_STARTED) or has_alife_info(INFO_ROGUE_DEAD) then
+		return "done"
+	end
+
+	local squad = get_story_squad(SQUAD_STORY_ID)
+	if not squad then
+		return "retry"
+	end
+
+	if squad_section(squad) ~= SQUAD_SECTION then
+		return "done"
+	end
+
+	squad:set_squad_relation("friend")
+	clear_stale_killer(squad)
+	log("set %s relation=friend", SQUAD_SECTION)
+	return "done"
+end
+
+function repair_tick()
+	repair_attempts = repair_attempts + 1
+	local result = try_repair()
+	if result == "done" then
+		return true
+	end
+	if repair_attempts >= REPAIR_MAX_ATTEMPTS then
+		-- Squad not spawned yet: DLTX applies on create_npc.
+		return true
+	end
+	ResetTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY)
+	return false
+end
+
+local function cancel_repair()
+	RemoveTimeEvent(EVENT_ID, REPAIR_ACTION)
+	repair_attempts = 0
+end
+
+local function schedule_repair()
+	cancel_repair()
+	if not db.actor then
+		return
+	end
+	if has_alife_info(INFO_DIALOG_STARTED) or has_alife_info(INFO_ROGUE_DEAD) then
+		return
+	end
+	CreateTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY, repair_tick)
+end
+
+function actor_on_first_update()
+	schedule_repair()
+end
+
+function on_game_load()
+	repair_attempts = 0
+end
+
+function on_game_start()
+	if callbacks_registered then
+		return
+	end
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("on_game_load", on_game_load)
+	callbacks_registered = true
+	log("loaded v%s", VERSION)
+end
+
+function on_game_end()
+	cancel_repair()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		callbacks_registered = false
+	end
+end
