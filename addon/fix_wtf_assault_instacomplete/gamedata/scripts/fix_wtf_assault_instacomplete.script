@@ -1,0 +1,210 @@
+-- WTF Assault empty-snapshot fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- igi_target_assault.Assault.on_init snapshots targets via add_target_squads.
+-- That helper only accepts a squad that already occupies the smart
+-- (current_action == 1, unless a script target is set). Quest issuance for
+-- Duty "Call of Duty" uses has_dogs: any squad assigned to the smart.
+-- After a Bar load the pack is often still walking. The snapshot stays empty,
+-- is_completed() treats empty as cleared, and the first status() completes
+-- the quest with the reward.
+--
+-- Same hole exists for other Assault users (GhenTuong supply/mutant/transaction)
+-- when squads are created after Assault.on_init in the same entity group.
+--
+-- This addon does not replace WTF files. It wraps Assault.on_init / status:
+-- merge assigned enemy squads (has_dogs + original faction/legit filters),
+-- and retry that collect in status() only while the snapshot is still empty.
+
+local LOG_TAG = "[fix_wtf_assault_instacomplete]"
+local VERSION = "1.0.0"
+
+local orig = {}
+local installed = false
+local callbacks_registered = false
+local logged_smart = {}
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function reset_log_cache()
+	logged_smart = {}
+end
+
+local function assault_table()
+	local ns = rawget(_G, "igi_target_assault")
+	if type(ns) == "table" and type(ns.Assault) == "table" then
+		return ns.Assault
+	end
+	return nil
+end
+
+-- Same legit filter as igi_target_assault.is_legit_squad (local there).
+local function is_legit_squad(squad)
+	if not squad then
+		return false
+	end
+	local ok, section = pcall(function()
+		return squad:section_name()
+	end)
+	if not ok or type(section) ~= "string" then
+		return false
+	end
+	return (not section:find("tushkano")) and (not section:find("rat"))
+end
+
+-- Assigned-to-smart collect: SIMBOARD.smarts[id].squads, matching has_dogs,
+-- plus the original enemy + legit filters. No current_action == 1.
+local function collect_assigned_enemies(entity)
+	local out = {}
+	if not (entity and entity.id and db.actor) then
+		return out
+	end
+
+	local board = rawget(_G, "SIMBOARD")
+	local smart = board and board.smarts and board.smarts[entity.id]
+	if not (smart and type(smart.squads) == "table") then
+		return out
+	end
+
+	local actor_faction = character_community(db.actor)
+	if not actor_faction then
+		return out
+	end
+
+	for sq_id in pairs(smart.squads) do
+		local se_squad = alife_object(sq_id)
+		if se_squad and is_legit_squad(se_squad) then
+			local ok, sq_faction = pcall(function()
+				return se_squad:get_squad_community()
+			end)
+			if ok and sq_faction
+				and game_relations.is_factions_enemies(actor_faction, sq_faction) then
+				out[#out + 1] = se_squad.id
+			end
+		end
+	end
+	return out
+end
+
+local function merge_squads(entity, extra)
+	if type(entity.squads) ~= "table" then
+		entity.squads = {}
+	end
+	if type(extra) ~= "table" or #extra == 0 then
+		return 0
+	end
+
+	local have = {}
+	for _, id in pairs(entity.squads) do
+		have[id] = true
+	end
+
+	local added = 0
+	for i = 1, #extra do
+		local id = extra[i]
+		if id and not have[id] then
+			entity.squads[#entity.squads + 1] = id
+			have[id] = true
+			added = added + 1
+		end
+	end
+	return added
+end
+
+local function snapshot_len(entity)
+	if type(entity.squads) ~= "table" then
+		return 0
+	end
+	return #entity.squads
+end
+
+local function log_recover(entity, added, reason)
+	local key = tostring(entity and entity.id)
+	if logged_smart[key] then
+		return
+	end
+	logged_smart[key] = true
+	log("recovered %s squads for smart %s (%s)", tostring(added), key, reason)
+end
+
+local function patched_on_init(entity)
+	orig.on_init(entity)
+	local added = merge_squads(entity, collect_assigned_enemies(entity))
+	if added > 0 then
+		log_recover(entity, added, "on_init")
+	end
+end
+
+local function patched_status(entity)
+	if snapshot_len(entity) == 0 then
+		local added = merge_squads(entity, collect_assigned_enemies(entity))
+		if added > 0 then
+			log_recover(entity, added, "status")
+		end
+	end
+	return orig.status(entity)
+end
+
+local function install()
+	if installed then
+		return true
+	end
+
+	local Assault = assault_table()
+	if not (Assault and type(Assault.on_init) == "function" and type(Assault.status) == "function") then
+		return false
+	end
+
+	orig.on_init = Assault.on_init
+	orig.status = Assault.status
+	Assault.on_init = patched_on_init
+	Assault.status = patched_status
+	installed = true
+	log("loaded v%s", VERSION)
+	return true
+end
+
+local function uninstall()
+	local Assault = assault_table()
+	if Assault then
+		if orig.on_init then
+			Assault.on_init = orig.on_init
+		end
+		if orig.status then
+			Assault.status = orig.status
+		end
+	end
+	orig = {}
+	installed = false
+	reset_log_cache()
+end
+
+function on_game_load()
+	reset_log_cache()
+end
+
+function actor_on_first_update()
+	if not installed then
+		install()
+	end
+end
+
+function on_game_start()
+	install()
+	if not callbacks_registered then
+		RegisterScriptCallback("on_game_load", on_game_load)
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
+	uninstall()
+end
