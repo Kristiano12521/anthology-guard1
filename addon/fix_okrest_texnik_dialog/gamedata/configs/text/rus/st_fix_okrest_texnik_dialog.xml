@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!--
+  fix_okrest_texnik_dialog: Russian strings for okr_a5_stalker_texnik_task_1..3.
+  English lives in st_quests_attribute_dynamic.xml; rus/ had no copy.
+  New file, does not replace anything.
+-->
+<string_table>
+
+    <string id="okr_a5_stalker_texnik_task_1_name">
+        <text>Найти инструменты для грубой работы</text>
+    </string>
+    <string id="okr_a5_stalker_texnik_task_1_text">
+        <text>Технарю нужны инструменты для грубой работы, чтобы выполнять простые улучшения оружия и брони. Найдите и принесите ему комплект.</text>
+    </string>
+    <string id="okr_a5_stalker_texnik_task_1_about">
+        <text>Найдите инструменты для грубой работы и передайте их Технарю на Окраинах.</text>
+    </string>
+    <string id="okr_a5_stalker_texnik_task_1_fetch_about">
+        <text>Инструменты для грубой работы</text>
+    </string>
+    <string id="okr_a5_stalker_texnik_task_1_fetch_finish">
+        <text>Инструменты для грубой работы переданы Технарю. Теперь доступны улучшения первого уровня.</text>
+    </string>
+
+    <string id="okr_a5_stalker_texnik_task_2_name">
+        <text>Найти инструменты для тонкой работы</text>
+    </string>
+    <string id="okr_a5_stalker_texnik_task_2_text">
+        <text>Технарю нужны инструменты для тонкой работы, чтобы выполнять более сложные улучшения оружия и брони. Найдите и принесите ему комплект.</text>
+    </string>
+    <string id="okr_a5_stalker_texnik_task_2_about">
+        <text>Найдите инструменты для тонкой работы и передайте их Технарю на Окраинах.</text>
+    </string>
+    <string id="okr_a5_stalker_texnik_task_2_fetch_about">
+        <text>Инструменты для тонкой работы</text>
+    </string>
+    <string id="okr_a5_stalker_texnik_task_2_fetch_finish">
+        <text>Инструменты для тонкой работы переданы Технарю. Теперь доступны улучшения второго уровня.</text>
+    </string>
+
+    <string id="okr_a5_stalker_texnik_task_3_name">
+        <text>Найти инструменты для калибровки</text>
+    </string>
+    <string id="okr_a5_stalker_texnik_task_3_text">
+        <text>Технарю нужны инструменты для калибровки, чтобы выполнять самые сложные улучшения оружия и брони. Найдите и принесите ему комплект.</text>
+    </string>
+    <string id="okr_a5_stalker_texnik_task_3_about">
+        <text>Найдите инструменты для калибровки и передайте их Технарю на Окраинах.</text>
+    </string>
+    <string id="okr_a5_stalker_texnik_task_3_fetch_about">
+        <text>Инструменты для калибровки</text>
+    </string>
+    <string id="okr_a5_stalker_texnik_task_3_fetch_finish">
+        <text>Инструменты для калибровки переданы Технарю. Теперь доступны все уровни улучшений.</text>
+    </string>
+
+</string_table>

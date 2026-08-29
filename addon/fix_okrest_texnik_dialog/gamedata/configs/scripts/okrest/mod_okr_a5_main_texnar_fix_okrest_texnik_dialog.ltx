@@ -1,0 +1,7 @@
+; Okrest technician dialog — patch okr_a5_main_texnar.ltx
+; Why: after the intro, meet_dialog always forced okr_quest_s1_texnik_dialog.
+;      Without okr_s1_actor_give_instr that dialog only has break_dialog,
+;      so the mechanic menu and toolkit hand-in never appear.
+
+![meet@stalker_texnik_meet]
+meet_dialog	= {+okr_a5_texnik_baza_scena_end_ztk -okr_a5_texnik_open_case_dialog_talks}okr_a5_texnik_open_case_dialog,{+okr_a5_texnik_dialog_talks +okr_s1_actor_give_instr -okr_s1_texnik_dialog_talks}okr_quest_s1_texnik_dialog,{-okr_a5_texnik_dialog_talks}okr_a5_texnik_dialog,okr_stand_hello_texnik_dialog
