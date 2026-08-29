@@ -1,0 +1,122 @@
+-- Ashot Army Warehouses Travel Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Western Goods named location western_goods_guide_dest_mil_base still
+-- carries Anomaly 1.5.x game-graph ids (lvid 281438 / gvid 2093).
+-- In Anthology 2.1 that gvid belongs to l04u_labx18, so Ashot's guide
+-- route "Army Warehouses, Freedom base" teleports into X-18.
+--
+-- DLTX would need hardcoded vertices that go stale on the next graph
+-- remap. Callback western_goods_guide_on_change_level only gets the
+-- location name and cannot rewrite the destination.
+-- Patch get_named_location: the single reader of those coords.
+
+local LOG_TAG = "[fix_ashot_aw_travel]"
+local DEST_NAME = "western_goods_guide_dest_mil_base"
+local TARGET_SMART = "mil_smart_terrain_7_7"
+
+local orig_get = nil
+
+local function level_name_for_gvid(gvid)
+	if gvid == nil then
+		return nil
+	end
+	local ok, name = pcall(function()
+		local graph = game_graph()
+		local vertex = graph and graph:vertex(gvid) or nil
+		local level_id = vertex and vertex:level_id() or nil
+		local sim = alife()
+		if not (sim and level_id ~= nil) then
+			return nil
+		end
+		return sim:level_name(level_id)
+	end)
+	if ok then
+		return name
+	end
+	return nil
+end
+
+local function is_military_level(name)
+	return name == "l07_military" or name == "military"
+end
+
+local function resolve_smart()
+	local registry = SIMBOARD and SIMBOARD.smarts_by_names
+	local smart = registry and registry[TARGET_SMART] or nil
+	if not (smart and smart.position and smart.m_level_vertex_id ~= nil and smart.m_game_vertex_id ~= nil) then
+		return nil, "smart terrain is unavailable"
+	end
+	local destination = level_name_for_gvid(smart.m_game_vertex_id)
+	if not is_military_level(destination) then
+		return nil, "smart terrain resolves to " .. tostring(destination)
+	end
+	return smart, destination
+end
+
+function patched_get_named_location(location_name, ...)
+	local loc = orig_get(location_name, ...)
+	if location_name ~= DEST_NAME then
+		return loc
+	end
+
+	if loc and is_military_level(level_name_for_gvid(loc.gvid)) then
+		return loc
+	end
+
+	local smart, destination_or_error = resolve_smart()
+	if not smart then
+		printf(
+			LOG_TAG .. " cannot remap %s (%s); leaving original destination",
+			DEST_NAME,
+			tostring(destination_or_error)
+		)
+		return loc
+	end
+
+	printf(
+		LOG_TAG .. " remapped %s gvid=%s -> %s lvid=%s gvid=%s dest=%s",
+		DEST_NAME,
+		tostring(loc and loc.gvid),
+		TARGET_SMART,
+		tostring(smart.m_level_vertex_id),
+		tostring(smart.m_game_vertex_id),
+		tostring(destination_or_error)
+	)
+
+	return {
+		name = (loc and loc.name) or DEST_NAME,
+		lvid = smart.m_level_vertex_id,
+		gvid = smart.m_game_vertex_id,
+		position = vector():set(smart.position.x, smart.position.y, smart.position.z),
+		orientation = (loc and loc.orientation) or vector():set(0, 0, 0),
+	}
+end
+
+local function install()
+	if type(western_goods_utils) ~= "table" or type(western_goods_utils.get_named_location) ~= "function" then
+		printf(LOG_TAG .. " western_goods_utils.get_named_location not found - guard NOT installed")
+		return false
+	end
+	if western_goods_utils.get_named_location == patched_get_named_location then
+		return true
+	end
+	orig_get = orig_get or western_goods_utils.get_named_location
+	western_goods_utils.get_named_location = patched_get_named_location
+	printf(LOG_TAG .. " get_named_location wrapped (%s -> %s)", DEST_NAME, TARGET_SMART)
+	return true
+end
+
+local function uninstall()
+	if orig_get and type(western_goods_utils) == "table" then
+		western_goods_utils.get_named_location = orig_get
+	end
+end
+
+function on_game_start()
+	install()
+end
+
+function on_game_end()
+	uninstall()
+end
