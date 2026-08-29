@@ -1,0 +1,8 @@
+; Dome Quest Marker Fix — patch tm_az_radar_mod.ltx
+; Why: two Kuplinov tasks still target sad_atr_trader (Stakhovsky, Whispering Valley).
+
+![atr_quest_ecolog_art_oazis_and_compass]
+target = {+atr_quest_ecolog_art_oazis_and_compass_haves}az_radar_atr_trader,{=actor_on_level(l15u_pripyat_und)}nil, cit_kpl_4_spot
+
+![cit_a2_quest_sich_to_ecolog_posilka]
+target = az_radar_atr_trader
