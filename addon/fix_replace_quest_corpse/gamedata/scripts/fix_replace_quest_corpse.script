@@ -1,0 +1,114 @@
+-- Missing replace_quest_corpse Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- sgm_tasks.task_update() calls a global that Anthology 2.1 never shipped.
+-- When a quest corpse is cleaned by alife (any far trip, not just X-16),
+-- the next task_update -- including right after save load -- fatals:
+-- attempt to call global 'replace_quest_corpse' (a nil value).
+--
+-- Restores the function on _G at script load / on_game_start so bind_stalker
+-- cannot race it. Spawns the replace_spot (same story_id as the corpse) and
+-- the quest item via the existing create() helper. Does not replace
+-- sgm_tasks.script and does not wrap task_update.
+
+local LOG_TAG = "[fix_replace_quest_corpse]"
+local VERSION = "1.0.0"
+
+local callbacks_registered = false
+local installed = false
+local previous = nil
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function section_exists(section)
+	if type(section) ~= "string" or section == "" then
+		return false
+	end
+	if not (ini_sys and type(ini_sys.section_exist) == "function") then
+		return true
+	end
+	return ini_sys:section_exist(section) and true or false
+end
+
+local function spawn_section(section, x, y, z, lv, gv)
+	if not section_exists(section) then
+		log("section missing: %s", tostring(section))
+		return nil
+	end
+	if type(create) ~= "function" then
+		log("create() is unavailable")
+		return nil
+	end
+	local ok, obj = pcall(create, section, x, y, z, lv, gv)
+	if not ok then
+		log("create(%s) failed: %s", tostring(section), tostring(obj))
+		return nil
+	end
+	return obj
+end
+
+local function replace_quest_corpse_impl(story_spot_id, item_section, x, y, z, level_vertex_id, game_vertex_id)
+	local spot = spawn_section(story_spot_id, x, y, z, level_vertex_id, game_vertex_id)
+	local item = spawn_section(item_section, x, y, z, level_vertex_id, game_vertex_id)
+	log(
+		"replace spot=%s item=%s spot_ok=%s item_ok=%s",
+		tostring(story_spot_id),
+		tostring(item_section),
+		tostring(spot ~= nil),
+		tostring(item ~= nil)
+	)
+	return spot, item
+end
+
+local function install()
+	local current = rawget(_G, "replace_quest_corpse")
+	if current == replace_quest_corpse_impl then
+		return true
+	end
+	if type(current) == "function" then
+		log("replace_quest_corpse already defined, skip")
+		return false
+	end
+	previous = current
+	rawset(_G, "replace_quest_corpse", replace_quest_corpse_impl)
+	installed = true
+	log("v%s installed on _G", VERSION)
+	return true
+end
+
+local function uninstall()
+	if not installed then
+		return
+	end
+	if rawget(_G, "replace_quest_corpse") == replace_quest_corpse_impl then
+		rawset(_G, "replace_quest_corpse", previous)
+	end
+	previous = nil
+	installed = false
+end
+
+function on_game_load()
+	install()
+end
+
+function on_game_start()
+	install()
+	if callbacks_registered then
+		return
+	end
+	RegisterScriptCallback("on_game_load", on_game_load)
+	callbacks_registered = true
+	log("loaded v%s", VERSION)
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		callbacks_registered = false
+	end
+	uninstall()
+end
+
+install()
