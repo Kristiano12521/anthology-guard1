@@ -1,0 +1,561 @@
+-- Aver <-> Dark Valley Transition Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Native level changers between aver and l04_darkvalley carry dest packets
+-- copied from sibling transitions:
+--   aver -> Dark Valley arrives at the puzir-side dest
+--   Dark Valley -> aver arrives at the garbage-side dest
+--
+-- Dest lives in the ALife STATE packet (all.spawn / save), not in LTX.
+-- DLTX on sr_teleport_sections.ltx cannot change it; all.spawn is forbidden.
+-- ZIP v0.5 teleported the actor after arrival (pending route, actor_on_update,
+-- zzz filename). This addon rewrites dest before the engine sends
+-- M_CHANGE_LEVEL, same packet path as debug_cmd_list.script:1659.
+--
+-- gvid/lvid are resolved from game_graph at runtime, not hardcoded.
+
+local LOG_TAG = "[fix_aver_darkvalley]"
+local VERSION = "1.0.0"
+local MAX_ALIFE_ID = 65534
+local MAX_GVID = 65535
+local BAD_RADIUS_SQ = 25 * 25
+local FIX_RADIUS_SQ = 4 * 4
+local VERTEX_WARN_SQ = 80 * 80
+
+local ROUTES = {
+	{
+		key = "aver_to_darkvalley",
+		name = "aver_level_changer_to_darkvalley_1",
+		source = "aver",
+		target = "l04_darkvalley",
+		bad_x = -157.581833,
+		bad_y = -0.140619,
+		bad_z = -433.517090,
+		fix_x = -94.382782,
+		fix_y = -2.695015,
+		fix_z = -39.998577,
+	},
+	{
+		key = "darkvalley_to_aver",
+		name = "val_level_changer_to_aver_1",
+		source = "l04_darkvalley",
+		target = "aver",
+		bad_x = -367.536285,
+		bad_y = 6.280872,
+		bad_z = -431.521545,
+		fix_x = 388.674194,
+		fix_y = -9.332470,
+		fix_z = -318.518494,
+	},
+}
+
+local callbacks_registered = false
+local done = {}
+local cached_id = {}
+local vertex_cache = {}
+local rescued_this_load = false
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function reset_state()
+	done = {}
+	cached_id = {}
+	vertex_cache = {}
+	rescued_this_load = false
+end
+
+local function all_done()
+	for i = 1, #ROUTES do
+		if not done[ROUTES[i].key] then
+			return false
+		end
+	end
+	return true
+end
+
+local function get_sim()
+	if type(alife) ~= "function" then
+		return nil
+	end
+	local ok, sim = pcall(alife)
+	return ok and sim or nil
+end
+
+local function object_name(se_obj)
+	if not se_obj then
+		return nil
+	end
+	local ok, name = pcall(function()
+		return se_obj:name()
+	end)
+	return ok and name or nil
+end
+
+local function object_id(se_obj)
+	if not se_obj then
+		return nil
+	end
+	if type(se_obj.id) == "function" then
+		local ok, id = pcall(function()
+			return se_obj:id()
+		end)
+		return ok and id or nil
+	end
+	return se_obj.id
+end
+
+local function object_level(sim, se_obj)
+	if not (sim and se_obj and se_obj.m_game_vertex_id) then
+		return nil
+	end
+	local ok, name = pcall(function()
+		local gg = game_graph()
+		local gv = gg and gg:vertex(se_obj.m_game_vertex_id) or nil
+		if not gv then
+			return nil
+		end
+		return sim:level_name(gv:level_id())
+	end)
+	return ok and name or nil
+end
+
+local function se_by_id(sim, id)
+	if not (sim and id) then
+		return nil
+	end
+	local ok, se_obj = pcall(function()
+		return sim:object(id)
+	end)
+	return ok and se_obj or nil
+end
+
+local function is_level_changer(se_obj)
+	if not se_obj then
+		return false
+	end
+	local ok, c = pcall(function()
+		return se_obj:clsid()
+	end)
+	if not (ok and c and clsid) then
+		return false
+	end
+	return c == clsid.level_changer or c == clsid.level_changer_s
+end
+
+local function dist_sq(pos, x, y, z)
+	if not pos then
+		return 1e30
+	end
+	local dx = pos.x - x
+	local dy = pos.y - y
+	local dz = pos.z - z
+	return dx * dx + dy * dy + dz * dz
+end
+
+local function pos_text(pos)
+	if not pos then
+		return "<nil>"
+	end
+	return string.format("%.6f, %.6f, %.6f", pos.x, pos.y, pos.z)
+end
+
+local function current_level()
+	local ok, name = pcall(function()
+		return level.name()
+	end)
+	if ok then
+		return name
+	end
+	return nil
+end
+
+local function nearest_vertex(target_level, x, y, z)
+	local cache_key = target_level
+	local cached = vertex_cache[cache_key]
+	if cached and cached.x == x and cached.y == y and cached.z == z then
+		return cached.gvid, cached.lvid, cached.d2
+	end
+
+	local sim = get_sim()
+	if not sim then
+		return nil, nil, nil
+	end
+
+	local ok, gvid, lvid, d2 = pcall(function()
+		local gg = game_graph()
+		if not gg then
+			return nil, nil, nil
+		end
+		local best_gvid, best_lvid, best_d2
+		for id = 0, MAX_GVID do
+			if not gg:valid_vertex_id(id) then
+				break
+			end
+			local vertex = gg:vertex(id)
+			if vertex and sim:level_name(vertex:level_id()) == target_level then
+				local lp = vertex:level_point()
+				local dist = dist_sq(lp, x, y, z)
+				if not best_d2 or dist < best_d2 then
+					best_d2 = dist
+					best_gvid = id
+					best_lvid = vertex:level_vertex_id()
+				end
+			end
+		end
+		return best_gvid, best_lvid, best_d2
+	end)
+
+	if not (ok and gvid and lvid) then
+		return nil, nil, nil
+	end
+
+	vertex_cache[cache_key] = {
+		x = x,
+		y = y,
+		z = z,
+		gvid = gvid,
+		lvid = lvid,
+		d2 = d2,
+	}
+	return gvid, lvid, d2
+end
+
+local function route_by_name(se_obj)
+	local name = object_name(se_obj)
+	if not name then
+		return nil
+	end
+	for i = 1, #ROUTES do
+		if name == ROUTES[i].name then
+			return ROUTES[i]
+		end
+	end
+	return nil
+end
+
+local function route_by_dest(se_obj)
+	if not is_level_changer(se_obj) then
+		return nil
+	end
+	if not (utils_stpk and type(utils_stpk.get_level_changer_data) == "function") then
+		return nil
+	end
+
+	local source = object_level(get_sim(), se_obj)
+	if not source then
+		return nil
+	end
+
+	local ok, data = pcall(function()
+		return utils_stpk.get_level_changer_data(se_obj)
+	end)
+	if not (ok and data and data.dest_position) then
+		return nil
+	end
+
+	for i = 1, #ROUTES do
+		local route = ROUTES[i]
+		if not done[route.key]
+		and source == route.source
+		and dist_sq(data.dest_position, route.bad_x, route.bad_y, route.bad_z) <= BAD_RADIUS_SQ then
+			return route
+		end
+	end
+	return nil
+end
+
+local function try_fix_object(se_obj, reason, route)
+	if not se_obj or all_done() then
+		return false
+	end
+
+	route = route or route_by_name(se_obj)
+	if not route or done[route.key] then
+		return false
+	end
+
+	local sim = get_sim()
+	local source = object_level(sim, se_obj)
+	local id = object_id(se_obj)
+	cached_id[route.key] = id
+
+	if source and source ~= route.source then
+		log(
+			"SKIP name=%s id=%s source=%s expected=%s reason=%s",
+			route.name,
+			tostring(id),
+			tostring(source),
+			route.source,
+			tostring(reason)
+		)
+		done[route.key] = true
+		return true
+	end
+
+	if not (utils_stpk
+		and type(utils_stpk.get_level_changer_data) == "function"
+		and type(utils_stpk.set_level_changer_data) == "function") then
+		log("ERROR utils_stpk level changer helpers missing reason=%s", tostring(reason))
+		return true
+	end
+
+	local ok_get, data = pcall(function()
+		return utils_stpk.get_level_changer_data(se_obj)
+	end)
+	if not (ok_get and data) then
+		log("ERROR get_level_changer_data failed id=%s reason=%s", tostring(id), tostring(reason))
+		return true
+	end
+
+	local dest = data.dest_position
+	local dest_level = data.dest_level_name
+
+	if dist_sq(dest, route.fix_x, route.fix_y, route.fix_z) <= FIX_RADIUS_SQ then
+		done[route.key] = true
+		log(
+			"already fixed route=%s id=%s dest=%s dest_level=%s reason=%s",
+			route.key,
+			tostring(id),
+			pos_text(dest),
+			tostring(dest_level),
+			tostring(reason)
+		)
+		return true
+	end
+
+	if dist_sq(dest, route.bad_x, route.bad_y, route.bad_z) > BAD_RADIUS_SQ then
+		done[route.key] = true
+		log(
+			"SKIP unexpected dest route=%s id=%s dest=%s dest_level=%s reason=%s",
+			route.key,
+			tostring(id),
+			pos_text(dest),
+			tostring(dest_level),
+			tostring(reason)
+		)
+		return true
+	end
+
+	local gvid, lvid, vertex_d2 = nearest_vertex(route.target, route.fix_x, route.fix_y, route.fix_z)
+	if not (gvid and lvid) then
+		log(
+			"ERROR no game_graph vertex on %s for route=%s reason=%s",
+			route.target,
+			route.key,
+			tostring(reason)
+		)
+		return true
+	end
+
+	if vertex_d2 and vertex_d2 > VERTEX_WARN_SQ then
+		log(
+			"WARN nearest vertex is %.1f m from dest route=%s gvid=%s lvid=%s",
+			math.sqrt(vertex_d2),
+			route.key,
+			tostring(gvid),
+			tostring(lvid)
+		)
+	end
+
+	local target = vector()
+	target:set(route.fix_x, route.fix_y, route.fix_z)
+	data.dest_position = target
+	data.dest_game_vertex_id = gvid
+	data.dest_level_vertex_id = lvid
+
+	local ok_set, set_err = pcall(function()
+		utils_stpk.set_level_changer_data(data, se_obj)
+	end)
+	if not ok_set then
+		log("ERROR set_level_changer_data failed id=%s err=%s", tostring(id), tostring(set_err))
+		return true
+	end
+
+	local ok_verify, verify = pcall(function()
+		return utils_stpk.get_level_changer_data(se_obj)
+	end)
+	local verify_pos = ok_verify and verify and verify.dest_position or nil
+	if dist_sq(verify_pos, route.fix_x, route.fix_y, route.fix_z) <= FIX_RADIUS_SQ then
+		done[route.key] = true
+		log(
+			"rewrote dest route=%s id=%s %s -> %s gvid=%s lvid=%s dest_level=%s reason=%s",
+			route.key,
+			tostring(id),
+			pos_text(dest),
+			pos_text(verify_pos),
+			tostring(verify and verify.dest_game_vertex_id or gvid),
+			tostring(verify and verify.dest_level_vertex_id or lvid),
+			tostring(verify and verify.dest_level_name or dest_level),
+			tostring(reason)
+		)
+	else
+		log(
+			"ERROR verify failed route=%s id=%s now=%s reason=%s",
+			route.key,
+			tostring(id),
+			pos_text(verify_pos),
+			tostring(reason)
+		)
+	end
+	return true
+end
+
+local function scan_alife(reason)
+	if all_done() then
+		return true
+	end
+
+	local sim = get_sim()
+	if not sim then
+		log("ALife unavailable reason=%s", tostring(reason))
+		return false
+	end
+
+	for i = 1, #ROUTES do
+		local route = ROUTES[i]
+		if not done[route.key] and cached_id[route.key] then
+			try_fix_object(se_by_id(sim, cached_id[route.key]), reason .. "_cached")
+		end
+	end
+	if all_done() then
+		return true
+	end
+
+	local function visit(se_obj, dest_fallback)
+		if all_done() or not se_obj then
+			return
+		end
+		local route = route_by_name(se_obj)
+		if not route and dest_fallback then
+			route = route_by_dest(se_obj)
+		end
+		if route then
+			try_fix_object(se_obj, reason, route)
+		end
+	end
+
+	local function walk_alife(dest_fallback)
+		if type(sim.iterate_objects) == "function" then
+			local ok = pcall(function()
+				sim:iterate_objects(function(se_obj)
+					visit(se_obj, dest_fallback)
+				end)
+			end)
+			if ok then
+				return
+			end
+		end
+		for id = 1, MAX_ALIFE_ID do
+			if all_done() then
+				return
+			end
+			visit(se_by_id(sim, id), dest_fallback)
+		end
+	end
+
+	walk_alife(false)
+	if not all_done() then
+		walk_alife(true)
+	end
+
+	if not all_done() then
+		log("targets not in ALife yet reason=%s", tostring(reason))
+	end
+	return all_done()
+end
+
+local function rescue_actor(reason)
+	if rescued_this_load then
+		return
+	end
+	if not (db and db.actor) then
+		return
+	end
+
+	local lvl = current_level()
+	local pos = db.actor:position()
+	if not (lvl and pos) then
+		return
+	end
+
+	for i = 1, #ROUTES do
+		local route = ROUTES[i]
+		if lvl == route.target
+		and dist_sq(pos, route.bad_x, route.bad_y, route.bad_z) <= BAD_RADIUS_SQ
+		and dist_sq(pos, route.fix_x, route.fix_y, route.fix_z) > FIX_RADIUS_SQ then
+			local target = vector()
+			target:set(route.fix_x, route.fix_y, route.fix_z)
+			local ok, err = pcall(function()
+				db.actor:set_actor_position(target)
+			end)
+			rescued_this_load = true
+			if ok then
+				log(
+					"rescued actor route=%s from=%s to=%s reason=%s",
+					route.key,
+					pos_text(pos),
+					pos_text(db.actor:position()),
+					tostring(reason)
+				)
+			else
+				log("ERROR rescue set_actor_position failed: %s", tostring(err))
+			end
+			return
+		end
+	end
+end
+
+function server_entity_on_register(se_obj, type_name)
+	if all_done() then
+		return
+	end
+	if type_name == "se_level_changer" then
+		try_fix_object(se_obj, "server_entity_on_register")
+	end
+end
+
+function actor_on_first_update()
+	scan_alife("actor_on_first_update")
+	rescue_actor("first_update")
+end
+
+function on_before_level_changing()
+	scan_alife("on_before_level_changing")
+end
+
+function on_level_changing()
+	scan_alife("on_level_changing")
+end
+
+function on_game_load()
+	reset_state()
+end
+
+function on_game_start()
+	if callbacks_registered then
+		return
+	end
+	reset_state()
+	RegisterScriptCallback("server_entity_on_register", server_entity_on_register)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("on_before_level_changing", on_before_level_changing)
+	RegisterScriptCallback("on_level_changing", on_level_changing)
+	RegisterScriptCallback("on_game_load", on_game_load)
+	callbacks_registered = true
+	log("loaded v%s routes=2", VERSION)
+end
+
+function on_game_end()
+	if not callbacks_registered then
+		return
+	end
+	UnregisterScriptCallback("server_entity_on_register", server_entity_on_register)
+	UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	UnregisterScriptCallback("on_before_level_changing", on_before_level_changing)
+	UnregisterScriptCallback("on_level_changing", on_level_changing)
+	UnregisterScriptCallback("on_game_load", on_game_load)
+	callbacks_registered = false
+	reset_state()
+end
