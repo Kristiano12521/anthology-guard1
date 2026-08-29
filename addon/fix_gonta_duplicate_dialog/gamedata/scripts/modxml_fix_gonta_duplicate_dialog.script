@@ -1,0 +1,87 @@
+-- Gonta Duplicate Dialog Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Filename must start with modxml_ so dxml_core gathers this script and
+-- calls on_xml_read() before XML dispatch.
+--
+-- character_desc_cop_zaton.xml lists both the CoP pair
+-- (zat_b106_stalker_gonta_about_himself / _about_mutants) and the LTTZ
+-- copies (gonta_about_himself / gonta_about_mutants). Same lines, two
+-- menu entries. Strip the LTTZ actor_dialog nodes at parse time.
+--
+-- ZIP v0.1.0 filtered dialog_list at talk time with an anonymous
+-- callback and a zzzz_ filename. That never touched the XML source.
+
+local LOG_TAG = "[fix_gonta_duplicate_dialog]"
+local CHAR_XML = [[gameplay\character_desc_cop_zaton.xml]]
+local GONTA_ID = "zat_b106_stalker_gonta"
+
+local COP_ABOUT_HIMSELF = "zat_b106_stalker_gonta_about_himself"
+local COP_ABOUT_MUTANTS = "zat_b106_stalker_gonta_about_mutants"
+local LTTZ_ABOUT_HIMSELF = "gonta_about_himself"
+local LTTZ_ABOUT_MUTANTS = "gonta_about_mutants"
+
+local function actor_dialog_id(xml_obj, el)
+	if not xml_obj or xml_obj:getElementName(el) ~= "actor_dialog" then
+		return nil
+	end
+	if not (el.kids and el.kids[1]) then
+		return nil
+	end
+	return xml_obj:getText(el)
+end
+
+local function strip_lttz_pair(xml_file_name, xml_obj)
+	if xml_file_name ~= CHAR_XML then
+		return
+	end
+	if not (xml_obj and type(xml_obj.query) == "function") then
+		return
+	end
+
+	local found = xml_obj:query("specific_character[id=" .. GONTA_ID .. "]")
+	local char_el = found and found[1]
+	if not char_el then
+		return
+	end
+
+	local has_cop_self = false
+	local has_cop_mutants = false
+	local lttz_self = nil
+	local lttz_mutants = nil
+
+	xml_obj:iterateChildren(char_el, function(el)
+		local id = actor_dialog_id(xml_obj, el)
+		if id == COP_ABOUT_HIMSELF then
+			has_cop_self = true
+		elseif id == COP_ABOUT_MUTANTS then
+			has_cop_mutants = true
+		elseif id == LTTZ_ABOUT_HIMSELF then
+			lttz_self = el
+		elseif id == LTTZ_ABOUT_MUTANTS then
+			lttz_mutants = el
+		end
+	end)
+
+	local removed = 0
+	if has_cop_self and lttz_self then
+		xml_obj:removeElement(lttz_self)
+		removed = removed + 1
+	end
+	if has_cop_mutants and lttz_mutants then
+		xml_obj:removeElement(lttz_mutants)
+		removed = removed + 1
+	end
+
+	if removed > 0 then
+		printf(LOG_TAG .. " stripped %d LTTZ actor_dialog(s) from %s", removed, GONTA_ID)
+	end
+end
+
+-- dxml_core calls this once while gathering modxml_*.script.
+-- Do not Unregister: on_xml_read is dispatched from COnXmlRead for the
+-- process lifetime; re-registering after on_game_end would miss the
+-- first parse of character_desc after a menu cycle.
+function on_xml_read()
+	RegisterScriptCallback("on_xml_read", strip_lttz_pair)
+end
