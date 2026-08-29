@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!--
+  fix_indeikam_breeding: overlay names for the Dean artefact af_indeikam3.
+  Same string ids as st_items_artefacts_dean.xml / container tables.
+  Does not remap inv_name. Does not change stats or descriptions.
+-->
+<string_table>
+	<string id="st_af_indeikam3_name">
+		<text>Patterned Stone</text>
+	</string>
+	<string id="st_af_indeikam3_af_iam_name">
+		<text>IAM w/ Patterned Stone</text>
+	</string>
+	<string id="st_af_indeikam3_af_aac_name">
+		<text>AAC w/ Patterned Stone</text>
+	</string>
+	<string id="st_af_indeikam3_af_aam_name">
+		<text>AAM w/ Patterned Stone</text>
+	</string>
+	<string id="st_af_indeikam3_lead_box_name">
+		<text>LLMC w/ Patterned Stone</text>
+	</string>
+</string_table>

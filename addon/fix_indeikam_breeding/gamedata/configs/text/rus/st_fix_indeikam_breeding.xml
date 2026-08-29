@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!--
+  fix_indeikam_breeding: overlay names for SGM af_indeikam and Dean af_indeikam3.
+  Same string ids as the language pack / container tables.
+  Does not remap inv_name. Does not change stats or descriptions.
+-->
+<string_table>
+	<string id="st_af_indeikam_name">
+		<text>«Индейский камень»</text>
+	</string>
+	<string id="st_af_indeikam3_name">
+		<text>«Узорчатый камень»</text>
+	</string>
+	<string id="st_af_indeikam3_af_iam_name">
+		<text>СПМ с «Узорчатым камнем»</text>
+	</string>
+	<string id="st_af_indeikam3_af_aac_name">
+		<text>ПКА с «Узорчатым камнем»</text>
+	</string>
+	<string id="st_af_indeikam3_af_aam_name">
+		<text>ПМА с «Узорчатым камнем»</text>
+	</string>
+	<string id="st_af_indeikam3_lead_box_name">
+		<text>СИМК с «Узорчатым камнем»</text>
+	</string>
+</string_table>
