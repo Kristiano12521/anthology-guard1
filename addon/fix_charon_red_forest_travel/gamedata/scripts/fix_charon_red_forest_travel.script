@@ -1,0 +1,117 @@
+-- Charon Red Forest Travel Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Charon's Monolith guide option calls dialogs_mlr.red_forest_guid_mon,
+-- which does mlr_utils.change_lvl("red_forest_guid_mon").
+-- Local CLT in mlr_utils maps that key to
+-- red_bridge_bandit_smart_skirmish_mlr. That smart is not in the
+-- Anthology spawn; change_lvl then indexes a nil se_obj (line 75).
+--
+-- The live smart is red_bridge_bandit_smart_skirmish.
+-- CLT is local, so it cannot be patched. DLTX cannot invent a smart
+-- without all.spawn. Wrap change_lvl, alias the missing name for the
+-- duration of the original call, then remove the alias.
+
+local LOG_TAG = "[fix_charon_red_forest_travel]"
+local ROUTE_KEY = "red_forest_guid_mon"
+local MISSING_SMART = "red_bridge_bandit_smart_skirmish_mlr"
+local TARGET_SMART = "red_bridge_bandit_smart_skirmish"
+local FALLBACK_SMART = "red_smart_terrain_bridge"
+
+local orig_change_lvl = nil
+
+local function registry()
+	return SIMBOARD and SIMBOARD.smarts_by_names or nil
+end
+
+local function valid_smart(smart)
+	return smart
+		and smart.position
+		and smart.m_level_vertex_id ~= nil
+		and smart.m_game_vertex_id ~= nil
+end
+
+local function resolve_standin()
+	local names = registry()
+	if not names then
+		return nil, nil, "SIMBOARD.smarts_by_names is unavailable"
+	end
+	if valid_smart(names[TARGET_SMART]) then
+		return names, names[TARGET_SMART], TARGET_SMART
+	end
+	if valid_smart(names[FALLBACK_SMART]) then
+		return names, names[FALLBACK_SMART], FALLBACK_SMART
+	end
+	return names, nil, "neither " .. TARGET_SMART .. " nor " .. FALLBACK_SMART .. " exists"
+end
+
+function patched_change_lvl(p, ...)
+	if p ~= ROUTE_KEY then
+		return orig_change_lvl(p, ...)
+	end
+
+	local names, standin, standin_or_error = resolve_standin()
+	if not (names and standin) then
+		printf(
+			LOG_TAG .. " cannot remap %s (%s); skipping travel to avoid nil se_obj",
+			ROUTE_KEY,
+			tostring(standin_or_error)
+		)
+		return
+	end
+
+	if valid_smart(names[MISSING_SMART]) then
+		return orig_change_lvl(p, ...)
+	end
+
+	names[MISSING_SMART] = standin
+	printf(
+		LOG_TAG .. " aliased %s -> %s for route %s",
+		MISSING_SMART,
+		tostring(standin_or_error),
+		ROUTE_KEY
+	)
+
+	local ok, a, b, c = pcall(orig_change_lvl, p, ...)
+	if names[MISSING_SMART] == standin then
+		names[MISSING_SMART] = nil
+	end
+
+	if not ok then
+		printf(LOG_TAG .. " original change_lvl failed: %s", tostring(a))
+		return
+	end
+	return a, b, c
+end
+
+local function install()
+	if type(mlr_utils) ~= "table" or type(mlr_utils.change_lvl) ~= "function" then
+		printf(LOG_TAG .. " mlr_utils.change_lvl not found - guard NOT installed")
+		return false
+	end
+	if mlr_utils.change_lvl == patched_change_lvl then
+		return true
+	end
+	orig_change_lvl = orig_change_lvl or mlr_utils.change_lvl
+	mlr_utils.change_lvl = patched_change_lvl
+	printf(
+		LOG_TAG .. " change_lvl wrapped (%s -> %s)",
+		MISSING_SMART,
+		TARGET_SMART
+	)
+	return true
+end
+
+local function uninstall()
+	if orig_change_lvl and type(mlr_utils) == "table" then
+		mlr_utils.change_lvl = orig_change_lvl
+	end
+end
+
+function on_game_start()
+	install()
+end
+
+function on_game_end()
+	uninstall()
+end
