@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+  <string id="st_burnshit_inventory_destroy">
+    <text>Уничтожить</text>
+  </string>
+  <string id="st_burnshit_inventory_destroy_all">
+    <text>Уничтожить всё</text>
+  </string>
+  <string id="st_burnshit_inventory_destroy_confirm_one">
+    <text>Безвозвратно уничтожить предмет «%s»?\n\nЭто действие нельзя отменить.</text>
+  </string>
+  <string id="st_burnshit_inventory_destroy_confirm_all">
+    <text>Безвозвратно уничтожить все доступные предметы из рюкзака?\nОбъектов к удалению: %d\nЗащищено и останется в рюкзаке: %d\n\nЭто действие нельзя отменить.</text>
+  </string>
+  <string id="st_burnshit_inventory_destroy_quest_warning">
+    <text>ВНИМАНИЕ: это квестовый предмет. Его удаление может сломать прохождение.</text>
+  </string>
+  <string id="st_burnshit_inventory_destroy_quest_warning_all">
+    <text>ВНИМАНИЕ: среди удаляемых объектов есть квестовые предметы: %d. Их удаление может сломать прохождение.</text>
+  </string>
+
+  <string id="st_burnshit_inventory_destroy_result_title">
+    <text>Уничтожение предметов</text>
+  </string>
+  <string id="st_burnshit_inventory_destroy_result_one">
+    <text>Предмет безвозвратно уничтожен.</text>
+  </string>
+  <string id="st_burnshit_inventory_destroy_result_all">
+    <text>Уничтожено предметов: %d\nПропущено или сохранено: %d</text>
+  </string>
+  <string id="st_burnshit_inventory_destroy_result_none">
+    <text>Предмет не уничтожен: он уже недоступен или защищён.</text>
+  </string>
+  <string id="st_burnshit_inventory_destroy_result_aborted">
+    <text>Уничтожение отменено: не удалось безопасно проверить экипировку.</text>
+  </string>
+  <string id="st_burnshit_inventory_destroy_result_empty">
+    <text>Нечего уничтожать: все предметы рюкзака экипированы, в избранном или запрещены настройками.</text>
+  </string>
+
+  <string id="ui_mcm_menu_burnshit_inventory_destroy">
+    <text>Burn Shit: уничтожение из инвентаря</text>
+  </string>
+  <string id="ui_mcm_burnshit_inventory_destroy_enabled">
+    <text>Разрешить уничтожение через контекстное меню</text>
+  </string>
+  <string id="ui_mcm_burnshit_inventory_destroy_enabled_desc">
+    <text>Добавляет в контекстное меню действия «Уничтожить» и «Уничтожить всё». «Уничтожить всё» показывается на каждом предмете инвентаря, включая экипированные и защищённые, и удаляет все доступные объекты из рюкзака, кроме экипированных и запрещённых настройками. Каждое действие требует подтверждения.</text>
+  </string>
+  <string id="ui_mcm_burnshit_inventory_destroy_destroyAll">
+    <text>Показывать «Уничтожить всё»</text>
+  </string>
+  <string id="ui_mcm_burnshit_inventory_destroy_destroyAll_desc">
+    <text>«Всегда»: пункт на каждом предмете инвентаря. «Несколько»: скрывать его, если одиночное «Уничтожить» уже покрывает единственный доступный объект. Экипированные, пояс, избранное и запрещённые настройками объекты не удаляются.</text>
+  </string>
+  <string id="ui_mcm_burnshit_inventory_destroy_allowQuestItems">
+    <text>Разрешить уничтожение квестовых предметов</text>
+  </string>
+  <string id="ui_mcm_burnshit_inventory_destroy_allowQuestItems_desc">
+    <text>Опасная настройка. При включении квестовые предметы можно удалить без возможности восстановления. Перед удалением всё равно появится отдельное предупреждение.</text>
+  </string>
+  <string id="ui_mcm_burnshit_inventory_destroy_protectFavorites">
+    <text>Не уничтожать избранные предметы</text>
+  </string>
+  <string id="ui_mcm_burnshit_inventory_destroy_protectFavorites_desc">
+    <text>Защищает предметы, отмеченные как «Избранное» системой SortingPlus. Отметка хранится по секции, поэтому сохраняются все экземпляры выбранного типа. Включено по умолчанию.</text>
+  </string>
+  <string id="ui_mcm_burnshit_inventory_destroy_allowUntradeables">
+    <text>Разрешить уничтожение неторгуемых предметов</text>
+  </string>
+  <string id="ui_mcm_burnshit_inventory_destroy_allowUntradeables_desc">
+    <text>Опасная настройка. Разрешает удалять предметы с параметром can_trade = false. Такие предметы могут быть сюжетными даже без явного флага quest_item. По умолчанию отключено.</text>
+  </string>
+  <string id="ui_mcm_burnshit_inventory_destroy_playSound">
+    <text>Воспроизводить звук сжигания</text>
+  </string>
+  <string id="ui_mcm_burnshit_inventory_destroy_playSound_desc">
+    <text>Воспроизводит короткий звук после подтверждённого уничтожения предметов.</text>
+  </string>
+
+  <string id="ui_mcm_lst_burnshit_inventory_destroy_never">
+    <text>Никогда</text>
+  </string>
+  <string id="ui_mcm_lst_burnshit_inventory_destroy_always">
+    <text>Всегда</text>
+  </string>
+  <string id="ui_mcm_lst_burnshit_inventory_destroy_multiple">
+    <text>Только если доступно несколько предметов</text>
+  </string>
+</string_table>

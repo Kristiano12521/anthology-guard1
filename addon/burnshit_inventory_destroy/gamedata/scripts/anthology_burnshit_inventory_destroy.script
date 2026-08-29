@@ -1,0 +1,789 @@
+-- Anthology Burn Shit Inventory Destroy Extension
+-- Version 1.0.6
+-- Adds irreversible inventory destruction through custom_functor_autoinject.
+-- The original Burn Shit campfire functionality is not replaced.
+--
+-- 1.0.6: Destroy All is visible on every inventory item by default; equipment
+-- checks use SCANNED_SLOTS (no slot 14) plus belt; backpack scan uses
+-- iterate_ruck; functors register from on_game_start (no zzz prefix);
+-- confirmation window is dropped on load; menu-open scans are cached.
+
+local VERSION = "1.0.6"
+local MCM_ID = "burnshit_inventory_destroy"
+local FUNCTOR_ONE = "burnshit_inventory_destroy"
+local FUNCTOR_ALL = "burnshit_inventory_destroy_all"
+
+-- Slot 14 is script-animation in vanilla SCANNED_SLOTS and is not a real
+-- item slot. Never probe it: a native abort there is not catchable by pcall.
+local FALLBACK_SLOTS = {
+    1, 2, 3, 4, 5, 6, 7,
+    8, 9, 10, 11, 12, 13,
+}
+
+local confirm_control = nil
+local perform_request = nil
+local logged_block_sections = {}
+
+local cache_time = nil
+local cache_equipped_ids = nil
+local cache_equipped_failed = false
+local cache_all_entries = nil
+local cache_all_stats = nil
+
+local function get_functor()
+    return custom_functor_autoinject
+end
+
+local function get_config()
+    return burnshit_inventory_destroy_config
+end
+
+local function log(fmt, ...)
+    if type(printf) ~= "function" then
+        return
+    end
+
+    local ok, message = pcall(string.format, fmt, ...)
+    if not ok then
+        message = tostring(fmt)
+    end
+    printf("[BurnShitInventoryDestroy] " .. message)
+end
+
+local function reset_runtime_state()
+    confirm_control = nil
+    cache_time = nil
+    cache_equipped_ids = nil
+    cache_equipped_failed = false
+    cache_all_entries = nil
+    cache_all_stats = nil
+    logged_block_sections = {}
+end
+
+local function option(id, default)
+    if ui_mcm and type(ui_mcm.get) == "function" then
+        local ok, value = pcall(ui_mcm.get, MCM_ID .. "/" .. id)
+        if ok and value ~= nil then
+            return value
+        end
+    end
+    return default
+end
+
+local function begin_menu_cache()
+    local now = time_global and time_global() or 0
+    if cache_time ~= now then
+        cache_time = now
+        cache_equipped_ids = nil
+        cache_equipped_failed = false
+        cache_all_entries = nil
+        cache_all_stats = nil
+    end
+end
+
+local function inventory_screen()
+    local menu = GetActorMenu and GetActorMenu() or nil
+    if not menu then
+        return nil
+    end
+
+    local ok, shown = pcall(menu.IsShown, menu)
+    if not ok or not shown or menu.mode ~= "inventory" then
+        return nil
+    end
+
+    return menu
+end
+
+local function owned_by_actor(item)
+    if not (item and db and db.actor) then
+        return false
+    end
+
+    local ok, parent = pcall(item.parent, item)
+    return ok and parent and parent:id() == db.actor:id()
+end
+
+local function snapshot_belt(ids)
+    local iterated = pcall(function()
+        db.actor:iterate_belt(function(_, equipped)
+            if equipped then
+                ids[equipped:id()] = true
+            end
+        end, db.actor)
+    end)
+    if iterated then
+        return true
+    end
+
+    local ok_count, belt_count = pcall(function()
+        return db.actor:belt_count() or 0
+    end)
+    if not ok_count then
+        log("belt snapshot failed | stage=count")
+        return false
+    end
+
+    for index = 0, belt_count - 1 do
+        local ok_item, equipped = pcall(function()
+            return db.actor:item_on_belt(index)
+        end)
+        if not ok_item then
+            log("belt snapshot failed | index=%d", index)
+            return false
+        end
+        if equipped then
+            ids[equipped:id()] = true
+        end
+    end
+
+    return true
+end
+
+local function equipped_id_snapshot()
+    if not (db and db.actor) then
+        return nil
+    end
+
+    local ids = {}
+    local slots = SCANNED_SLOTS
+    if type(slots) ~= "table" then
+        slots = nil
+    end
+
+    if slots then
+        for slot, enabled in pairs(slots) do
+            if enabled then
+                local ok, equipped = pcall(function()
+                    return db.actor:item_in_slot(slot)
+                end)
+                if not ok then
+                    log("slot snapshot failed | slot=%s", tostring(slot))
+                    return nil
+                end
+                if equipped then
+                    ids[equipped:id()] = true
+                end
+            end
+        end
+    else
+        for i = 1, #FALLBACK_SLOTS do
+            local slot = FALLBACK_SLOTS[i]
+            local ok, equipped = pcall(function()
+                return db.actor:item_in_slot(slot)
+            end)
+            if not ok then
+                log("slot snapshot failed | slot=%d", slot)
+                return nil
+            end
+            if equipped then
+                ids[equipped:id()] = true
+            end
+        end
+    end
+
+    if not snapshot_belt(ids) then
+        return nil
+    end
+
+    return ids
+end
+
+local function cached_equipped_ids()
+    begin_menu_cache()
+    if cache_equipped_failed then
+        return nil
+    end
+    if cache_equipped_ids == nil then
+        cache_equipped_ids = equipped_id_snapshot()
+        if cache_equipped_ids == nil then
+            cache_equipped_failed = true
+            return nil
+        end
+    end
+    return cache_equipped_ids
+end
+
+local function is_equipped(item)
+    if not item then
+        return true
+    end
+
+    local ids = cached_equipped_ids()
+    return not ids or ids[item:id()] == true
+end
+
+local function section_override(section)
+    local Config = get_config()
+    local overrides = Config and Config.destroyableItemOverrides
+    if type(overrides) == "table" then
+        return overrides[section]
+    end
+    return nil
+end
+
+local function item_class(section)
+    local ok, class = pcall(SYS_GetParam, 0, section, "class")
+    if ok then
+        return class
+    end
+    return nil
+end
+
+local function class_override(section)
+    local Config = get_config()
+    local overrides = Config and Config.destroyableClassOverrides
+    if type(overrides) ~= "table" then
+        return nil
+    end
+    local class = item_class(section)
+    if class and overrides[class] then
+        return true
+    end
+    return nil
+end
+
+local function is_quest_item(section)
+    local value = SYS_GetParam(1, section, "quest_item")
+    return value == true or value == 1
+end
+
+local function is_untradeable(section)
+    return SYS_GetParam(1, section, "can_trade") == false
+end
+
+local function is_favorite_section(section)
+    if not option("protectFavorites", true) then
+        return false
+    end
+
+    local module = zzz_rax_sortingplus_mcm
+    if module and type(module.is_favorite) == "function" then
+        local ok, value = pcall(module.is_favorite, section)
+        if ok then
+            return value == true
+        end
+        log("favorite check failed | section=%s", tostring(section))
+    end
+
+    return false
+end
+
+local function policy_block_reason(item)
+    local section = item:section()
+    local override = section_override(section)
+
+    if override == false then
+        return "override"
+    end
+
+    if is_favorite_section(section) then
+        return "favorite"
+    end
+
+    if override == true or class_override(section) then
+        return nil
+    end
+
+    if is_quest_item(section) and not option("allowQuestItems", false) then
+        return "quest"
+    end
+
+    if is_untradeable(section) and not option("allowUntradeables", false) then
+        return "untradeable"
+    end
+
+    return nil
+end
+
+local function policy_allows(item)
+    return policy_block_reason(item) == nil
+end
+
+local function is_destroyable(item, require_visible_inventory)
+    if not option("enabled", true) then
+        return false
+    end
+
+    if require_visible_inventory and not inventory_screen() then
+        return false
+    end
+
+    if not owned_by_actor(item) or is_equipped(item) then
+        return false
+    end
+
+    local se = alife_object(item:id())
+    if not se then
+        return false
+    end
+
+    return policy_allows(item)
+end
+
+local function item_name(item)
+    if not item then
+        return ""
+    end
+
+    if ui_item and type(ui_item.get_obj_name) == "function" then
+        local ok, name = pcall(ui_item.get_obj_name, item)
+        if ok and name and name ~= "" then
+            return tostring(name)
+        end
+    end
+
+    local section = item:section()
+    local inv_name = SYS_GetParam(0, section, "inv_name")
+    if inv_name and inv_name ~= "" then
+        local ok, translated = pcall(game.translate_string, inv_name)
+        if ok and translated and translated ~= "" then
+            return tostring(translated)
+        end
+        return tostring(inv_name)
+    end
+
+    return tostring(section)
+end
+
+local empty_stats = function()
+    return {
+        quest_count = 0,
+        protected_count = 0,
+        favorite_count = 0,
+        quest_protected_count = 0,
+        untradeable_count = 0,
+        override_count = 0,
+    }
+end
+
+local function collect_all_destroyable(stop_after_two)
+    begin_menu_cache()
+
+    if not stop_after_two and cache_all_entries then
+        return cache_all_entries, cache_all_stats
+    end
+
+    local entries = {}
+    local stats = empty_stats()
+
+    local function consider(other)
+        if stop_after_two and #entries >= 2 then
+            return
+        end
+
+        if not (other and owned_by_actor(other) and alife_object(other:id())) then
+            return
+        end
+
+        local reason = policy_block_reason(other)
+        local section = other:section()
+
+        if reason then
+            stats.protected_count = stats.protected_count + 1
+            if reason == "favorite" then
+                stats.favorite_count = stats.favorite_count + 1
+            elseif reason == "quest" then
+                stats.quest_protected_count = stats.quest_protected_count + 1
+            elseif reason == "untradeable" then
+                stats.untradeable_count = stats.untradeable_count + 1
+            elseif reason == "override" then
+                stats.override_count = stats.override_count + 1
+            end
+        else
+            entries[#entries + 1] = {
+                id = other:id(),
+                section = section,
+            }
+
+            if is_quest_item(section) then
+                stats.quest_count = stats.quest_count + 1
+            end
+        end
+    end
+
+    local ruck_started = false
+    local ruck_ok, ruck_err = pcall(function()
+        db.actor:iterate_ruck(function(_, other)
+            ruck_started = true
+            consider(other)
+        end, db.actor)
+    end)
+
+    if not ruck_ok and not ruck_started then
+        local equipped_ids = cached_equipped_ids()
+        if not equipped_ids then
+            return entries, stats
+        end
+
+        db.actor:iterate_inventory(function(_, other)
+            if other and not equipped_ids[other:id()] then
+                consider(other)
+            end
+        end, db.actor)
+    elseif not ruck_ok then
+        log("ruck iterate failed | error=%s", tostring(ruck_err))
+    end
+
+    if not stop_after_two then
+        cache_all_entries = entries
+        cache_all_stats = stats
+    end
+
+    return entries, stats
+end
+
+local function refresh_inventory()
+    local menu = GetActorMenu and GetActorMenu() or nil
+    if not menu then
+        return
+    end
+
+    pcall(menu.UnHighlight_All, menu)
+    pcall(menu.UpdateItems, menu)
+end
+
+local function show_result_message(text)
+    if not (text and text ~= "" and db and db.actor) then
+        return
+    end
+
+    local title = game.translate_string("st_burnshit_inventory_destroy_result_title")
+    local ok, err = pcall(function()
+        db.actor:give_game_news(
+            title,
+            text,
+            "ui_iconsTotal_grouping",
+            0,
+            6000,
+            0
+        )
+    end)
+
+    if not ok then
+        log("result message failed | error=%s", tostring(err))
+    end
+end
+
+local function play_destroy_sound(count)
+    if count < 1 or not option("playSound", true) then
+        return
+    end
+
+    local Config = get_config()
+    local sound = Config and Config.destroySound
+    if not sound or not db or not db.actor then
+        return
+    end
+
+    local base = Config.baseVolume or 0.48
+    local per_item = Config.volumePerItem or 0.04
+    local maximum = Config.maxVolume or 0.88
+    local volume = math.min(base + per_item * (count - 1), maximum)
+
+    pcall(sound.play_no_feedback, sound, db.actor, 0, 0, db.actor:position(), volume, 1.0)
+end
+
+class "burnshit_inventory_destroy_confirm" (CUIScriptWnd)
+
+function burnshit_inventory_destroy_confirm:__init() super()
+    self:SetWndRect(Frect():set(0, 0, 1024, 768))
+    self.message_box = CUIMessageBoxEx()
+    self:Register(self.message_box, "burnshit_inventory_destroy_confirm")
+
+    self:AddCallback(
+        "burnshit_inventory_destroy_confirm",
+        ui_events.MESSAGE_BOX_YES_CLICKED,
+        self.OnYes,
+        self
+    )
+    self:AddCallback(
+        "burnshit_inventory_destroy_confirm",
+        ui_events.MESSAGE_BOX_NO_CLICKED,
+        self.OnNo,
+        self
+    )
+end
+
+function burnshit_inventory_destroy_confirm:__finalize()
+end
+
+function burnshit_inventory_destroy_confirm:ShowRequest(request, text)
+    self.request = request
+    self.message_box:InitMessageBox("message_box_yes_no")
+    self.message_box:SetText(text)
+    self.message_box:ShowDialog(true)
+end
+
+function burnshit_inventory_destroy_confirm:OnYes()
+    local request = self.request
+    self.request = nil
+    if request and perform_request then
+        perform_request(request)
+    end
+end
+
+function burnshit_inventory_destroy_confirm:OnNo()
+    self.request = nil
+end
+
+local function confirmation_text(item, request)
+    local text
+
+    if request.mode == "all" then
+        text = string.format(
+            game.translate_string("st_burnshit_inventory_destroy_confirm_all"),
+            #request.entries,
+            request.protected_count or 0
+        )
+
+        if request.quest_count and request.quest_count > 0 then
+            text = text .. "\n\n" .. string.format(
+                game.translate_string("st_burnshit_inventory_destroy_quest_warning_all"),
+                request.quest_count
+            )
+        end
+    else
+        text = string.format(
+            game.translate_string("st_burnshit_inventory_destroy_confirm_one"),
+            item_name(item)
+        )
+
+        if is_quest_item(item:section()) then
+            text = text .. "\n\n" .. game.translate_string("st_burnshit_inventory_destroy_quest_warning")
+        end
+    end
+
+    return text
+end
+
+local function request_destroy(item, destroy_all)
+    local entries
+    local stats = empty_stats()
+    local mode = "one"
+    local selected_section = nil
+
+    if destroy_all then
+        if not option("enabled", true) or not inventory_screen() then
+            return
+        end
+
+        entries, stats = collect_all_destroyable(false)
+        mode = "all"
+    else
+        if not is_destroyable(item, true) then
+            return
+        end
+
+        selected_section = item:section()
+        entries = {{
+            id = item:id(),
+            section = selected_section,
+        }}
+        if is_quest_item(selected_section) then
+            stats.quest_count = 1
+        end
+    end
+
+    if not entries or #entries < 1 then
+        if mode == "all" then
+            show_result_message(game.translate_string("st_burnshit_inventory_destroy_result_empty"))
+        end
+        return
+    end
+
+    local request = {
+        entries = entries,
+        mode = mode,
+        quest_count = stats.quest_count or 0,
+        protected_count = stats.protected_count or 0,
+        favorite_count = stats.favorite_count or 0,
+        quest_protected_count = stats.quest_protected_count or 0,
+        untradeable_count = stats.untradeable_count or 0,
+        selected_section = selected_section,
+    }
+
+    if not confirm_control then
+        confirm_control = burnshit_inventory_destroy_confirm()
+    end
+
+    confirm_control:ShowRequest(request, confirmation_text(item, request))
+end
+
+perform_request = function(request)
+    if not (request and request.entries and db and db.actor) then
+        return
+    end
+
+    local equipped_ids = equipped_id_snapshot()
+    if not equipped_ids then
+        log("request aborted | reason=equipment_snapshot_failed | mode=%s", tostring(request.mode))
+        show_result_message(game.translate_string("st_burnshit_inventory_destroy_result_aborted"))
+        return
+    end
+
+    local destroyed = 0
+
+    for _, entry in ipairs(request.entries) do
+        local id = entry.id
+        local section = entry.section
+        local item = level.object_by_id(id)
+
+        if item
+        and item:section() == section
+        and owned_by_actor(item)
+        and not equipped_ids[id]
+        and policy_allows(item)
+        then
+            local ok, released = pcall(alife_release_id, id, "BurnShitInventoryDestroy")
+            if ok and released then
+                destroyed = destroyed + 1
+            else
+                log("release failed | id=%s | section=%s | error=%s", tostring(id), tostring(section), tostring(released))
+            end
+        end
+    end
+
+    local requested = #request.entries
+    local runtime_skipped = requested - destroyed
+    local preserved = (request.protected_count or 0) + runtime_skipped
+
+    if destroyed > 0 then
+        play_destroy_sound(destroyed)
+        refresh_inventory()
+    end
+
+    if request.mode == "all" then
+        show_result_message(string.format(
+            game.translate_string("st_burnshit_inventory_destroy_result_all"),
+            destroyed,
+            preserved
+        ))
+        log(
+            "destroyed | scope=all_backpack | count=%d | requested=%d | protected=%d | runtime_skipped=%d",
+            destroyed,
+            requested,
+            request.protected_count or 0,
+            runtime_skipped
+        )
+    elseif destroyed > 0 then
+        show_result_message(game.translate_string("st_burnshit_inventory_destroy_result_one"))
+        log("destroyed | section=%s | count=%d", tostring(request.selected_section), destroyed)
+    else
+        show_result_message(game.translate_string("st_burnshit_inventory_destroy_result_none"))
+        log("nothing destroyed | mode=%s", tostring(request.mode))
+    end
+end
+
+local function log_block_reason_once(item)
+    local section = item:section()
+    if logged_block_sections[section] then
+        return
+    end
+    logged_block_sections[section] = true
+
+    local reason = policy_block_reason(item)
+    local class = item_class(section)
+    log(
+        "destroy check | section=%s | class=%s | blocked_by=%s",
+        tostring(section),
+        class ~= nil and tostring(class) or "unknown",
+        reason ~= nil and tostring(reason) or "none"
+    )
+end
+
+local function can_destroy_one(item)
+    local allowed = is_destroyable(item, true)
+
+    if not allowed and item and inventory_screen() and owned_by_actor(item) and not is_equipped(item) then
+        log_block_reason_once(item)
+    end
+
+    return allowed
+end
+
+local function can_destroy_all(item)
+    if not option("enabled", true) or not inventory_screen() then
+        return false
+    end
+
+    local mode = option("destroyAll", "always")
+    if mode == "never" then
+        return false
+    end
+
+    -- Always: show on every inventory item, including equipped/protected.
+    -- Visibility does not iterate the backpack.
+    if mode == "always" then
+        return true
+    end
+
+    -- Hide Destroy All only when Destroy already covers the single eligible
+    -- object. Protected/equipped clicks and empty-eligible backpacks still
+    -- get the row so the menu is never blank.
+    local entries = collect_all_destroyable(true)
+    if #entries == 1 and is_destroyable(item, true) then
+        return false
+    end
+
+    return true
+end
+
+local function register_functors()
+    local Functor = get_functor()
+    if not (Functor and type(Functor.add_functor) == "function") then
+        log("disabled: custom_functor_autoinject is unavailable")
+        return
+    end
+
+    -- Same name overwrites the live slot; it does not create a second row.
+    Functor.add_functor(
+        FUNCTOR_ONE,
+        can_destroy_one,
+        function()
+            return "st_burnshit_inventory_destroy"
+        end,
+        nil,
+        function(item)
+            request_destroy(item, false)
+        end
+    )
+
+    Functor.add_functor(
+        FUNCTOR_ALL,
+        can_destroy_all,
+        function()
+            return "st_burnshit_inventory_destroy_all"
+        end,
+        nil,
+        function(item)
+            request_destroy(item, true)
+        end
+    )
+
+    log("loaded v%s | confirmation=yes_no | equipped=blocked | favorites=protected | quest_default=blocked | untradeable_default=blocked | destroy_all=always", VERSION)
+end
+
+local function unregister_functors()
+    local Functor = get_functor()
+    if not (Functor and type(Functor.remove_functor) == "function") then
+        return
+    end
+
+    pcall(Functor.remove_functor, FUNCTOR_ONE)
+    pcall(Functor.remove_functor, FUNCTOR_ALL)
+end
+
+function on_game_start()
+    register_functors()
+end
+
+function on_game_load()
+    reset_runtime_state()
+    register_functors()
+end
+
+function on_game_end()
+    unregister_functors()
+    reset_runtime_state()
+end

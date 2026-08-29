@@ -1,0 +1,20 @@
+-- Optional per-section overrides:
+-- false = never show the destroy action for this section
+-- true  = allow even when general quest/trade restrictions would block it
+
+destroyableItemOverrides = {
+    -- example_section = false,
+}
+
+-- Optional per-CLASS overrides. Anomaly sometimes sets can_trade = false on
+-- a whole attachment category as a "not sold through the trade window" flag,
+-- not as a rarity marker. Fill this in ONLY after confirming the real class
+-- string from the [BurnShitInventoryDestroy] destroy check log line.
+destroyableClassOverrides = {
+    -- WP_SCOPE = true,
+}
+
+destroySound = sound_object("burnshit\\fire_whoosh")
+baseVolume = 0.48
+volumePerItem = 0.04
+maxVolume = 0.88

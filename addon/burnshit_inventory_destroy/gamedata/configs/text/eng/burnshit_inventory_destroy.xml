@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+  <string id="st_burnshit_inventory_destroy"><text>Destroy</text></string>
+  <string id="st_burnshit_inventory_destroy_all"><text>Destroy everything</text></string>
+  <string id="st_burnshit_inventory_destroy_confirm_one"><text>Permanently destroy "%s"?\n\nThis action cannot be undone.</text></string>
+  <string id="st_burnshit_inventory_destroy_confirm_all"><text>Permanently destroy every eligible item in the rucksack?\nObjects to destroy: %d\nProtected and kept in the rucksack: %d\n\nThis action cannot be undone.</text></string>
+  <string id="st_burnshit_inventory_destroy_quest_warning"><text>WARNING: this is a quest item. Destroying it may break progression.</text></string>
+  <string id="st_burnshit_inventory_destroy_quest_warning_all"><text>WARNING: the selection contains %d quest item(s). Destroying them may break progression.</text></string>
+
+  <string id="st_burnshit_inventory_destroy_result_title"><text>Item destruction</text></string>
+  <string id="st_burnshit_inventory_destroy_result_one"><text>The item was permanently destroyed.</text></string>
+  <string id="st_burnshit_inventory_destroy_result_all"><text>Items destroyed: %d\nSkipped or preserved: %d</text></string>
+  <string id="st_burnshit_inventory_destroy_result_none"><text>The item was not destroyed because it is no longer available or is protected.</text></string>
+  <string id="st_burnshit_inventory_destroy_result_aborted"><text>Destruction was cancelled because equipment could not be checked safely.</text></string>
+  <string id="st_burnshit_inventory_destroy_result_empty"><text>Nothing to destroy: every rucksack item is equipped, favorited or blocked by settings.</text></string>
+
+  <string id="ui_mcm_menu_burnshit_inventory_destroy"><text>Burn Shit: inventory destruction</text></string>
+  <string id="ui_mcm_burnshit_inventory_destroy_enabled"><text>Enable context-menu destruction</text></string>
+  <string id="ui_mcm_burnshit_inventory_destroy_enabled_desc"><text>Adds Destroy and Destroy everything to the item context menu. Destroy everything is shown on every inventory item, including equipped and protected ones, and removes every eligible rucksack object except equipped, favorite or policy-blocked items. Every action requires confirmation.</text></string>
+  <string id="ui_mcm_burnshit_inventory_destroy_destroyAll"><text>Show Destroy everything</text></string>
+  <string id="ui_mcm_burnshit_inventory_destroy_destroyAll_desc"><text>Always: the action is on every inventory item. Multiple: hide it when Destroy already covers the only eligible object. Equipped, belted, favorite and policy-blocked objects are never deleted.</text></string>
+  <string id="ui_mcm_burnshit_inventory_destroy_allowQuestItems"><text>Allow destroying quest items</text></string>
+  <string id="ui_mcm_burnshit_inventory_destroy_allowQuestItems_desc"><text>Dangerous. Quest items can be permanently removed. A warning is still shown before confirmation.</text></string>
+  <string id="ui_mcm_burnshit_inventory_destroy_protectFavorites"><text>Protect favorite items</text></string>
+  <string id="ui_mcm_burnshit_inventory_destroy_protectFavorites_desc"><text>Protects sections marked as Favorite by SortingPlus. The flag is section-wide, so every instance of that item type is preserved. Enabled by default.</text></string>
+  <string id="ui_mcm_burnshit_inventory_destroy_allowUntradeables"><text>Allow destroying untradeable items</text></string>
+  <string id="ui_mcm_burnshit_inventory_destroy_allowUntradeables_desc"><text>Dangerous. Allows items marked can_trade = false; some may be story-critical without an explicit quest_item flag. Disabled by default.</text></string>
+  <string id="ui_mcm_burnshit_inventory_destroy_playSound"><text>Play burning sound</text></string>
+  <string id="ui_mcm_burnshit_inventory_destroy_playSound_desc"><text>Plays a short sound after confirmed destruction.</text></string>
+
+  <string id="ui_mcm_lst_burnshit_inventory_destroy_never"><text>Never</text></string>
+  <string id="ui_mcm_lst_burnshit_inventory_destroy_always"><text>Always</text></string>
+  <string id="ui_mcm_lst_burnshit_inventory_destroy_multiple"><text>Only when multiple eligible items exist</text></string>
+</string_table>

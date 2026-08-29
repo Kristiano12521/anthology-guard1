@@ -1,0 +1,62 @@
+function on_mcm_load()
+    return {
+        id = "burnshit_inventory_destroy",
+        sh = true,
+        gr = {
+            {
+                id = "title",
+                type = "slide",
+                text = "ui_mcm_menu_burnshit_inventory_destroy",
+                link = "ui_options_slider_player",
+                size = {512, 50},
+                spacing = 20,
+            },
+            {
+                val = 1,
+                type = "check",
+                id = "enabled",
+                hint = "burnshit_inventory_destroy_enabled",
+                def = true,
+            },
+            {
+                id = "destroyAll",
+                type = ui_mcm.kb_mod_list,
+                val = 0,
+                def = "always",
+                content = {
+                    {"never", "burnshit_inventory_destroy_never"},
+                    {"always", "burnshit_inventory_destroy_always"},
+                    {"multiple", "burnshit_inventory_destroy_multiple"},
+                },
+            },
+            {
+                val = 1,
+                type = "check",
+                id = "allowQuestItems",
+                hint = "burnshit_inventory_destroy_allowQuestItems",
+                def = false,
+            },
+            {
+                val = 1,
+                type = "check",
+                id = "protectFavorites",
+                hint = "burnshit_inventory_destroy_protectFavorites",
+                def = true,
+            },
+            {
+                val = 1,
+                type = "check",
+                id = "allowUntradeables",
+                hint = "burnshit_inventory_destroy_allowUntradeables",
+                def = false,
+            },
+            {
+                val = 1,
+                type = "check",
+                id = "playSound",
+                hint = "burnshit_inventory_destroy_playSound",
+                def = true,
+            },
+        },
+    }
+end
