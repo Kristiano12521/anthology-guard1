@@ -1,0 +1,7 @@
+; Generic mechanic -- add steel_wool to base stock.
+; Why: item is in [tools] (mechanic does not exclude tools) and is used
+;      as a repair/craft part next to grease/duct_tape, but SYS_Balance
+;      supplies never list it. supplies_2/3/4 inherit supplies_1.
+
+![supplies_1]
+steel_wool = 2, 1

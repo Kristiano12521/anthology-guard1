@@ -1,0 +1,13 @@
+; Generic medic -- sell plastic jars (jar) for medical crafting.
+; Why: jar is in [trash]; medic profile inherits trash as NO TRADE.
+;      Adding supplies without sell/buy override would spawn the item
+;      in inventory but never offer it. supplies_2 inherits supplies_1.
+
+![trade_generic_buy]
+jar = 1, 1
+
+![trade_generic_sell]
+jar = 1, 1
+
+![supplies_1]
+jar = 2, 1
