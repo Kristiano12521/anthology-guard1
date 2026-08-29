@@ -1,0 +1,354 @@
+-- Stash ID Desync Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Treasure map spots are bound to alife id. release_stash_by_id and the
+-- dead-object path in get_random_stash drop the cache entry and leave
+-- the spot. The id is reused (often m_crow); actor_on_item_take_from_box
+-- never fires for a non-box, so the marker walks and then hangs.
+--
+-- ZIP v3 swept all caches with anonymous callbacks, niled entries
+-- without caches_count, missed spots whose cache was already gone,
+-- and did not stop the next desync.
+--
+-- Wrap release_stash_by_id (spots + treat caches[id]==false as present
+-- so the local count decrements). On se_invbox unregister do the same.
+-- One delayed repair: drop desynced cache ids, then scan leftover spots.
+
+local LOG_TAG = "[fix_stash_id_desync]"
+local VERSION = "1.0.0"
+local EVENT_ID = "fix_stash_id_desync"
+local REPAIR_ACTION = "repair"
+local REPAIR_DELAY = 1.0
+local CHUNK_DELAY = 0
+local ID_CHUNK = 4096
+local ID_MAX = 65534
+local SPOTS = { "treasure", "treasure_searched", "treasure_unique" }
+
+local orig_release = nil
+local callbacks_registered = false
+local caches_swept = false
+local scan_id = 1
+local dropped_caches = 0
+local cleared_spots = 0
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function caches_table()
+	local caches = treasure_manager and treasure_manager.caches
+	if type(caches) == "table" then
+		return caches
+	end
+	return nil
+end
+
+local function is_invbox_se(se_obj)
+	if not se_obj then
+		return false
+	end
+	local ok, cls = pcall(function()
+		return se_obj:clsid()
+	end)
+	if not ok or cls == nil then
+		return false
+	end
+	if type(IsInvbox) == "function" then
+		local ok_box, result = pcall(IsInvbox, nil, cls)
+		return ok_box and result and true or false
+	end
+	return cls == clsid.inventory_box_s or cls == clsid.inventory_box
+end
+
+local function object_id(se_obj)
+	if not se_obj then
+		return nil
+	end
+	local id = se_obj.id
+	if type(id) == "function" then
+		local ok, result = pcall(function()
+			return se_obj:id()
+		end)
+		if ok then
+			return result
+		end
+		return nil
+	end
+	return id
+end
+
+local function has_spot(id, spot)
+	if not (id and level and type(level.map_has_object_spot) == "function") then
+		return false
+	end
+	local ok, result = pcall(level.map_has_object_spot, id, spot)
+	return ok and result ~= 0
+end
+
+local function remove_treasure_spots(id)
+	if not id then
+		return 0
+	end
+	if not (level and type(level.map_remove_object_spot) == "function") then
+		return 0
+	end
+	local removed = 0
+	for i = 1, #SPOTS do
+		local spot = SPOTS[i]
+		if has_spot(id, spot) then
+			pcall(level.map_remove_object_spot, id, spot)
+			removed = removed + 1
+		end
+	end
+	return removed
+end
+
+local function object_label(se_obj)
+	if not se_obj then
+		return "none"
+	end
+	local ok_name, name = pcall(function()
+		return se_obj:name()
+	end)
+	local ok_sec, sec = pcall(function()
+		return se_obj:section_name()
+	end)
+	return string.format(
+		"name=%s section=%s",
+		tostring(ok_name and name or "?"),
+		tostring(ok_sec and sec or "?")
+	)
+end
+
+local function is_desynced(id)
+	local se_obj = alife_object(id)
+	if not se_obj then
+		return true, nil, "missing"
+	end
+	if not is_invbox_se(se_obj) then
+		return true, se_obj, "not_invbox"
+	end
+	return false, se_obj, nil
+end
+
+function patched_release_stash_by_id(id)
+	remove_treasure_spots(id)
+	local caches = caches_table()
+	if caches and caches[id] == false then
+		caches[id] = true
+	end
+	if type(orig_release) == "function" then
+		return orig_release(id)
+	end
+end
+
+local function spot_count(id)
+	local count = 0
+	for i = 1, #SPOTS do
+		if has_spot(id, SPOTS[i]) then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+local function drop_stash(id, reason, se_obj)
+	local caches = caches_table()
+	local had_cache = caches and caches[id] ~= nil
+	local spots = spot_count(id)
+
+	if treasure_manager and type(treasure_manager.release_stash_by_id) == "function" then
+		treasure_manager.release_stash_by_id(id)
+	elseif type(orig_release) == "function" then
+		remove_treasure_spots(id)
+		if caches and caches[id] == false then
+			caches[id] = true
+		end
+		orig_release(id)
+	else
+		remove_treasure_spots(id)
+	end
+
+	if spots > 0 then
+		cleared_spots = cleared_spots + spots
+	end
+	if had_cache then
+		dropped_caches = dropped_caches + 1
+	end
+	if spots > 0 or had_cache then
+		log(
+			"cleared id=%s reason=%s spots=%s cache=%s %s",
+			tostring(id),
+			tostring(reason),
+			tostring(spots),
+			tostring(had_cache),
+			object_label(se_obj)
+		)
+	end
+end
+
+local function sweep_caches()
+	local caches = caches_table()
+	if not caches then
+		log("treasure_manager.caches is unavailable; cache sweep skipped")
+		return
+	end
+
+	local doomed = {}
+	for id, _ in pairs(caches) do
+		local desynced, se_obj, reason = is_desynced(id)
+		if desynced then
+			doomed[#doomed + 1] = { id = id, reason = reason, se_obj = se_obj }
+		end
+	end
+
+	for i = 1, #doomed do
+		local row = doomed[i]
+		drop_stash(row.id, row.reason, row.se_obj)
+	end
+end
+
+local function sweep_id_range(from_id, to_id)
+	for id = from_id, to_id do
+		local found = false
+		for i = 1, #SPOTS do
+			if has_spot(id, SPOTS[i]) then
+				found = true
+				break
+			end
+		end
+		if found then
+			local desynced, se_obj, reason = is_desynced(id)
+			if desynced then
+				drop_stash(id, reason, se_obj)
+			end
+		end
+	end
+end
+
+local function install()
+	if not (treasure_manager and type(treasure_manager.release_stash_by_id) == "function") then
+		log("treasure_manager.release_stash_by_id is not ready")
+		return false
+	end
+	if treasure_manager.release_stash_by_id == patched_release_stash_by_id then
+		return true
+	end
+	if orig_release then
+		return true
+	end
+	orig_release = treasure_manager.release_stash_by_id
+	treasure_manager.release_stash_by_id = patched_release_stash_by_id
+	log("v%s release_stash_by_id wrapped", VERSION)
+	return true
+end
+
+local function uninstall()
+	if orig_release and treasure_manager and treasure_manager.release_stash_by_id == patched_release_stash_by_id then
+		treasure_manager.release_stash_by_id = orig_release
+	end
+	orig_release = nil
+end
+
+local function reset_repair()
+	caches_swept = false
+	scan_id = 1
+	dropped_caches = 0
+	cleared_spots = 0
+end
+
+local function cancel_repair()
+	RemoveTimeEvent(EVENT_ID, REPAIR_ACTION)
+	reset_repair()
+end
+
+local function finish_repair()
+	log(
+		"repair done spots=%s cache_entries=%s",
+		tostring(cleared_spots),
+		tostring(dropped_caches)
+	)
+	return true
+end
+
+function repair_tick()
+	install()
+
+	if not caches_swept then
+		sweep_caches()
+		caches_swept = true
+		scan_id = 1
+		ResetTimeEvent(EVENT_ID, REPAIR_ACTION, CHUNK_DELAY)
+		return false
+	end
+
+	local last = scan_id + ID_CHUNK - 1
+	if last > ID_MAX then
+		last = ID_MAX
+	end
+	sweep_id_range(scan_id, last)
+	scan_id = last + 1
+
+	if scan_id > ID_MAX then
+		return finish_repair()
+	end
+
+	ResetTimeEvent(EVENT_ID, REPAIR_ACTION, CHUNK_DELAY)
+	return false
+end
+
+local function schedule_repair()
+	RemoveTimeEvent(EVENT_ID, REPAIR_ACTION)
+	reset_repair()
+	CreateTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY, repair_tick)
+end
+
+function server_entity_on_unregister(se_obj, typ)
+	if not se_obj then
+		return
+	end
+	local invbox = typ == "se_invbox" or is_invbox_se(se_obj)
+	if not invbox then
+		return
+	end
+	install()
+	local id = object_id(se_obj)
+	if not id then
+		return
+	end
+	drop_stash(id, "unregister", se_obj)
+end
+
+function actor_on_first_update()
+	install()
+	schedule_repair()
+end
+
+function on_game_load()
+	RemoveTimeEvent(EVENT_ID, REPAIR_ACTION)
+	reset_repair()
+	install()
+end
+
+function on_game_start()
+	install()
+	if callbacks_registered then
+		return
+	end
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("on_game_load", on_game_load)
+	RegisterScriptCallback("server_entity_on_unregister", server_entity_on_unregister)
+	callbacks_registered = true
+	log("loaded v%s", VERSION)
+end
+
+function on_game_end()
+	cancel_repair()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		UnregisterScriptCallback("server_entity_on_unregister", server_entity_on_unregister)
+		callbacks_registered = false
+	end
+	uninstall()
+end
