@@ -1,0 +1,139 @@
+-- Sim mechanic empty stock fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- xr_logic defaults a missing `trade` field to trade_generic.ltx, whose
+-- buy_supplies is empty. A sim mechanic on a camp/visitor job opens the
+-- trade UI but has nothing to sell. aaaa_script_fixes_mp then keeps the
+-- generic-era resupply_time after the exclusive mechanic job is applied,
+-- so update() skips buy_supplies; dont_keep_items has already wiped the
+-- inventory.
+--
+-- Identify by xr_conditions.check_npc_mechanic (sim_default_*_mechanic),
+-- not by a save-specific object id.
+
+local LOG_TAG = "[fix_sim_mechanic_trade]"
+
+local GENERIC_CFG = "items\\trade\\trade_generic.ltx"
+local MECHANIC_CFG = "items\\trade\\trade_generic_mechanic.ltx"
+
+local orig_trade_init = nil
+local orig_update = nil
+local orig_reset_show_spot = nil
+
+local function normalize_cfg(cfg)
+	if type(cfg) ~= "string" then
+		return cfg
+	end
+	return string.gsub(string.lower(cfg), "/", "\\")
+end
+
+local function is_default_generic(cfg)
+	return normalize_cfg(cfg) == normalize_cfg(GENERIC_CFG)
+end
+
+local function is_sim_mechanic(npc)
+	if not npc then
+		return false
+	end
+	if type(xr_conditions) == "table" and type(xr_conditions.check_npc_mechanic) == "function" then
+		local ok, result = pcall(xr_conditions.check_npc_mechanic, db.actor, npc)
+		if ok and result then
+			return true
+		end
+	end
+	local name = npc.name and npc:name()
+	return type(name) == "string" and string.find(name, "sim_default_%a+_mechanic") ~= nil
+end
+
+local function needs_mechanic_restock(npc)
+	if not is_sim_mechanic(npc) then
+		return false
+	end
+	local id = npc:id()
+	local profile = id and trade_manager.get_trade_profile(id)
+	return profile and profile.cfg_ltx and not profile.current_buy_supplies
+end
+
+local function patched_trade_init(npc, cfg)
+	if is_sim_mechanic(npc) and is_default_generic(cfg) then
+		cfg = MECHANIC_CFG
+	end
+	local result = orig_trade_init(npc, cfg)
+	if needs_mechanic_restock(npc) then
+		trade_manager.update(npc, true)
+	end
+	return result
+end
+
+local function patched_update(npc, force_refresh)
+	if not force_refresh and needs_mechanic_restock(npc) then
+		force_refresh = true
+	end
+	return orig_update(npc, force_refresh)
+end
+
+local function patched_reset_show_spot(npc, scheme, st, section)
+	orig_reset_show_spot(npc, scheme, st, section)
+	if not is_sim_mechanic(npc) then
+		return
+	end
+	local id = npc:id()
+	if not id then
+		return
+	end
+	if level.map_has_object_spot(id, "ui_pda2_mechanic_location") ~= 0 then
+		return
+	end
+	if db.actor and npc:general_goodwill(db.actor) > -1000 then
+		level.map_add_object_spot(id, "ui_pda2_mechanic_location", "st_ui_pda_legend_mechanic")
+	end
+end
+
+local function install()
+	if type(trade_manager) == "table" and type(trade_manager.trade_init) == "function" then
+		if trade_manager.trade_init ~= patched_trade_init then
+			orig_trade_init = orig_trade_init or trade_manager.trade_init
+			trade_manager.trade_init = patched_trade_init
+		end
+	else
+		printf(LOG_TAG .. " trade_manager.trade_init not found")
+	end
+
+	if type(trade_manager) == "table" and type(trade_manager.update) == "function" then
+		if trade_manager.update ~= patched_update then
+			orig_update = orig_update or trade_manager.update
+			trade_manager.update = patched_update
+		end
+	else
+		printf(LOG_TAG .. " trade_manager.update not found")
+	end
+
+	if type(stalker_generic) == "table" and type(stalker_generic.reset_show_spot) == "function" then
+		if stalker_generic.reset_show_spot ~= patched_reset_show_spot then
+			orig_reset_show_spot = orig_reset_show_spot or stalker_generic.reset_show_spot
+			stalker_generic.reset_show_spot = patched_reset_show_spot
+		end
+	else
+		printf(LOG_TAG .. " stalker_generic.reset_show_spot not found")
+	end
+end
+
+local function uninstall()
+	if orig_trade_init and type(trade_manager) == "table" then
+		trade_manager.trade_init = orig_trade_init
+	end
+	if orig_update and type(trade_manager) == "table" then
+		trade_manager.update = orig_update
+	end
+	if orig_reset_show_spot and type(stalker_generic) == "table" then
+		stalker_generic.reset_show_spot = orig_reset_show_spot
+	end
+end
+
+function on_game_start()
+	install()
+end
+
+function on_game_end()
+	uninstall()
+end
