@@ -1,0 +1,286 @@
+-- WTF / PDA Taskboard Macro Guard
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- A malformed WTF text macro can throw "attempt to index a nil value" from
+-- Macro.resolve / resolve_and_link_cache while the PDA taskboard refreshes.
+-- WTF already wraps try_prepare_quest in igi_helper.pcall (coroutine resume).
+-- That wrapper does not always catch loadstring eval errors in this engine, so
+-- one bad generated candidate aborts refresh_tasks for every nearby NPC.
+--
+-- This addon does not replace WTF or Taskboard files. It wraps the public
+-- entry points with the engine pcall and rejects only the broken candidate.
+
+local LOG_TAG = "[fix_wtf_taskboard_guard]"
+local VERSION = "1.0.0"
+
+local orig = {}
+local installed = false
+local logged_task = {}
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function reset_log_cache()
+	logged_task = {}
+end
+
+local function fmt_quest(cache)
+	if type(cache) ~= "table" then
+		return "<no-cache>"
+	end
+	if cache.task_id then
+		return tostring(cache.task_id)
+	end
+	local q = cache.quest_id
+	if type(q) == "table" then
+		return tostring(q[1]) .. "/" .. tostring(q[2])
+	end
+	return tostring(q or cache.id or "<unknown>")
+end
+
+local function fmt_entity(link_context)
+	local current = link_context and link_context.this
+	if type(current) ~= "table" then
+		return "<cache>"
+	end
+	return tostring(current.link_id or current.id or current.section or current.name or "<entity>")
+end
+
+local function macro_context(self, link_context, err)
+	local cache = link_context and link_context.CACHE
+	local expr = "<n/a>"
+	if self and type(self._without_links) == "function" then
+		local ok, out = pcall(self._without_links, self)
+		if ok then
+			expr = tostring(out)
+		end
+	end
+	return "quest=" .. fmt_quest(cache)
+		.. "; entity=" .. fmt_entity(link_context)
+		.. "; macro=" .. tostring(self and self.orig)
+		.. "; expression=" .. expr
+		.. "; error=" .. tostring(err)
+end
+
+local function log_task_once(task_id, reason, detail)
+	local key = tostring(task_id or reason)
+	if logged_task[key] then
+		return
+	end
+	logged_task[key] = true
+	log("%s task_id=%s %s", tostring(reason), tostring(task_id), tostring(detail or ""))
+end
+
+-- Shallow dup_table in finalize_task_cache shares nested entity tables with
+-- the JSON template. A thrown @$ expansion would leave that template dirty.
+local function dup_deep(value, seen)
+	if type(value) ~= "table" then
+		return value
+	end
+	seen = seen or {}
+	if seen[value] then
+		return seen[value]
+	end
+	local copy = {}
+	seen[value] = copy
+	for k, v in pairs(value) do
+		copy[k] = dup_deep(v, seen)
+	end
+	return copy
+end
+
+local function patched_macro_resolve(self, link_context)
+	local ok, out = pcall(orig.macro_resolve, self, link_context)
+	if not ok then
+		error(macro_context(self, link_context, out))
+	end
+	return out
+end
+
+local function patched_try_prepare_quest(task_id, task_data, tg_id)
+	local data = task_data
+	if type(task_data) == "table" then
+		data = dup_deep(task_data)
+	end
+	local ok, out = pcall(orig.try_prepare_quest, task_id, data, tg_id)
+	if not ok then
+		log_task_once(task_id, "Rejected generated task", out)
+		return nil
+	end
+	return out
+end
+
+-- igi_task_manager keeps a load-time snapshot of try_prepare_quest in a local
+-- Igi table. Wrapping igi_generic_task.try_prepare_quest does not affect
+-- is_valid_quest; wrap is_valid_quest itself.
+local function patched_is_valid_quest(tg_id, task_data, task_id)
+	local data = task_data
+	if type(task_data) == "table" then
+		data = dup_deep(task_data)
+	end
+	local ok, out = pcall(orig.is_valid_quest, tg_id, data, task_id)
+	if not ok then
+		log_task_once(task_id, "Rejected generated task", out)
+		return false
+	end
+	return out
+end
+
+local function patched_generate_available_tasks(npc, is_sim)
+	local ok, err = pcall(orig.generate_available_tasks, npc, is_sim)
+	if not ok then
+		local id, section = "<nil>", "<nil>"
+		if npc then
+			local ok_id, npc_id = pcall(function()
+				return npc:id()
+			end)
+			local ok_sec, npc_sec = pcall(function()
+				return npc:section()
+			end)
+			if ok_id then
+				id = tostring(npc_id)
+			end
+			if ok_sec then
+				section = tostring(npc_sec)
+			end
+		end
+		log("Skipped NPC after generation error: id=%s section=%s error=%s", id, section, tostring(err))
+		return
+	end
+	return err
+end
+
+local function patched_prepare_task(task_data)
+	local ok, err = pcall(orig.prepare_task, task_data)
+	if not ok then
+		local task_id = task_data and task_data.task_id or "<unknown>"
+		log_task_once(task_id, "prepare_task failed", err)
+	end
+end
+
+local function patched_refresh_tasks()
+	local ok, err = pcall(orig.refresh_tasks)
+	if not ok then
+		log("refresh_tasks aborted: %s", tostring(err))
+	end
+end
+
+local function wrap(slot, owner, name, patched)
+	if type(owner) ~= "table" or type(owner[name]) ~= "function" then
+		return false
+	end
+	if owner[name] == patched then
+		return true
+	end
+	orig[slot] = orig[slot] or owner[name]
+	owner[name] = patched
+	return true
+end
+
+local function install()
+	if installed then
+		return true
+	end
+
+	local wrapped = 0
+	local missing = 0
+
+	local function need(ok, label)
+		if ok then
+			wrapped = wrapped + 1
+		else
+			missing = missing + 1
+			log("missing %s", label)
+		end
+	end
+
+	if type(igi_text_processor) == "table" and type(igi_text_processor.Macro) == "table" then
+		need(wrap("macro_resolve", igi_text_processor.Macro, "resolve", patched_macro_resolve), "igi_text_processor.Macro.resolve")
+	else
+		missing = missing + 1
+		log("missing igi_text_processor.Macro")
+	end
+
+	if type(igi_generic_task) == "table" then
+		need(wrap("try_prepare_quest", igi_generic_task, "try_prepare_quest", patched_try_prepare_quest), "igi_generic_task.try_prepare_quest")
+	else
+		missing = missing + 1
+		log("missing igi_generic_task")
+	end
+
+	if type(igi_task_manager) == "table" then
+		need(wrap("is_valid_quest", igi_task_manager, "is_valid_quest", patched_is_valid_quest), "igi_task_manager.is_valid_quest")
+	else
+		missing = missing + 1
+		log("missing igi_task_manager")
+	end
+
+	if type(axr_task_manager) == "table" then
+		need(wrap("generate_available_tasks", axr_task_manager, "generate_available_tasks", patched_generate_available_tasks), "axr_task_manager.generate_available_tasks")
+	else
+		missing = missing + 1
+		log("missing axr_task_manager")
+	end
+
+	if type(pda_taskboard) == "table" then
+		need(wrap("refresh_tasks", pda_taskboard, "refresh_tasks", patched_refresh_tasks), "pda_taskboard.refresh_tasks")
+		if type(pda_taskboard.prepare_task) == "function" then
+			need(wrap("prepare_task", pda_taskboard, "prepare_task", patched_prepare_task), "pda_taskboard.prepare_task")
+		end
+	else
+		log("pda_taskboard not found - NPC generate guard still active")
+	end
+
+	installed = wrapped > 0
+	log("loaded v%s wrapped=%s missing=%s", VERSION, tostring(wrapped), tostring(missing))
+	return installed
+end
+
+local function uninstall()
+	if type(igi_text_processor) == "table" and type(igi_text_processor.Macro) == "table" and orig.macro_resolve then
+		igi_text_processor.Macro.resolve = orig.macro_resolve
+	end
+	if type(igi_generic_task) == "table" and orig.try_prepare_quest then
+		igi_generic_task.try_prepare_quest = orig.try_prepare_quest
+	end
+	if type(igi_task_manager) == "table" and orig.is_valid_quest then
+		igi_task_manager.is_valid_quest = orig.is_valid_quest
+	end
+	if type(axr_task_manager) == "table" and orig.generate_available_tasks then
+		axr_task_manager.generate_available_tasks = orig.generate_available_tasks
+	end
+	if type(pda_taskboard) == "table" then
+		if orig.refresh_tasks then
+			pda_taskboard.refresh_tasks = orig.refresh_tasks
+		end
+		if orig.prepare_task then
+			pda_taskboard.prepare_task = orig.prepare_task
+		end
+	end
+	orig = {}
+	installed = false
+	reset_log_cache()
+end
+
+function on_game_load()
+	reset_log_cache()
+end
+
+local callbacks_registered = false
+
+function on_game_start()
+	install()
+	if not callbacks_registered then
+		RegisterScriptCallback("on_game_load", on_game_load)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		callbacks_registered = false
+	end
+	uninstall()
+end
