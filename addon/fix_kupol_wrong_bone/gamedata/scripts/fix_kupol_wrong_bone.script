@@ -1,0 +1,260 @@
+-- Kupol Wrong Fixed Bone Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Entering az_radar (Kupol outskirts) fatals in P_build_Shell:
+--   PhysicsShell.cpp:150
+--   wrong fixed bone
+--
+-- Culprit (binary isolation, ZIP v1.0.0):
+--   name        = cit_physic_object_0014
+--   section     = physic_object   (class O_PHYSIC, not O_PHYS_S)
+--   visual      = dynamics\dead_body\skelet_combine_pose_02
+--   fixed_bones = link
+--
+-- "link" is the default pin bone for crates/static meshes. This visual is a
+-- dead-body skeleton (bip01), so the engine cannot bind that bone.
+-- The value lives in the alife STATE packet (all.spawn / save), not in LTX:
+-- DLTX on [physic_object] would hit every physic object; all.spawn is forbidden.
+-- No story_id, alife():object() is by numeric id only.
+--
+-- ZIP v1.0.0 scanned ids 1..65534 on every first_update and every level
+-- change, used a zzzz filename, skipped the patch if already on az_radar
+-- (object can still be offline until switch_distance), and never unregistered.
+-- This addon writes the packet once per load, then stops.
+
+local LOG_TAG = "[fix_kupol_wrong_bone]"
+local VERSION = "1.0.0"
+
+local TARGET_LEVEL = "az_radar"
+local TARGET_NAME = "cit_physic_object_0014"
+local TARGET_VISUAL = "dynamics\\dead_body\\skelet_combine_pose_02"
+local TARGET_FIXED = "link"
+local MAX_ALIFE_ID = 65534
+
+local callbacks_registered = false
+local patched_this_load = false
+local cached_id = nil
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function get_sim()
+	if type(alife) ~= "function" then
+		return nil
+	end
+	local ok, sim = pcall(alife)
+	return ok and sim or nil
+end
+
+local function object_name(se_obj)
+	if not se_obj then
+		return nil
+	end
+	local ok, name = pcall(function()
+		return se_obj:name()
+	end)
+	return ok and name or nil
+end
+
+local function object_id(se_obj)
+	if not se_obj then
+		return nil
+	end
+	if type(se_obj.id) == "function" then
+		local ok, id = pcall(function()
+			return se_obj:id()
+		end)
+		return ok and id or nil
+	end
+	return se_obj.id
+end
+
+local function object_level(sim, se_obj)
+	if not (sim and se_obj and se_obj.m_game_vertex_id) then
+		return nil
+	end
+	local ok, name = pcall(function()
+		local gg = game_graph()
+		local gv = gg:vertex(se_obj.m_game_vertex_id)
+		if not gv then
+			return nil
+		end
+		return sim:level_name(gv:level_id())
+	end)
+	return ok and name or nil
+end
+
+local function se_by_id(sim, id)
+	if not (sim and id) then
+		return nil
+	end
+	local ok, se_obj = pcall(function()
+		return sim:object(id)
+	end)
+	return ok and se_obj or nil
+end
+
+-- Returns:
+--   true  — this object is handled (patched, already empty, or skipped as
+--           a different signature). Caller must not keep searching.
+--   false — not the target / not ready; keep looking.
+local function try_fix_object(se_obj, reason)
+	if patched_this_load or object_name(se_obj) ~= TARGET_NAME then
+		return false
+	end
+
+	local sim = get_sim()
+	if object_level(sim, se_obj) ~= TARGET_LEVEL then
+		return false
+	end
+
+	cached_id = object_id(se_obj)
+
+	if not (utils_stpk and type(utils_stpk.get_physic_data) == "function" and type(utils_stpk.set_physic_data) == "function") then
+		log("ERROR utils_stpk physic helpers missing reason=%s", tostring(reason))
+		return true
+	end
+
+	local ok_get, data = pcall(function()
+		return utils_stpk.get_physic_data(se_obj)
+	end)
+	if not (ok_get and data) then
+		log("ERROR get_physic_data failed id=%s reason=%s", tostring(cached_id), tostring(reason))
+		return true
+	end
+
+	local visual = data.visual_name or ""
+	local fixed = data.fixed_bones or ""
+
+	if visual ~= TARGET_VISUAL then
+		log(
+			"SKIP visual mismatch id=%s visual=%s expected=%s fixed_bones=%s",
+			tostring(cached_id),
+			tostring(visual),
+			TARGET_VISUAL,
+			tostring(fixed)
+		)
+		patched_this_load = true
+		return true
+	end
+
+	if fixed == "" then
+		patched_this_load = true
+		log("already clear id=%s reason=%s", tostring(cached_id), tostring(reason))
+		return true
+	end
+
+	if fixed ~= TARGET_FIXED then
+		log(
+			"SKIP fixed_bones mismatch id=%s visual=%s fixed_bones=%s expected=%s",
+			tostring(cached_id),
+			tostring(visual),
+			tostring(fixed),
+			TARGET_FIXED
+		)
+		patched_this_load = true
+		return true
+	end
+
+	data.fixed_bones = ""
+	local ok_set, set_err = pcall(function()
+		utils_stpk.set_physic_data(data, se_obj)
+	end)
+	if not ok_set then
+		log("ERROR set_physic_data failed id=%s err=%s", tostring(cached_id), tostring(set_err))
+		return true
+	end
+
+	local ok_verify, verify = pcall(function()
+		return utils_stpk.get_physic_data(se_obj)
+	end)
+	if ok_verify and verify and (verify.fixed_bones or "") == "" then
+		patched_this_load = true
+		log("cleared fixed_bones id=%s reason=%s", tostring(cached_id), tostring(reason))
+	else
+		log("ERROR verify failed id=%s reason=%s", tostring(cached_id), tostring(reason))
+	end
+	return true
+end
+
+local function scan_alife(reason)
+	if patched_this_load then
+		return true
+	end
+
+	local sim = get_sim()
+	if not sim then
+		log("ALife unavailable reason=%s", tostring(reason))
+		return false
+	end
+
+	if cached_id then
+		if try_fix_object(se_by_id(sim, cached_id), reason .. "_cached") then
+			return patched_this_load
+		end
+		cached_id = nil
+	end
+
+	for id = 1, MAX_ALIFE_ID do
+		if try_fix_object(se_by_id(sim, id), reason) then
+			return patched_this_load
+		end
+	end
+
+	log("target not in ALife yet reason=%s", tostring(reason))
+	return false
+end
+
+function server_entity_on_register(se_obj, type_name)
+	if patched_this_load then
+		return
+	end
+	if type_name == "se_physic" then
+		try_fix_object(se_obj, "server_entity_on_register")
+	end
+end
+
+function actor_on_first_update()
+	scan_alife("actor_on_first_update")
+end
+
+function on_before_level_changing()
+	scan_alife("on_before_level_changing")
+end
+
+function on_level_changing()
+	scan_alife("on_level_changing")
+end
+
+function on_game_load()
+	patched_this_load = false
+	cached_id = nil
+end
+
+function on_game_start()
+	if callbacks_registered then
+		return
+	end
+	RegisterScriptCallback("server_entity_on_register", server_entity_on_register)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("on_before_level_changing", on_before_level_changing)
+	RegisterScriptCallback("on_level_changing", on_level_changing)
+	RegisterScriptCallback("on_game_load", on_game_load)
+	callbacks_registered = true
+	log("loaded v%s target=%s level=%s", VERSION, TARGET_NAME, TARGET_LEVEL)
+end
+
+function on_game_end()
+	if not callbacks_registered then
+		return
+	end
+	UnregisterScriptCallback("server_entity_on_register", server_entity_on_register)
+	UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	UnregisterScriptCallback("on_before_level_changing", on_before_level_changing)
+	UnregisterScriptCallback("on_level_changing", on_level_changing)
+	UnregisterScriptCallback("on_game_load", on_game_load)
+	callbacks_registered = false
+	patched_this_load = false
+	cached_id = nil
+end
