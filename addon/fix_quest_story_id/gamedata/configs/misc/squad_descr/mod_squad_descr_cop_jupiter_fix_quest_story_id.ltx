@@ -1,0 +1,6 @@
+; Quest Story ID Collision Fix — patch squad_descr_cop_jupiter.ltx
+; Why: jup_a9_dogs_normal is recreated by create_squad; a fixed story_id collides
+;      on every respawn. Respawn logic uses squad_exist / create_squad, not story_id.
+
+![jup_a9_dogs_normal]
+!story_id

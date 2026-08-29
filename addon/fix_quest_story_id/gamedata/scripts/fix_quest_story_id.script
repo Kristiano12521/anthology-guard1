@@ -1,0 +1,339 @@
+-- Quest Story ID Collision Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- story_objects.register keeps the first owner of a story_id and drops the rest.
+-- Anthology reuses a few ids across NPC vs squad, item vs restrictor, and two
+-- oasis hearts. Task markers then point at the wrong object.
+--
+-- Config collisions are stripped by DLTX. Spawn-ini collisions cannot be
+-- patched without replacing all.spawn, so register() prefers the object that
+-- quests actually look up. Does not rewind NPC XR logic.
+
+local LOG_TAG = "[fix_quest_story_id]"
+local VERSION = "1.0.0"
+local TASK_ID_LEVSHA = "yan_quest_levsha"
+local LEVSHA_SECTION = "yan_stalker_levsha"
+local EVENT_ID = "fix_quest_story_id"
+local REPAIR_ACTION = "levsha_task"
+local REPAIR_DELAY = 1.0
+local REPAIR_MAX_ATTEMPTS = 10
+
+local orig_register = nil
+local callbacks_registered = false
+local repair_attempts = 0
+local logged = {}
+
+-- Incoming object must match this to win a colliding story_id.
+local preference = {
+	jup_b16_oasis_artifact = {name = "jup_af_oasis_heart"},
+	main_story_19_aver_documents = {section = "main_story_19_aver_documents"},
+	main_story_14_sci_documents = {section = "main_story_14_sci_documents"},
+	main_story_16_kas_documents = {section = "main_story_16_kas_documents"},
+	main_story_17_country_documents = {section = "main_story_17_country_documents"},
+	main_story_18_los_documents = {section = "main_story_18_los_documents"},
+	yan_stalker_levsha = {section = LEVSHA_SECTION},
+	esc_village_zona_quest = {name = "esc_village_zona_quest_0000"},
+	esc_zone_atp_all = {name = "esc_zone_atp_all"},
+	labx5_lamp_118 = {name = "labx5_lamp_118_galogen_1_glass"},
+}
+
+-- Repeated squads: keep the first live owner, do not spam vanilla warnings.
+local keep_first = {
+	jup_a9_dogs_normal = true,
+}
+
+-- Five identical Spectrum devices; quest code never looks these ids up.
+local suppress = {
+	bar_a2_spec_juk_item_1_id = true,
+	bar_a2_spec_juk_item_2_id = true,
+}
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function log_once(key, fmt, ...)
+	if logged[key] then
+		return
+	end
+	logged[key] = true
+	log(fmt, ...)
+end
+
+local function get_alife_object(obj_id)
+	if type(obj_id) ~= "number" then
+		return nil
+	end
+	local sim = alife()
+	if not sim then
+		return nil
+	end
+	local ok, obj = pcall(function()
+		return sim:object(obj_id)
+	end)
+	return ok and obj or nil
+end
+
+local function object_matches(obj_id, rule)
+	local obj = get_alife_object(obj_id)
+	if not obj then
+		return false
+	end
+	if rule.section then
+		local ok, section = pcall(function()
+			return obj:section_name()
+		end)
+		if not ok or section ~= rule.section then
+			return false
+		end
+	end
+	if rule.name then
+		local ok, name = pcall(function()
+			return obj:name()
+		end)
+		if not ok or name ~= rule.name then
+			return false
+		end
+	end
+	return true
+end
+
+local function patched_register(obj_id, story_id)
+	if suppress[story_id] then
+		log_once("suppress:" .. tostring(story_id), "suppressed unused story_id %s", story_id)
+		return
+	end
+
+	local by_story = story_objects.object_id_by_story_id
+	local by_object = story_objects.story_id_by_object_id
+	local current_id = type(by_story) == "table" and by_story[story_id] or nil
+
+	if current_id and current_id ~= obj_id then
+		local rule = preference[story_id]
+		if rule then
+			local current_preferred = object_matches(current_id, rule)
+			local incoming_preferred = object_matches(obj_id, rule)
+
+			if incoming_preferred and not current_preferred then
+				if type(by_object) == "table" then
+					by_object[current_id] = nil
+					by_object[obj_id] = story_id
+				end
+				by_story[story_id] = obj_id
+				log_once(
+					"replace:" .. tostring(story_id),
+					"selected object %s for story_id %s (replaced %s)",
+					obj_id, story_id, current_id
+				)
+				return
+			end
+
+			if current_preferred then
+				log_once(
+					"keep:" .. tostring(story_id),
+					"ignored duplicate object %s for story_id %s",
+					obj_id, story_id
+				)
+				return
+			end
+		elseif keep_first[story_id] then
+			log_once(
+				"first:" .. tostring(story_id),
+				"kept first object %s for repeated story_id %s",
+				current_id, story_id
+			)
+			return
+		end
+	end
+
+	if type(orig_register) ~= "function" then
+		return
+	end
+	return orig_register(obj_id, story_id)
+end
+
+local function install()
+	if not story_objects or type(story_objects.register) ~= "function" then
+		log("story_objects.register is not ready")
+		return false
+	end
+	if story_objects.register == patched_register then
+		return true
+	end
+	-- Already wrapped once. A later mod may have wrapped us; calling
+	-- register() again here would recurse (their wrap -> ours -> theirs).
+	if orig_register then
+		return true
+	end
+	orig_register = story_objects.register
+	story_objects.register = patched_register
+	log("v%s register() wrapped", VERSION)
+	return true
+end
+
+local function uninstall()
+	if orig_register and type(story_objects) == "table" and story_objects.register == patched_register then
+		story_objects.register = orig_register
+	end
+	orig_register = nil
+end
+
+local function get_task_record(task_id)
+	if not task_manager or type(task_manager.get_task_manager) ~= "function" then
+		return nil, "retry"
+	end
+	local ok, manager = pcall(function()
+		return task_manager.get_task_manager()
+	end)
+	if not ok or not manager or type(manager.task_info) ~= "table" then
+		return nil, "retry"
+	end
+	return manager.task_info[task_id], "ready"
+end
+
+local function update_task_marker(task_record, target_id)
+	if not db.actor then
+		return false
+	end
+	local game_task = task_record.t
+	if not game_task then
+		local ok, result = pcall(function()
+			return db.actor:get_task(TASK_ID_LEVSHA, true)
+		end)
+		if ok then
+			game_task = result
+		end
+	end
+	if not game_task then
+		return false
+	end
+	task_record.t = game_task
+	if task_record.spot then
+		local ok = pcall(function()
+			game_task:change_map_location(task_record.spot, target_id)
+		end)
+		if ok then
+			return true
+		end
+	end
+	local ok = pcall(function()
+		game_task:set_map_object_id(target_id)
+	end)
+	return ok
+end
+
+local function preferred_levsha_id()
+	local registered_id = type(get_story_object_id) == "function" and get_story_object_id(LEVSHA_SECTION) or nil
+	if registered_id and object_matches(registered_id, preference.yan_stalker_levsha) then
+		return registered_id
+	end
+	if story_objects and type(story_objects.object_id_by_story_id) == "table" then
+		local id = story_objects.object_id_by_story_id[LEVSHA_SECTION]
+		if id and object_matches(id, preference.yan_stalker_levsha) then
+			return id
+		end
+	end
+	return nil
+end
+
+function try_repair_levsha_task()
+	install()
+
+	local task_record, state = get_task_record(TASK_ID_LEVSHA)
+	if state ~= "ready" then
+		return false
+	end
+	if not task_record then
+		return true
+	end
+
+	local levsha_id = preferred_levsha_id()
+	if not levsha_id then
+		return false
+	end
+
+	local old_target = task_record.current_target
+	if old_target == levsha_id then
+		return true
+	end
+
+	local old_obj = get_alife_object(old_target)
+	if old_obj then
+		local ok, old_section = pcall(function()
+			return old_obj:section_name()
+		end)
+		if ok and old_section == LEVSHA_SECTION then
+			return true
+		end
+	end
+
+	task_record.current_target = levsha_id
+	local marker_updated = update_task_marker(task_record, levsha_id)
+	log(
+		"repaired yan_quest_levsha target: %s -> %s, marker_updated=%s",
+		tostring(old_target), levsha_id, tostring(marker_updated)
+	)
+	return true
+end
+
+function repair_levsha_task_tick()
+	repair_attempts = repair_attempts + 1
+	if try_repair_levsha_task() then
+		return true
+	end
+	if repair_attempts >= REPAIR_MAX_ATTEMPTS then
+		log("Levsha task repair was not completed after %s attempts", repair_attempts)
+		return true
+	end
+	if type(CreateTimeEvent) == "function" then
+		CreateTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY, repair_levsha_task_tick)
+	end
+	return true
+end
+
+local function schedule_levsha_repair()
+	repair_attempts = 0
+	if type(RemoveTimeEvent) == "function" then
+		pcall(RemoveTimeEvent, EVENT_ID, REPAIR_ACTION)
+	end
+	if type(CreateTimeEvent) == "function" then
+		CreateTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY, repair_levsha_task_tick)
+	else
+		try_repair_levsha_task()
+	end
+end
+
+function actor_on_first_update()
+	install()
+	schedule_levsha_repair()
+end
+
+function on_game_load()
+	logged = {}
+	repair_attempts = 0
+end
+
+function on_game_start()
+	install()
+	if callbacks_registered then
+		return
+	end
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("on_game_load", on_game_load)
+	callbacks_registered = true
+	log("loaded v%s", VERSION)
+end
+
+function on_game_end()
+	if type(RemoveTimeEvent) == "function" then
+		pcall(RemoveTimeEvent, EVENT_ID, REPAIR_ACTION)
+	end
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		callbacks_registered = false
+	end
+	uninstall()
+	logged = {}
+	repair_attempts = 0
+end

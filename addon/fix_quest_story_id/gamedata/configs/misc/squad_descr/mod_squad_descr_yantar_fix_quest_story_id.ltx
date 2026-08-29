@@ -1,0 +1,6 @@
+; Quest Story ID Collision Fix — patch squad_descr_yantar.ltx
+; Why: squad yan_stalker_levsha_true shared story_id with NPC yan_stalker_levsha.
+;      Task yan_quest_levsha target then resolved to the offline group, not the stalker.
+
+![yan_stalker_levsha_true]
+!story_id
