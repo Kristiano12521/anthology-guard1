@@ -1,0 +1,8 @@
+; Fallstation Joker door — patch flst_roll_entrance_logic.ltx
+; Why: sr_idle@wait only listens for the outside call button.
+;      After @exit_2 -> @init the controller is back in @wait while the
+;      player can still talk to the guard and get flst_j1_dialog_ohr_open_ze_dver.
+;      Same transition as stock [sr_idle@lab_10].
+
+![sr_idle@wait]
+on_info2 = {+flst_j1_dialog_ohr_open_ze_dver} sr_idle@exit_1 %=anim_obj_forward(flst_roll_door) +flst_roll_enter_door_locked +flst_j1_guard_say_bye%
