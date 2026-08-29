@@ -1,0 +1,295 @@
+-- Noosphere Voice X18 Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- dar_control_poltergeist never registered exclusive jobs for LTTZ Dark
+-- Presence apparitions. They die as generic NPCs, so *_despawn is not given
+-- and lttz_dp_noosphere_voice stays on text5 after Eidolon.
+--
+-- Exclusive jobs are restored by DLTX. This script covers one-shot kills
+-- that skip health_le, and saves already stuck after a kill. Does not
+-- replace task_status_functor or the apparition logic files.
+
+local LOG_TAG = "[fix_noosphere_voice_x18]"
+local VERSION = "1.0.0"
+local EVENT_ID = "fix_noosphere_voice_x18"
+local REPAIR_ACTION = "recover"
+local REPAIR_DELAY = 5.0
+local REPAIR_RETRY = 2.0
+local MISSING_CONFIRMS = 4
+local REPAIR_MAX_ATTEMPTS = 12
+
+local callbacks_registered = false
+local repair_attempts = 0
+local missing_checks = {}
+
+local stages = {
+	{
+		spawn = "stalker_stitch_zombied_spawn",
+		story = "stalker_stitch_zombied",
+		done = "stalker_stitch_zombied_despawn",
+	},
+	{
+		spawn = "stalker_rogue_monolith_spawn",
+		story = "stalker_rogue_monolith",
+		done = "stalker_rogue_monolith_despawn",
+	},
+	{
+		spawn = "army_degtyarev_dark_spawn",
+		story = "army_degtyarev_dark",
+		done = "army_degtyarev_dark_despawn",
+	},
+	{
+		spawn = "stalker_strelok_dark_spawn",
+		story = "stalker_strelok_dark",
+		done = "stalker_strelok_dark_despawn",
+	},
+	{
+		spawn = "monolith_eidolon_ghost_spawn",
+		story = "monolith_eidolon_ghost",
+		done = "monolith_eidolon_ghost_despawn",
+	},
+	{
+		spawn = "greh_sabaoth_ghost_squad_spawn",
+		story = "greh_sabaoth_ghost",
+		done = "greh_sabaoth_ghost_despawn",
+	},
+	{
+		spawn = "x18_dark_presence_final_squad_spawn",
+		story = "x18_dark_presence_final",
+		done = "x18_dark_presence_final_dead",
+	},
+}
+
+local death_flags = {
+	stalker_stitch_zombied = {
+		spawn = "stalker_stitch_zombied_spawn",
+		done = "stalker_stitch_zombied_despawn",
+	},
+	stalker_rogue_monolith = {
+		spawn = "stalker_rogue_monolith_spawn",
+		done = "stalker_rogue_monolith_despawn",
+	},
+	army_degtyarev_dark = {
+		spawn = "army_degtyarev_dark_spawn",
+		done = "army_degtyarev_dark_despawn",
+	},
+	stalker_strelok_dark = {
+		spawn = "stalker_strelok_dark_spawn",
+		done = "stalker_strelok_dark_despawn",
+	},
+	monolith_eidolon_ghost = {
+		spawn = "monolith_eidolon_ghost_spawn",
+		done = "monolith_eidolon_ghost_despawn",
+	},
+	greh_sabaoth_ghost = {
+		spawn = "greh_sabaoth_ghost_squad_spawn",
+		done = "greh_sabaoth_ghost_despawn",
+	},
+}
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function give_info_once(info, reason)
+	if not info or has_alife_info(info) then
+		return false
+	end
+	give_info(info)
+	log("%s -> +%s", tostring(reason or "repair"), tostring(info))
+	return true
+end
+
+local function current_level_is_x18()
+	return level.name() == "l04u_labx18"
+end
+
+local function quest_is_repairable()
+	return db.actor
+		and current_level_is_x18()
+		and has_alife_info("lttz_dp_active")
+		and has_alife_info("x18_dark_presence_dialog")
+		and not has_alife_info("lttz_dp_noosphere_voice_complete")
+		and not has_alife_info("x18_dark_presence_final_dead")
+end
+
+local function object_alive_by_id(id)
+	id = tonumber(id)
+	if not id then
+		return nil
+	end
+
+	local se_obj = alife_object(id)
+	if se_obj then
+		local ok, alive = pcall(function()
+			return se_obj:alive()
+		end)
+		if ok then
+			return alive == true
+		end
+	end
+
+	local obj = level.object_by_id(id)
+	if obj then
+		local ok, alive = pcall(function()
+			return obj:alive()
+		end)
+		if ok then
+			return alive == true
+		end
+	end
+
+	return nil
+end
+
+-- Returns: "missing", "empty", "alive", "dead", or "unknown".
+local function squad_state(story_id)
+	local squad = get_story_squad(story_id)
+	if not squad then
+		return "missing"
+	end
+
+	local count = squad:npc_count()
+	if count == 0 then
+		return "empty"
+	end
+
+	local checked = 0
+	local alive_found = false
+	local ok = pcall(function()
+		for member in squad:squad_members() do
+			local alive = object_alive_by_id(member.id)
+			if alive ~= nil then
+				checked = checked + 1
+				if alive then
+					alive_found = true
+					break
+				end
+			end
+		end
+	end)
+
+	if not ok then
+		return "unknown"
+	end
+	if alive_found then
+		return "alive"
+	end
+	if checked > 0 then
+		return "dead"
+	end
+	return "unknown"
+end
+
+local function recover_stage(stage)
+	if not has_alife_info(stage.spawn) or has_alife_info(stage.done) then
+		missing_checks[stage.story] = 0
+		return "skip"
+	end
+
+	local status = squad_state(stage.story)
+	if status == "alive" or status == "unknown" then
+		missing_checks[stage.story] = 0
+		return "ok"
+	end
+
+	if status == "missing" then
+		local misses = (missing_checks[stage.story] or 0) + 1
+		missing_checks[stage.story] = misses
+		if misses < MISSING_CONFIRMS then
+			return "wait"
+		end
+	else
+		missing_checks[stage.story] = 0
+	end
+
+	give_info_once(
+		stage.done,
+		string.format("RECOVERY story=%s state=%s", tostring(stage.story), tostring(status))
+	)
+	return "repaired"
+end
+
+function recover_tick()
+	repair_attempts = repair_attempts + 1
+	if not quest_is_repairable() then
+		return true
+	end
+
+	-- Only the first unresolved spawned stage. Prevents skipping a living
+	-- apparition or advancing several stages in one event.
+	for _, stage in ipairs(stages) do
+		if has_alife_info(stage.spawn) and not has_alife_info(stage.done) then
+			local result = recover_stage(stage)
+			if result == "wait" and repair_attempts < REPAIR_MAX_ATTEMPTS then
+				ResetTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_RETRY)
+				return false
+			end
+			return true
+		end
+	end
+
+	return true
+end
+
+local function cancel_recovery()
+	RemoveTimeEvent(EVENT_ID, REPAIR_ACTION)
+	repair_attempts = 0
+	missing_checks = {}
+end
+
+local function schedule_recovery()
+	cancel_recovery()
+	if not quest_is_repairable() then
+		return
+	end
+	CreateTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY, recover_tick)
+end
+
+function actor_on_first_update()
+	schedule_recovery()
+end
+
+function on_game_load()
+	repair_attempts = 0
+	missing_checks = {}
+end
+
+function npc_on_death_callback(victim, killer)
+	if not (victim and quest_is_repairable()) then
+		return
+	end
+
+	local ok, section = pcall(function()
+		return victim:section()
+	end)
+	if not (ok and section) then
+		return
+	end
+
+	local flags = death_flags[section]
+	if flags and has_alife_info(flags.spawn) and not has_alife_info(flags.done) then
+		give_info_once(flags.done, "DEATH FALLBACK section=" .. tostring(section))
+	end
+end
+
+function on_game_start()
+	if callbacks_registered then
+		return
+	end
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("on_game_load", on_game_load)
+	RegisterScriptCallback("npc_on_death_callback", npc_on_death_callback)
+	callbacks_registered = true
+	log("loaded v%s", VERSION)
+end
+
+function on_game_end()
+	cancel_recovery()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		UnregisterScriptCallback("npc_on_death_callback", npc_on_death_callback)
+		callbacks_registered = false
+	end
+end
