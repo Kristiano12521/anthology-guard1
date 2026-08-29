@@ -1,0 +1,11 @@
+; Church guard vs Assistant — patch scf_cerkov_stalker_6.ltx
+; Why: combat_ignore only skipped the actor; parent on_info6 is not
+;      enumerated on the child section.
+
+![walker@ohrannik]
+combat_ignore_cond = true
+combat_ignore_keep_when_attacked = true
+on_info2 = {=actor_enemy} %=actor_neutral%
+
+![walker@stalker_hide]
+on_info2 = {=actor_enemy} %=actor_neutral%

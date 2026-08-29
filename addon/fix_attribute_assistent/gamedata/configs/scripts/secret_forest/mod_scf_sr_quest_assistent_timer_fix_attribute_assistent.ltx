@@ -1,0 +1,6 @@
+; Assistant quest timer — patch scf_sr_quest_assistent_timer.ltx
+; Why: original calls a non-ASCII functor name. Lookup misses the
+;      ported function and xr_logic.script:492 calls nil.
+
+![sr_idle@timer_quest]
+on_info3 = {+scf_actor_obidelsa_na_assistenta_i} sr_idle@nil %=mod_sms_error_task%

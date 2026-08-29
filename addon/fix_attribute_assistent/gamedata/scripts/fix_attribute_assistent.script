@@ -1,0 +1,89 @@
+-- Attribute Assistant: missing SMS functor + church hostility
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- scf_sr_quest_assistent_timer calls xr_effects.mod_sms_error_task
+-- plus a non-ASCII suffix. The ported functor lives under another
+-- encoding of that suffix; xr_logic looks up a different key and
+-- calls nil at xr_logic.script:492.
+--
+-- ZIP v1.0 replaced whole LTX files and used news_manager.send_tip.
+-- This addon keeps the original give_game_news + pda_tips, registers
+-- an ASCII name (and the CP1251 alias), and DLTX-patches only the
+-- fields that were dead or too narrow.
+
+local LOG_TAG = "[fix_attribute_assistent]"
+local VERSION = "1.0.0"
+
+-- CP1251 letter a (0xE0). LTX/script keys must match the byte
+-- the condlist parser actually stored, not a UTF-8 lookalike.
+local KEY_CP1251 = "mod_sms_error_task_" .. string.char(0xE0)
+
+local orig_ascii = nil
+local orig_cp1251 = nil
+local installed = false
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+-- Same body as xr_effects.script attribute-mod block.
+local function send_error_sms(actor, npc)
+	local who = db and db.actor
+	if not who then
+		return
+	end
+	who:give_game_news("st_mod_warning_name", "mod_sms_error_task_text", "ui_xray_error_icon", 0, 6996)
+	if xr_sound and type(xr_sound.set_sound_play) == "function" then
+		xr_sound.set_sound_play(who:id(), "pda_tips")
+	end
+end
+
+local function install()
+	if type(xr_effects) ~= "table" then
+		log("xr_effects missing, functor not installed")
+		return false
+	end
+
+	if xr_effects.mod_sms_error_task ~= send_error_sms then
+		orig_ascii = xr_effects.mod_sms_error_task
+		xr_effects.mod_sms_error_task = send_error_sms
+	end
+
+	if xr_effects[KEY_CP1251] ~= send_error_sms then
+		orig_cp1251 = xr_effects[KEY_CP1251]
+		xr_effects[KEY_CP1251] = send_error_sms
+	end
+
+	installed = true
+	return true
+end
+
+local function uninstall()
+	if type(xr_effects) ~= "table" or not installed then
+		return
+	end
+	if xr_effects.mod_sms_error_task == send_error_sms then
+		xr_effects.mod_sms_error_task = orig_ascii
+	end
+	if xr_effects[KEY_CP1251] == send_error_sms then
+		xr_effects[KEY_CP1251] = orig_cp1251
+	end
+	orig_ascii = nil
+	orig_cp1251 = nil
+	installed = false
+end
+
+-- xr_effects is loaded before user scripts. Install now so a condlist
+-- cannot race on_game_start. on_game_start repeats if a later script
+-- cleared the slot.
+install()
+
+function on_game_start()
+	if install() then
+		log("loaded v%s", VERSION)
+	end
+end
+
+function on_game_end()
+	uninstall()
+end

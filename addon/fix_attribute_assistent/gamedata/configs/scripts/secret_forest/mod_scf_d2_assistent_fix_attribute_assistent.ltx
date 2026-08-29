@@ -1,0 +1,8 @@
+; Darkscape Assistant — patch scf_d2_assistent.ltx
+; Why: same dead parent on_info65 as scf_n1_assistent.
+
+![animpoint@start_cut]
+on_info3 = {=actor_enemy} %=actor_neutral%
+
+![animpoint@sit_to_ass]
+on_info5 = {=actor_enemy} %=actor_neutral%

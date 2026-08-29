@@ -1,0 +1,6 @@
+; Church Assistant — patch scf_n1_assistent.ltx
+; Why: on_info65 on animpoint@generic is not enumerated on the child
+;      section (cfg_get_switch_conditions walks the child's own lines).
+
+![animpoint@start_cut]
+on_info3 = {=actor_enemy} %=actor_neutral%

@@ -1,0 +1,24 @@
+; Church named NPCs — patch scf_n1_main_logic.ltx
+; Why: @def combat_ignore only skipped the actor, so Bes / Lytik / Lexa
+;      fought the Assistant. Parent on_info65 is not enumerated on children.
+
+![walker@def]
+combat_ignore_cond = true
+combat_ignore_keep_when_attacked = true
+
+![animpoint@def]
+combat_ignore_cond = true
+combat_ignore_keep_when_attacked = true
+
+![remark@def]
+combat_ignore_cond = true
+combat_ignore_keep_when_attacked = true
+
+![walker@scf_n1_bes_start]
+on_info2 = {=actor_enemy} %=actor_neutral%
+
+![walker@scf_n1_lytik_start]
+on_info = {=actor_enemy} %=actor_neutral%
+
+![walker@scf_n1_lexa_start]
+on_info3 = {=actor_enemy} %=actor_neutral%

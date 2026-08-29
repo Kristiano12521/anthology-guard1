@@ -1,0 +1,24 @@
+; Church campfire stalkers — patch scf_n1_kosters_logic.ltx
+; Why: sit schemes inherited actor-only combat_ignore; parent on_info65
+;      never ran. Hide-from-surge schemes keep their own condlist.
+
+![walker@def]
+combat_ignore_cond = true
+combat_ignore_keep_when_attacked = true
+
+![animpoint@def]
+combat_ignore_cond = true
+combat_ignore_keep_when_attacked = true
+
+![remark@def]
+combat_ignore_cond = true
+combat_ignore_keep_when_attacked = true
+
+![walker@stalker_1]
+on_info2 = {=actor_enemy} %=actor_neutral%
+
+![walker@stalker_2]
+on_info2 = {=actor_enemy} %=actor_neutral%
+
+![animpoint@stalker_3]
+on_info2 = {=actor_enemy} %=actor_neutral%
