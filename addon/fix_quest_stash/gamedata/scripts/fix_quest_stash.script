@@ -14,11 +14,11 @@
 --
 -- This addon migrates save_var to the type from current task_ini,
 -- rewrites a pending cache string, and wraps the status functor so
--- a leftover old PDA still counts. Does not copy items or wrap
--- treasure_manager.get_random_stash.
+-- a leftover old PDA still counts. Missing 1001-1038 item sections
+-- are restored via DLTX. Does not wrap treasure_manager.get_random_stash.
 
 local LOG_TAG = "[fix_quest_stash]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local EVENT_ID = "fix_quest_stash"
 local REPAIR_ACTION = "migrate"
 local REPAIR_DELAY = 1.0

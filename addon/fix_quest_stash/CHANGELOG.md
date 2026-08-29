@@ -1,5 +1,34 @@
 # Quest Stash Type Migration Fix
 
+## [1.0.1] — 2026-08-30
+
+**Изменено**
+
+- `gamedata/configs/items/items/mod_items_quest_fix_quest_stash.ltx` — DLTX `@[drx_sl_quest_item_1001]`–`1038`: создать секции, если их затёр чужой полный `items_quest.ltx`.
+
+**Причина**
+
+`[QUE] wtf 4_2` кладёт свой `items_quest.ltx` только со слотами 1–3. Сейв хранит `drx_sl_quest_item_1014` / `1023`, движок пишет `Can't create entity`, миграция не может восстановить КПК, `bar_npc_dolg_svayzist_task_4` срывается на загрузке.
+
+**Как исправлено**
+
+Те же поля, что в Anthology `items_quest.ltx`, оператор `@` — не падает, если база уже есть. Скрипт миграции не менялся.
+
+**Не затронуто**
+
+- `fix_quest_stash.script`, `mod_treasure_manager_fix_quest_stash.ltx`
+- общие слоты 1–3, `tasks_stash.script`, `get_random_stash`, `all.spawn`
+
+**Совместимость**
+
+- Сейвы: новая игра не нужна. Грузить слот **до** провала, не сейв после `DRX SL task ended`
+- В MO2 ниже сборки и `[QUE] wtf 4_2`
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_quest_stash`
+- В игре: не прогонялось. Ожидаемый лог: нет `Can't create entity 'drx_sl_quest_item_1014'`, нет `cannot recover ... section missing`
+
 ## [1.0.0] — 2026-08-29
 
 **Изменено**

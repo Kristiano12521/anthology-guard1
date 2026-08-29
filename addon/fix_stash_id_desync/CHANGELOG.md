@@ -1,5 +1,34 @@
 # Stash ID Desync Fix
 
+## [1.0.1] — 2026-08-30
+
+**Изменено**
+
+- `gamedata/scripts/fix_stash_id_desync.script` — `server_entity_on_unregister` больше не зовёт `release_stash_by_id` после `actor_on_net_destroy` / без `db.actor` (teardown на Disconnect).
+
+**Причина**
+
+На выходе из игры alife снимает все `se_invbox`. Хук принимал это за уничтожение ящика и чистил `treasure_manager.caches` (~1500 записей `mar_treasure_*` и дальше). При «сохранить и выйти» пул тайников можно убить.
+
+**Как исправлено**
+
+Флаг живой сессии: `true` с `actor_on_first_update`, `false` с `actor_on_net_destroy` / `on_game_load` / `on_game_end`. Уничтожение ящика в игре по-прежнему идёт в `release_stash_by_id`.
+
+**Не затронуто**
+
+- обёртка `release_stash_by_id`, отложенный repair после загрузки
+- `get_random_stash`, Tosox, `fix_quest_stash`, `all.spawn`
+
+**Совместимость**
+
+- Сейвы: без миграции. Если уже сохранялись после сессии 1.0.0 с wipe на выходе — пул мог похудеть; тогда нужен более ранний сейв
+- В MO2 как раньше
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_stash_id_desync`
+- В игре: не прогонялось. На выходе не должно быть пачки `cleared id=... reason=unregister`
+
 ## [1.0.0] — 2026-08-29
 
 **Изменено**
