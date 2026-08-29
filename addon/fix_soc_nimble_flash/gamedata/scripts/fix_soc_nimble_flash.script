@@ -1,0 +1,138 @@
+-- SoC Nimble Flash Dialog Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Sidorovich's completion branch in escape_trader_start_dialog is gated on
+-- +actor_has_item_flash. The task already checks actor_has_item(esc_wounded_flash).
+-- The info is only granted by trader_zone_task [sr_idle@has_item]. After the
+-- gunslinger intro, [sr_idle] requires -esc_kill_gunslinger, so a reset or
+-- late-online restrictor never reaches @has_item. Broken saves keep the flash
+-- and lose the info.
+--
+-- DLTX unblocks the restrictor. This script covers saves already in nil/offline
+-- and item-take after Nimble. Does not complete the task or pay the reward.
+
+local LOG_TAG = "[fix_soc_nimble_flash]"
+local VERSION = "1.0.0"
+local EVENT_ID = "fix_soc_nimble_flash"
+local REPAIR_ACTION = "recover"
+local REPAIR_DELAY = 1.0
+local REPAIR_RETRY = 1.0
+local REPAIR_MAX_ATTEMPTS = 8
+
+local ITEM_SECTION = "esc_wounded_flash"
+local INFO_SOC_STARTED = "soc_start"
+local INFO_WOUNDED_STARTED = "tutorial_wounded_start"
+local INFO_ITEM_GATE = "actor_has_item_flash"
+local INFO_QUEST_COMPLETED = "esc_serious_talk"
+
+local callbacks_registered = false
+local repair_attempts = 0
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function actor_has_flash()
+	if not db.actor then
+		return false
+	end
+	local ok, item = pcall(function()
+		return db.actor:object(ITEM_SECTION)
+	end)
+	return ok and item ~= nil
+end
+
+local function give_info_once(info, reason)
+	if not info or not db.actor or has_alife_info(info) then
+		return false
+	end
+	give_info(info)
+	log("%s -> +%s", tostring(reason or "repair"), tostring(info))
+	return true
+end
+
+local function quest_is_repairable()
+	return db.actor
+		and has_alife_info(INFO_SOC_STARTED)
+		and has_alife_info(INFO_WOUNDED_STARTED)
+		and not has_alife_info(INFO_QUEST_COMPLETED)
+		and not has_alife_info(INFO_ITEM_GATE)
+end
+
+-- true = drop the event; false = keep it and wait for ResetTimeEvent.
+function recover_tick()
+	repair_attempts = repair_attempts + 1
+	if not db.actor then
+		if repair_attempts < REPAIR_MAX_ATTEMPTS then
+			ResetTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_RETRY)
+			return false
+		end
+		return true
+	end
+
+	if not quest_is_repairable() then
+		return true
+	end
+
+	if not actor_has_flash() then
+		return true
+	end
+
+	give_info_once(INFO_ITEM_GATE, "RECOVERY")
+	return true
+end
+
+local function cancel_recovery()
+	RemoveTimeEvent(EVENT_ID, REPAIR_ACTION)
+	repair_attempts = 0
+end
+
+local function schedule_recovery()
+	cancel_recovery()
+	-- actor:object can still miss the item inside actor_on_item_take
+	-- (inventory restore). recover_tick re-checks after the delay.
+	CreateTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY, recover_tick)
+end
+
+function actor_on_first_update()
+	schedule_recovery()
+end
+
+function on_game_load()
+	repair_attempts = 0
+end
+
+function actor_on_item_take(item)
+	if not item then
+		return
+	end
+	local ok, section = pcall(function()
+		return item:section()
+	end)
+	if ok and section == ITEM_SECTION then
+		-- Inventory restore also emits this callback. Do not mutate info
+		-- portions here; defer to CreateTimeEvent after load/take finishes.
+		schedule_recovery()
+	end
+end
+
+function on_game_start()
+	if callbacks_registered then
+		return
+	end
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("on_game_load", on_game_load)
+	RegisterScriptCallback("actor_on_item_take", actor_on_item_take)
+	callbacks_registered = true
+	log("loaded v%s", VERSION)
+end
+
+function on_game_end()
+	cancel_recovery()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		UnregisterScriptCallback("actor_on_item_take", actor_on_item_take)
+		callbacks_registered = false
+	end
+end

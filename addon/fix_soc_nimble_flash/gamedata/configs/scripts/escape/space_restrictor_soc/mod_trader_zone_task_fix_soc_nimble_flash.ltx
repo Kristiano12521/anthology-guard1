@@ -1,0 +1,7 @@
+; SoC Nimble flash dialog fix — patch trader_zone_task.ltx
+; Why: after intro, [sr_idle] requires -esc_kill_gunslinger, so the restrictor
+;      never reaches @has_item and never grants actor_has_item_flash.
+
+![sr_idle]
+on_info2 = {+esc_kill_gunslinger =actor_has_item(esc_wounded_flash)} nil %+actor_has_item_flash%
+on_info3 = {+esc_kill_gunslinger} sr_idle@has_item
