@@ -1,0 +1,178 @@
+-- Aim Fatigue HUD visibility fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- [HARD] Aim Fatigue stores MCM checkboxes via local as_bool:
+--   return type(value) == "boolean" and value or fallback
+-- Lua `a and b or c` returns c when b is false, so show_AS_counter /
+-- show_AS_bar cannot become false and AS_disable cannot turn off after
+-- it was enabled. HUD Update() compares the flags correctly; only the
+-- helper is wrong. as_bool is local and cannot be patched.
+--
+-- This addon wraps aim_stamina.on_option_change and load_state, then
+-- rewrites the three booleans from MCM. ZIP Visibility Fix registered
+-- the same callbacks and relied on filename order instead.
+
+local LOG_TAG = "[fix_aim_fatigue_visibility]"
+local VERSION = "1.0.0"
+local MODULE_NAME = "aim_stamina"
+local MCM_NAME = "aim_stamina_mcm"
+
+local orig_on_option_change = nil
+local orig_load_state = nil
+local installed = false
+local callbacks_registered = false
+local stolen_option = false
+local stolen_load = false
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function module_of(name)
+	return rawget(_G, name)
+end
+
+local function real_bool(value, fallback)
+	if type(value) == "boolean" then
+		return value
+	end
+	return fallback
+end
+
+local function read_flag(key, fallback)
+	local mcm = module_of(MCM_NAME)
+	if not (mcm and type(mcm.get_config) == "function") then
+		return fallback
+	end
+	local ok, value = pcall(mcm.get_config, key)
+	if not ok then
+		return fallback
+	end
+	return real_bool(value, fallback)
+end
+
+function apply_visibility_flags()
+	local as = module_of(MODULE_NAME)
+	if not as then
+		return
+	end
+	as.show_AS_counter = read_flag("show_AS_counter", true)
+	as.show_AS_bar = read_flag("show_AS_bar", true)
+	as.AS_disable = read_flag("AS_disable", false)
+end
+
+function patched_on_option_change()
+	if orig_on_option_change then
+		orig_on_option_change()
+	end
+	apply_visibility_flags()
+end
+
+function patched_load_state(m_data)
+	if orig_load_state then
+		orig_load_state(m_data)
+	end
+	apply_visibility_flags()
+end
+
+local function steal_callback(name, orig_fn, patched_fn)
+	if type(UnregisterScriptCallback) == "function" and type(orig_fn) == "function" and orig_fn ~= patched_fn then
+		UnregisterScriptCallback(name, orig_fn)
+	end
+	if type(RegisterScriptCallback) == "function" then
+		RegisterScriptCallback(name, patched_fn)
+		return true
+	end
+	return false
+end
+
+local function install()
+	if installed then
+		return true
+	end
+
+	local as = module_of(MODULE_NAME)
+	if not (as and type(as.on_option_change) == "function" and type(as.load_state) == "function") then
+		return false
+	end
+
+	orig_on_option_change = orig_on_option_change or as.on_option_change
+	orig_load_state = orig_load_state or as.load_state
+
+	if as.on_option_change ~= patched_on_option_change then
+		if as.on_option_change ~= orig_on_option_change then
+			orig_on_option_change = as.on_option_change
+		end
+		as.on_option_change = patched_on_option_change
+	end
+	if as.load_state ~= patched_load_state then
+		if as.load_state ~= orig_load_state then
+			orig_load_state = as.load_state
+		end
+		as.load_state = patched_load_state
+	end
+
+	stolen_option = steal_callback("on_option_change", orig_on_option_change, patched_on_option_change) or stolen_option
+	stolen_load = steal_callback("load_state", orig_load_state, patched_load_state) or stolen_load
+
+	installed = true
+	log("loaded v%s wrapped on_option_change and load_state", VERSION)
+	return true
+end
+
+local function uninstall()
+	local as = module_of(MODULE_NAME)
+	if as then
+		if orig_on_option_change then
+			as.on_option_change = orig_on_option_change
+		end
+		if orig_load_state then
+			as.load_state = orig_load_state
+		end
+	end
+
+	if stolen_option then
+		UnregisterScriptCallback("on_option_change", patched_on_option_change)
+		if orig_on_option_change then
+			RegisterScriptCallback("on_option_change", orig_on_option_change)
+		end
+		stolen_option = false
+	end
+	if stolen_load then
+		UnregisterScriptCallback("load_state", patched_load_state)
+		if orig_load_state then
+			RegisterScriptCallback("load_state", orig_load_state)
+		end
+		stolen_load = false
+	end
+
+	installed = false
+end
+
+function actor_on_first_update()
+	if not installed then
+		install()
+	end
+	apply_visibility_flags()
+end
+
+-- Top-level wrap if Aim Fatigue already loaded (this file loads later).
+-- Do not read options here: MCM forbids get() during script load.
+install()
+
+function on_game_start()
+	install()
+	apply_visibility_flags()
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
+	uninstall()
+end
