@@ -1,0 +1,519 @@
+-- Quest Stash Type Migration Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Anthology remapped shared DRX stash types 1-7 to unique 1001-1038 in
+-- task LTX (on_job_descr). Old saves still store stash_type=6 etc.
+-- tasks_stash.script concatenates that value onto drx_sl_quest_item_,
+-- so the status functor looks for the wrong PDA, stage stays 0, the
+-- marker stays on the stash, and the turn-in dialog never appears.
+--
+-- ZIP v1.4 copied 38 item sections that already exist, wrapped
+-- get_random_stash (blacklist already covers those names), polled
+-- actor_on_update, used a zzzz filename, and destroyed shared items
+-- 1-3 that vanilla tasks still use.
+--
+-- This addon migrates save_var to the type from current task_ini,
+-- rewrites a pending cache string, and wraps the status functor so
+-- a leftover old PDA still counts. Does not copy items or wrap
+-- treasure_manager.get_random_stash.
+
+local LOG_TAG = "[fix_quest_stash]"
+local VERSION = "1.0.0"
+local EVENT_ID = "fix_quest_stash"
+local REPAIR_ACTION = "migrate"
+local REPAIR_DELAY = 1.0
+local REPAIR_MAX_ATTEMPTS = 10
+local STASH_EFFECT = "drx_sl_create_quest_stash"
+local ITEM_PREFIX = "drx_sl_quest_item_"
+local INFO_PREFIX = "drx_sl_quest_item_task_"
+local INFO_SUFFIX = "_started"
+
+local orig_status = nil
+local callbacks_registered = false
+local repair_attempts = 0
+local canonical_cache = {}
+local migrated = {}
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function is_anthology_type(typ)
+	return typ and typ >= 1001 and typ <= 1038
+end
+
+local function item_section(typ)
+	return typ and (ITEM_PREFIX .. tostring(typ)) or nil
+end
+
+local function info_portion(typ)
+	return typ and (INFO_PREFIX .. tostring(typ) .. INFO_SUFFIX) or nil
+end
+
+local function parse_canonical_type(task_id)
+	if not task_id or not task_manager or not task_manager.task_ini then
+		return nil
+	end
+	local ok, descr = pcall(function()
+		return task_manager.task_ini:r_string_ex(task_id, "on_job_descr")
+	end)
+	if not ok or type(descr) ~= "string" then
+		return nil
+	end
+	local typ = string.match(descr, STASH_EFFECT .. "%([^:)]+:(%d+)%)")
+	return tonumber(typ)
+end
+
+local function canonical_type(task_id)
+	local cached = canonical_cache[task_id]
+	if cached ~= nil then
+		if cached == false then
+			return nil
+		end
+		return cached
+	end
+	if not (task_manager and task_manager.task_ini) then
+		return nil
+	end
+	local typ = parse_canonical_type(task_id)
+	canonical_cache[task_id] = typ or false
+	return typ
+end
+
+local function active_task_table()
+	if not task_manager or type(task_manager.get_task_manager) ~= "function" then
+		return nil
+	end
+	local ok, manager = pcall(task_manager.get_task_manager)
+	if not ok or not manager or type(manager.task_info) ~= "table" then
+		return nil
+	end
+	return manager.task_info
+end
+
+local function load_task_var(task_id)
+	if not db.actor or type(load_var) ~= "function" then
+		return nil
+	end
+	local ok, var = pcall(load_var, db.actor, task_id)
+	if not ok then
+		return nil
+	end
+	return var
+end
+
+local function actor_has(section)
+	if not (db.actor and section) then
+		return false
+	end
+	local ok, item = pcall(function()
+		return db.actor:object(section)
+	end)
+	return ok and item and true or false
+end
+
+local function actor_item(section)
+	if not (db.actor and section) then
+		return nil
+	end
+	local ok, item = pcall(function()
+		return db.actor:object(section)
+	end)
+	if ok then
+		return item
+	end
+	return nil
+end
+
+local function section_exists(section)
+	return section and ini_sys and ini_sys:section_exist(section) and true or false
+end
+
+local function replace_plain(text, old, new)
+	local index = string.find(text, old, 1, true)
+	if not index then
+		return text, false
+	end
+	return string.sub(text, 1, index - 1) .. new .. string.sub(text, index + #old), true
+end
+
+local function old_type_needed_by_other(old_type, except_task_id, info)
+	if not (old_type and info) then
+		return false
+	end
+	for task_id, _ in pairs(info) do
+		if task_id ~= except_task_id then
+			if canonical_type(task_id) == old_type then
+				return true
+			end
+			local var = load_task_var(task_id)
+			if var and (tonumber(var.stash_type) == old_type or tonumber(var.stash_type_legacy) == old_type) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function rewrite_pending_cache(target_id, old_section, new_section)
+	if not (target_id and old_section and new_section) then
+		return false
+	end
+	local caches = treasure_manager and treasure_manager.caches
+	if type(caches) ~= "table" then
+		return false
+	end
+	local pending = caches[target_id]
+	if type(pending) ~= "string" then
+		return false
+	end
+	local updated, changed = replace_plain(pending, old_section, new_section)
+	if changed then
+		caches[target_id] = updated
+		log("rewrote pending cache id=%s %s -> %s", tostring(target_id), old_section, new_section)
+	end
+	return changed
+end
+
+local function cache_pending(target_id)
+	local caches = treasure_manager and treasure_manager.caches
+	if type(caches) ~= "table" or not target_id then
+		return false
+	end
+	return type(caches[target_id]) == "string"
+end
+
+local function give_info(name)
+	if not (name and db.actor) then
+		return
+	end
+	if type(has_alife_info) == "function" and has_alife_info(name) then
+		return
+	end
+	pcall(function()
+		db.actor:give_info_portion(name)
+	end)
+end
+
+local function disable_info(name)
+	if not (name and db.actor) then
+		return
+	end
+	if type(has_alife_info) == "function" and not has_alife_info(name) then
+		return
+	end
+	pcall(function()
+		db.actor:disable_info_portion(name)
+	end)
+end
+
+local function mark_ready(tsk, task_id, section, reason)
+	if tsk then
+		tsk.stage = 1
+		tsk.check_time = 0
+	end
+	log("task ready task=%s section=%s reason=%s", tostring(task_id), tostring(section), tostring(reason))
+end
+
+local function spawn_on_actor(section)
+	if not (db.actor and section_exists(section) and type(alife_create_item) == "function") then
+		return nil
+	end
+	local ok, item = pcall(alife_create_item, section, db.actor)
+	if ok then
+		return item
+	end
+	return nil
+end
+
+local function release_actor_item(item)
+	if not item then
+		return
+	end
+	local ok, item_id = pcall(function()
+		return item:id()
+	end)
+	if not ok or not item_id then
+		return
+	end
+	local se_obj = alife_object(item_id)
+	if se_obj and type(alife_release) == "function" then
+		pcall(alife_release, se_obj)
+	end
+end
+
+local function convert_or_give(task_id, tsk, old_type, new_type, info)
+	local new_section = item_section(new_type)
+	local old_section = item_section(old_type)
+	if actor_has(new_section) then
+		mark_ready(tsk, task_id, new_section, "actor_has_canonical")
+		return true
+	end
+
+	local old_item = actor_item(old_section)
+	if not old_item then
+		return false
+	end
+
+	if not section_exists(new_section) then
+		return false
+	end
+
+	if old_type_needed_by_other(old_type, task_id, info) then
+		if spawn_on_actor(new_section) then
+			mark_ready(tsk, task_id, new_section, "gave_canonical_kept_shared")
+			return true
+		end
+		return false
+	end
+
+	local spawned = spawn_on_actor(new_section)
+	if not spawned then
+		log("convert failed task=%s old=%s new=%s", tostring(task_id), old_section, new_section)
+		return false
+	end
+	release_actor_item(old_item)
+	mark_ready(tsk, task_id, new_section, "converted_legacy_item")
+	return true
+end
+
+local function recover_missing(task_id, tsk, var, new_section)
+	if actor_has(new_section) then
+		mark_ready(tsk, task_id, new_section, "actor_has_canonical")
+		return true
+	end
+	if not var.stash_created then
+		return false
+	end
+	if cache_pending(var.target_id) then
+		return false
+	end
+	if not section_exists(new_section) then
+		log("cannot recover task=%s: section %s missing", tostring(task_id), tostring(new_section))
+		return false
+	end
+	if spawn_on_actor(new_section) then
+		mark_ready(tsk, task_id, new_section, "recovered_consumed_cache")
+		return true
+	end
+	return false
+end
+
+local function migrate_task(task_id, tsk, info)
+	local new_type = canonical_type(task_id)
+	if not is_anthology_type(new_type) then
+		return false
+	end
+
+	local var = load_task_var(task_id)
+	if type(var) ~= "table" then
+		return false
+	end
+
+	local old_type = tonumber(var.stash_type)
+	local new_section = item_section(new_type)
+	local changed = false
+
+	if old_type and old_type ~= new_type then
+		var.stash_type_legacy = old_type
+		var.stash_type = new_type
+		if type(save_var) == "function" then
+			save_var(db.actor, task_id, var)
+		end
+
+		give_info(info_portion(new_type))
+		if not old_type_needed_by_other(old_type, task_id, info) then
+			disable_info(info_portion(old_type))
+		end
+
+		rewrite_pending_cache(var.target_id, item_section(old_type), new_section)
+		changed = true
+		log(
+			"migrated task=%s stash_type=%s->%s section=%s",
+			tostring(task_id),
+			tostring(old_type),
+			tostring(new_type),
+			new_section
+		)
+	end
+
+	if actor_has(new_section) then
+		mark_ready(tsk, task_id, new_section, "actor_has_canonical")
+		return true
+	end
+
+	if old_type and old_type ~= new_type then
+		if convert_or_give(task_id, tsk, old_type, new_type, info) then
+			return true
+		end
+	end
+
+	recover_missing(task_id, tsk, var, new_section)
+	return changed
+end
+
+local function migrate_active_tasks()
+	if not db.actor then
+		return "retry"
+	end
+
+	local info = active_task_table()
+	if not info then
+		return "retry"
+	end
+
+	for task_id, tsk in pairs(info) do
+		if not migrated[task_id] then
+			local new_type = canonical_type(task_id)
+			if canonical_cache[task_id] == false then
+				migrated[task_id] = true
+			elseif new_type then
+				local var = load_task_var(task_id)
+				if type(var) == "table" then
+					migrate_task(task_id, tsk, info)
+					migrated[task_id] = true
+				end
+			end
+		end
+	end
+
+	return "done"
+end
+
+local SHARED_TYPES = {1, 2, 3, 4, 5, 6, 7}
+
+local function leftover_shared_type(task_id, new_type, info, var)
+	local legacy = var and tonumber(var.stash_type_legacy)
+	if legacy and legacy ~= new_type and actor_has(item_section(legacy)) then
+		return legacy
+	end
+	for i = 1, #SHARED_TYPES do
+		local typ = SHARED_TYPES[i]
+		if typ ~= new_type and actor_has(item_section(typ)) then
+			if not old_type_needed_by_other(typ, task_id, info) then
+				return typ
+			end
+		end
+	end
+	return nil
+end
+
+local function accept_legacy_item(task_id, tsk, info)
+	local new_type = canonical_type(task_id)
+	if not is_anthology_type(new_type) then
+		return
+	end
+	if actor_has(item_section(new_type)) then
+		return
+	end
+	local var = load_task_var(task_id)
+	local legacy = leftover_shared_type(task_id, new_type, info, var)
+	if legacy then
+		convert_or_give(task_id, tsk, legacy, new_type, info)
+	end
+end
+
+function patched_status(tsk, task_id)
+	local info = active_task_table()
+	if info and task_id then
+		if not migrated[task_id] then
+			local var = load_task_var(task_id)
+			if type(var) == "table" and canonical_type(task_id) then
+				migrate_task(task_id, tsk, info)
+				migrated[task_id] = true
+			end
+		end
+		accept_legacy_item(task_id, tsk, info)
+	end
+
+	if type(orig_status) == "function" then
+		return orig_status(tsk, task_id)
+	end
+end
+
+local function install_status_wrap()
+	if not task_status_functor or type(task_status_functor.drx_sl_quest_item_task_status) ~= "function" then
+		log("status functor is not ready")
+		return false
+	end
+	if task_status_functor.drx_sl_quest_item_task_status == patched_status then
+		return true
+	end
+	if orig_status then
+		return true
+	end
+	orig_status = task_status_functor.drx_sl_quest_item_task_status
+	task_status_functor.drx_sl_quest_item_task_status = patched_status
+	log("v%s status functor wrapped", VERSION)
+	return true
+end
+
+local function uninstall_status_wrap()
+	if orig_status and task_status_functor and task_status_functor.drx_sl_quest_item_task_status == patched_status then
+		task_status_functor.drx_sl_quest_item_task_status = orig_status
+	end
+	orig_status = nil
+end
+
+function try_repair()
+	install_status_wrap()
+	return migrate_active_tasks()
+end
+
+function repair_tick()
+	repair_attempts = repair_attempts + 1
+	local result = try_repair()
+	if result == "done" then
+		return true
+	end
+	if repair_attempts >= REPAIR_MAX_ATTEMPTS then
+		log("migration was not completed after %s attempts", repair_attempts)
+		return true
+	end
+	ResetTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY)
+	return false
+end
+
+local function cancel_repair()
+	RemoveTimeEvent(EVENT_ID, REPAIR_ACTION)
+	repair_attempts = 0
+end
+
+local function schedule_repair()
+	cancel_repair()
+	CreateTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY, repair_tick)
+end
+
+function actor_on_first_update()
+	install_status_wrap()
+	schedule_repair()
+end
+
+function on_game_load()
+	canonical_cache = {}
+	migrated = {}
+	repair_attempts = 0
+end
+
+function on_game_start()
+	install_status_wrap()
+	if callbacks_registered then
+		return
+	end
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("on_game_load", on_game_load)
+	callbacks_registered = true
+	log("loaded v%s", VERSION)
+end
+
+function on_game_end()
+	cancel_repair()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		callbacks_registered = false
+	end
+	uninstall_status_wrap()
+	canonical_cache = {}
+	migrated = {}
+end

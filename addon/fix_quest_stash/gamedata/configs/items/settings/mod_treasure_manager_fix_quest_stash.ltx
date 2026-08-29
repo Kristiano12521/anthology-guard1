@@ -1,0 +1,8 @@
+; Quest stash picker: val_q7_n is a quest spawn box, not a loot cache.
+; Why: get_random_stash(inv_box) already skips [blacklist_stashes_names].
+;      Anthology lists the ZIP v1.1 names except this one. Future quest
+;      assignment will not pick it. Already-assigned saves are repaired
+;      by the script, not by wrapping get_random_stash.
+
+![blacklist_stashes_names]
+val_q7_n
