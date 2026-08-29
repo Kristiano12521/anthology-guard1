@@ -1,0 +1,566 @@
+-- Radio device fixes
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- 1) Hideout Furniture placeable radio: original constructor lists every
+--    file in the station folder via getFS():file_list_open. MO2/VFS extra
+--    files (.mohidden, non-ogg) become sound_object() junk. The ZIP 1.0.3
+--    replaced the whole script and hard-coded 2 vanilla stations.
+--    This wraps file_list_open for $game_sounds$ radio paths: keep *.ogg,
+--    fall back to track_N/session_N via getFS():exist. Original HF file
+--    stays. Disable Hideout_Furniture_Placeable_Radio_Fix.zip.
+--
+-- 2) World radios / notebooks: option sound/radio/zone only gated ph_sound
+--    (Zone FM). Most base devices use ph_idle + play_sound and ignore it.
+--    ph_sound defaults no_hit=true. ph_idle hit_on_bone requires exact bone 2.
+--    No on_use. This gates play_sound, accepts any hit, toggles on use.
+
+local LOG_TAG = "[fix_radio]"
+local VERSION = "1.0.0"
+local TIP_ID = "st_fix_radio_use"
+
+local orig = {}
+local installed = false
+local callbacks_registered = false
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function module_of(name)
+	return rawget(_G, name)
+end
+
+function patched_ui_get(id)
+	if not orig.ui_get then
+		return nil
+	end
+	local v = orig.ui_get(id)
+	if id == "sound/radio/zone" then
+		return v == true or v == 1 or v == "true"
+	end
+	return v
+end
+
+local function zone_enabled()
+	if not (ui_options and ui_options.get) then
+		return true
+	end
+	local v = ui_options.get("sound/radio/zone")
+	return v == true or v == 1 or v == "true"
+end
+
+local function obj_name_lower(obj)
+	if not obj then
+		return ""
+	end
+	local ok, name = pcall(function()
+		return obj:name()
+	end)
+	if ok and type(name) == "string" then
+		return string.lower(name)
+	end
+	return ""
+end
+
+local function is_device_radio(obj)
+	if not obj then
+		return false
+	end
+	if IsStalker and IsStalker(obj) then
+		return false
+	end
+	local n = obj_name_lower(obj)
+	if n == "" then
+		return false
+	end
+	if string.find(n, "radioactiv", 1, true) then
+		return false
+	end
+	if string.find(n, "radio", 1, true) then
+		return true
+	end
+	if string.find(n, "notebook", 1, true) then
+		return true
+	end
+	if string.find(n, "laptop", 1, true) then
+		return true
+	end
+	return false
+end
+
+local function set_use_tip(obj)
+	if not (obj and obj.set_tip_text) then
+		return
+	end
+	local text = TIP_ID
+	if game and game.translate_string then
+		text = game.translate_string(TIP_ID)
+	end
+	pcall(function()
+		obj:set_tip_text(text)
+	end)
+	if obj.set_nonscript_usable then
+		pcall(function()
+			obj:set_nonscript_usable(false)
+		end)
+	end
+end
+
+------------------------------------------------------------
+-- Sound folder listing
+------------------------------------------------------------
+local function is_ogg_name(name)
+	if type(name) ~= "string" then
+		return false
+	end
+	return string.sub(string.lower(name), -4) == ".ogg"
+end
+
+local function list_entry_name(item)
+	if type(item) == "string" then
+		return item
+	end
+	if type(item) == "userdata" and item.NameShort then
+		local ok, short = pcall(function()
+			return item:NameShort()
+		end)
+		if ok and type(short) == "string" then
+			return short
+		end
+	end
+	return nil
+end
+
+local function make_string_list(files)
+	return {
+		Size = function()
+			return #files
+		end,
+		GetAt = function(_, idx)
+			return files[idx + 1]
+		end,
+	}
+end
+
+local function probe_numbered(rel)
+	local fs = getFS()
+	if not (fs and rel) then
+		return {}
+	end
+	if string.sub(rel, -1) ~= "\\" then
+		rel = rel .. "\\"
+	end
+	local prefixes = { "track_", "session_" }
+	local pi, n
+	for pi = 1, #prefixes do
+		local batch = {}
+		for n = 1, 64 do
+			local fname = prefixes[pi] .. tostring(n) .. ".ogg"
+			if fs:exist("$game_sounds$", rel .. fname) ~= nil then
+				batch[#batch + 1] = fname
+			else
+				break
+			end
+		end
+		if #batch > 0 then
+			return batch
+		end
+	end
+	return {}
+end
+
+local function filter_radio_list(list, rel)
+	local files = {}
+	if list and list.Size then
+		local count = list:Size() or 0
+		local i
+		for i = 0, count - 1 do
+			local name = list_entry_name(list:GetAt(i))
+			if is_ogg_name(name) then
+				files[#files + 1] = name
+			end
+		end
+	end
+	table.sort(files)
+	if #files == 0 then
+		files = probe_numbered(rel)
+	end
+	return make_string_list(files)
+end
+
+local function is_radio_sound_path(fs_id, rel)
+	if fs_id ~= "$game_sounds$" then
+		return false
+	end
+	if type(rel) ~= "string" then
+		return false
+	end
+	local l = string.lower(rel)
+	if string.find(l, "radioactiv", 1, true) then
+		return false
+	end
+	return string.find(l, "radio", 1, true) ~= nil
+end
+
+function wrapped_file_list_open(self, a, b, c)
+	if not orig.file_list_open then
+		return nil
+	end
+	if c ~= nil then
+		local list = orig.file_list_open(self, a, b, c)
+		if is_radio_sound_path(a, b) then
+			return filter_radio_list(list, b)
+		end
+		return list
+	end
+	return orig.file_list_open(self, a, b)
+end
+
+local function install_fs_wrap()
+	if orig.file_list_open then
+		return true
+	end
+	local fs = getFS()
+	if not fs then
+		return false
+	end
+	local candidate = nil
+	if FS and type(FS.file_list_open) == "function" then
+		candidate = { owner = FS, key = "file_list_open", fn = FS.file_list_open }
+	elseif type(fs.file_list_open) == "function" then
+		candidate = { owner = fs, key = "file_list_open", fn = fs.file_list_open }
+	end
+	if not candidate then
+		return false
+	end
+	orig.file_list_open = candidate.fn
+	orig.file_list_owner = candidate.owner
+	orig.file_list_key = candidate.key
+	local ok = pcall(function()
+		candidate.owner[candidate.key] = wrapped_file_list_open
+	end)
+	if not ok then
+		orig.file_list_open = nil
+		orig.file_list_owner = nil
+		orig.file_list_key = nil
+		return false
+	end
+	log("wrapped file_list_open v%s", VERSION)
+	return true
+end
+
+------------------------------------------------------------
+-- Hideout Furniture constructor
+------------------------------------------------------------
+function patched_placeable_init(self, obj)
+	if not orig.placeable_init then
+		return
+	end
+	if orig.file_list_owner then
+		return orig.placeable_init(self, obj)
+	end
+	local fs = getFS()
+	local prev = fs and fs.file_list_open
+	if type(prev) == "function" then
+		orig.file_list_open = orig.file_list_open or prev
+		pcall(function()
+			fs.file_list_open = wrapped_file_list_open
+		end)
+	end
+	local ok, err = pcall(orig.placeable_init, self, obj)
+	if type(prev) == "function" then
+		pcall(function()
+			fs.file_list_open = prev
+		end)
+	end
+	if not ok then
+		error(err)
+	end
+end
+
+local function install_placeable()
+	local mod = module_of("placeable_radio")
+	if not (mod and mod.placeable_radio_wrapper) then
+		return false
+	end
+	local cls = mod.placeable_radio_wrapper
+	if type(cls.__init) ~= "function" then
+		return false
+	end
+	if cls.__init == patched_placeable_init then
+		return true
+	end
+	orig.placeable_init = orig.placeable_init or cls.__init
+	cls.__init = patched_placeable_init
+	return true
+end
+
+------------------------------------------------------------
+-- World radios: zone / hit / use
+------------------------------------------------------------
+local function ini_has_section(ini, section)
+	if not (ini and section and ini.section_exist) then
+		return false
+	end
+	local ok, has = pcall(function()
+		return ini:section_exist(section)
+	end)
+	return ok and has
+end
+
+local function toggle_ph_idle_radio(self)
+	local obj = self.object
+	if not obj then
+		return
+	end
+	local bag = db and db.storage and db.storage[obj:id()]
+	local ini = (bag and bag.ini) or (self.st and self.st.ini)
+	local active = (bag and bag.active_section) or ""
+	if not ini then
+		return
+	end
+	local target
+	if string.find(string.lower(tostring(active)), "broken", 1, true) then
+		if ini_has_section(ini, "ph_idle@music") then
+			target = "ph_idle@music"
+		end
+	else
+		if ini_has_section(ini, "ph_idle@broken") then
+			target = "ph_idle@broken"
+		end
+	end
+	if target and xr_logic and xr_logic.switch_to_section then
+		xr_logic.switch_to_section(obj, ini, target)
+	end
+end
+
+function patched_idle_hit(self, obj, amount, local_direction, who, bone_index)
+	if self.st and self.st.hit_on_bone and self.st.hit_on_bone[bone_index] then
+		return orig.idle_hit(self, obj, amount, local_direction, who, bone_index)
+	end
+	if is_device_radio(self.object) and self.st and self.st.hit_on_bone then
+		local bone, data
+		for bone, data in pairs(self.st.hit_on_bone) do
+			if data and data.state and xr_logic then
+				local section = xr_logic.pick_section_from_condlist(db.actor, self.object, data.state)
+				if section then
+					xr_logic.switch_to_section(obj, self.st.ini, section)
+					return
+				end
+			end
+		end
+	end
+	if orig.idle_hit then
+		return orig.idle_hit(self, obj, amount, local_direction, who, bone_index)
+	end
+end
+
+function patched_idle_use(self, obj, actor)
+	if orig.idle_use then
+		local handled = orig.idle_use(self, obj, actor)
+		if handled then
+			return handled
+		end
+	end
+	if is_device_radio(self.object) then
+		toggle_ph_idle_radio(self)
+		return true
+	end
+end
+
+function patched_idle_update(self, delta)
+	if is_device_radio(self.object) then
+		set_use_tip(self.object)
+		if not zone_enabled() and xr_sound and xr_sound.stop_sounds_by_id then
+			xr_sound.stop_sounds_by_id(self.object:id())
+		end
+	end
+	if orig.idle_update then
+		return orig.idle_update(self, delta)
+	end
+end
+
+function patched_snd_hit(self, obj, amount, local_direction, who, bone_index)
+	if is_device_radio(self.object) then
+		if self.played_sound then
+			self.played_sound:stop()
+			self.played_sound = nil
+		end
+		self.destructed = true
+		return
+	end
+	if orig.snd_hit then
+		return orig.snd_hit(self, obj, amount, local_direction, who, bone_index)
+	end
+end
+
+function patched_snd_use(self, obj, actor)
+	if orig.snd_use then
+		orig.snd_use(self, obj, actor)
+	end
+	if not is_device_radio(self.object) then
+		return
+	end
+	self.destructed = not self.destructed
+	if self.destructed and self.played_sound then
+		self.played_sound:stop()
+		self.played_sound = nil
+	end
+end
+
+function patched_snd_update(self, delta)
+	if is_device_radio(self.object) then
+		set_use_tip(self.object)
+	end
+	if not zone_enabled() then
+		if self.played_sound then
+			self.played_sound:stop()
+			self.played_sound = nil
+		end
+		return
+	end
+	if orig.snd_update then
+		return orig.snd_update(self, delta)
+	end
+end
+
+function patched_play_sound(actor, obj, p)
+	if obj and is_device_radio(obj) and not zone_enabled() then
+		if xr_sound and xr_sound.stop_sounds_by_id then
+			xr_sound.stop_sounds_by_id(obj:id())
+		end
+		return
+	end
+	if orig.play_sound then
+		return orig.play_sound(actor, obj, p)
+	end
+end
+
+local function class_of(mod_name, class_name)
+	local mod = module_of(mod_name)
+	if mod and mod[class_name] then
+		return mod[class_name]
+	end
+	return module_of(class_name)
+end
+
+local function patch_method(mod_name, class_name, method, wrapper, orig_key)
+	local cls = class_of(mod_name, class_name)
+	if not cls then
+		return false
+	end
+	if cls[method] == wrapper then
+		return true
+	end
+	if type(cls[method]) ~= "function" then
+		return false
+	end
+	if orig[orig_key] == nil then
+		orig[orig_key] = cls[method]
+	end
+	cls[method] = wrapper
+	return true
+end
+
+local function install_world()
+	local ok = true
+	ok = patch_method("ph_idle", "action_idle", "hit_callback", patched_idle_hit, "idle_hit") and ok
+	ok = patch_method("ph_idle", "action_idle", "use_callback", patched_idle_use, "idle_use") and ok
+	ok = patch_method("ph_idle", "action_idle", "update", patched_idle_update, "idle_update") and ok
+	ok = patch_method("ph_sound", "snd_source", "hit_callback", patched_snd_hit, "snd_hit") and ok
+	ok = patch_method("ph_sound", "snd_source", "update", patched_snd_update, "snd_update") and ok
+
+	local snd_cls = class_of("ph_sound", "snd_source")
+	if snd_cls then
+		if orig.snd_use == nil then
+			orig.snd_use = snd_cls.use_callback
+			orig.snd_use_added = snd_cls.use_callback == nil
+		end
+		snd_cls.use_callback = patched_snd_use
+	end
+
+	local fx = module_of("xr_effects")
+	if fx and type(fx.play_sound) == "function" and fx.play_sound ~= patched_play_sound then
+		orig.play_sound = orig.play_sound or fx.play_sound
+		fx.play_sound = patched_play_sound
+	end
+
+	if ui_options and type(ui_options.get) == "function" and ui_options.get ~= patched_ui_get then
+		orig.ui_get = orig.ui_get or ui_options.get
+		ui_options.get = patched_ui_get
+	end
+	return ok
+end
+
+local function restore_method(mod_name, class_name, method, orig_key)
+	local cls = class_of(mod_name, class_name)
+	if cls and orig[orig_key] ~= nil then
+		cls[method] = orig[orig_key]
+	end
+end
+
+function install()
+	install_fs_wrap()
+	install_placeable()
+	install_world()
+	if not installed then
+		installed = true
+		log("loaded v%s", VERSION)
+	end
+	return true
+end
+
+function uninstall()
+	if orig.file_list_owner and orig.file_list_key and orig.file_list_open then
+		pcall(function()
+			orig.file_list_owner[orig.file_list_key] = orig.file_list_open
+		end)
+	end
+	local hf = module_of("placeable_radio")
+	if hf and hf.placeable_radio_wrapper and orig.placeable_init then
+		hf.placeable_radio_wrapper.__init = orig.placeable_init
+	end
+	restore_method("ph_idle", "action_idle", "hit_callback", "idle_hit")
+	restore_method("ph_idle", "action_idle", "use_callback", "idle_use")
+	restore_method("ph_idle", "action_idle", "update", "idle_update")
+	restore_method("ph_sound", "snd_source", "hit_callback", "snd_hit")
+	restore_method("ph_sound", "snd_source", "update", "snd_update")
+	local snd_cls = class_of("ph_sound", "snd_source")
+	if snd_cls then
+		if orig.snd_use_added then
+			snd_cls.use_callback = nil
+		elseif orig.snd_use then
+			snd_cls.use_callback = orig.snd_use
+		end
+	end
+	local fx = module_of("xr_effects")
+	if fx and orig.play_sound then
+		fx.play_sound = orig.play_sound
+	end
+	if ui_options and orig.ui_get then
+		ui_options.get = orig.ui_get
+	end
+	installed = false
+end
+
+function actor_on_first_update()
+	install()
+end
+
+install_fs_wrap()
+
+function on_game_start()
+	install()
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
+	uninstall()
+end
