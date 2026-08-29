@@ -1,0 +1,151 @@
+-- Valley of Whispers Ambush & Ilya Stash Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Ilya stash on_info was parsed as a section name (unclosed %= line).
+-- DLTX restores one-shot loot on key use. This script remaps an already
+-- saved broken/missing active_section when that box is activated.
+-- Does not wrap spawn of the ambush dummy (see DLTX on cs_actor).
+
+local LOG_TAG = "[fix_vows_ambush_stash]"
+local VERSION = "1.0.0"
+local STASH_NAME = "sad_b1_iliya_treasure"
+local KEY_SECTION = "sad_mudak_inventory_key"
+local SECTION_WAIT = "ph_idle@wait"
+local SECTION_LOCKED = "ph_idle@locked"
+
+local orig_activate_by_section = nil
+local callbacks_registered = false
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function is_iliya_stash(npc)
+	if not npc or type(npc.name) ~= "function" then
+		return false
+	end
+	local ok, name = pcall(function()
+		return npc:name()
+	end)
+	return ok and name == STASH_NAME
+end
+
+local function actor_has_key()
+	if not db.actor then
+		return false
+	end
+	local ok, item = pcall(function()
+		return db.actor:object(KEY_SECTION)
+	end)
+	return ok and item ~= nil
+end
+
+local function recovered_section()
+	if actor_has_key() then
+		return SECTION_LOCKED
+	end
+	return SECTION_WAIT
+end
+
+local function section_is_broken(ini, section)
+	if type(section) ~= "string" then
+		return false
+	end
+	if section == "" or section == "nil" then
+		return true
+	end
+	if string.sub(section, 1, 2) == "%=" then
+		return true
+	end
+	return ini and type(ini.section_exist) == "function" and not ini:section_exist(section)
+end
+
+function patched_activate_by_section(npc, ini, section, gulag_name, loading)
+	if is_iliya_stash(npc) and section_is_broken(ini, section) then
+		local old_section = tostring(section)
+		section = recovered_section()
+		log("recovered section [%s] -> [%s]", old_section, section)
+	end
+	return orig_activate_by_section(npc, ini, section, gulag_name, loading)
+end
+
+local function install()
+	if not (xr_logic and type(xr_logic.activate_by_section) == "function") then
+		log("xr_logic.activate_by_section is not ready")
+		return false
+	end
+	if xr_logic.activate_by_section == patched_activate_by_section then
+		return true
+	end
+	if orig_activate_by_section then
+		return true
+	end
+	orig_activate_by_section = xr_logic.activate_by_section
+	xr_logic.activate_by_section = patched_activate_by_section
+	log("v%s activate_by_section wrapped", VERSION)
+	return true
+end
+
+local function uninstall()
+	if orig_activate_by_section and xr_logic and xr_logic.activate_by_section == patched_activate_by_section then
+		xr_logic.activate_by_section = orig_activate_by_section
+	end
+	orig_activate_by_section = nil
+end
+
+local function stash_needs_repair(npc)
+	if not is_iliya_stash(npc) then
+		return false
+	end
+	local st = db.storage[npc:id()]
+	if not st then
+		return false
+	end
+	if not st.active_scheme then
+		return true
+	end
+	return section_is_broken(st.ini, st.active_section)
+end
+
+function try_repair_online_stash()
+	install()
+	if type(get_story_object) ~= "function" then
+		return
+	end
+	local ok, npc = pcall(get_story_object, STASH_NAME)
+	if not (ok and npc) then
+		return
+	end
+	if not stash_needs_repair(npc) then
+		return
+	end
+	local st = db.storage[npc:id()]
+	if not (st and st.ini) then
+		return
+	end
+	local section = recovered_section()
+	xr_logic.activate_by_section(npc, st.ini, section, st.gulag_name or "", false)
+	log("online stash repaired -> [%s]", section)
+end
+
+function actor_on_first_update()
+	try_repair_online_stash()
+end
+
+function on_game_start()
+	install()
+	if callbacks_registered then
+		return
+	end
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	callbacks_registered = true
+	log("loaded v%s", VERSION)
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
+	uninstall()
+end

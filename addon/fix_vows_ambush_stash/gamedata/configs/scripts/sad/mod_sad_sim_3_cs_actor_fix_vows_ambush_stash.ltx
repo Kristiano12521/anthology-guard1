@@ -1,0 +1,8 @@
+; Night Hunt ambush dummy — patch sad_sim_3_cs_actor.ltx
+; Why: animpoint@5 waits for +sad_sim_3_rob_snorki from the jump animation
+;      into-functor. If wounded plays the anim without that functor, brothers
+;      never leave remark@1_4 and the camera ends the scene. Timer continues
+;      the chain. spawn_object in rob_logic is left as-is (take_item/relocate).
+
+![animpoint@5]
+on_timer = 3500 | remark@wait %+sad_sim_3_rob_snorki%
