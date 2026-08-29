@@ -1,48 +1,54 @@
 -- Gigant Space Restriction Crash Fix
 -- Anomaly 1.5.3 / Anthology 2.1
 --
--- CPseudoGigant::reinit fatals in CSpaceRestriction while the client object
--- is constructed. CRestrictedObject::net_Spawn copies
--- CSE_ALifeMonsterAbstract.m_out/in_space_restrictors and then
--- space_restriction_manager().restrict(). Lua binders run after that, so
--- actor_on_first_update cannot win the race.
+-- CPseudoGigant::reinit fatals in CSpaceRestrictionBridge::initialized when
+-- a gigant goes online again after a level leave/return. First load of a save
+-- already on that level works: the client object is restored, not rebuilt.
+-- Re-entry calls net_Spawn / CRestrictedObject and path-builder reinit.
 --
--- ZIP v1.0.1 deleted a hardcoded ALife id (40604). id_cleaner remaps ids:
--- later loads saw conserva / lights_hanging_lamp on that id and the script
--- no-op'd every session. Dead City needed a different id (24062) for the
--- same crash class.
+-- Lua binders run after that spawn, so actor_on_update cannot win the race.
+-- CSE m_out/m_in_space_restrictors are not exported (lua_help has no such
+-- properties on cse_alife_monster_abstract). Writing them is a no-op.
 --
--- This addon never keys off numeric ids. On server_entity_on_register it
--- quarantines a current-level gigant that still carries static restrictor
--- strings (or a broken graph/smart) via set_switch_online(false) and a
--- can_switch_online wrap. After ALife has registered, it clears dangling
--- restrictors and lets a healthy monster back online. If the strings cannot
--- be cleared, the object is released with alife_release (squad-safe).
+-- This addon never keys off numeric ALife ids (id_cleaner remaps them).
+-- Off-level and current-level-offline gigants stay offline via
+-- set_switch_online(false) + se_monster.can_switch_online wrap until
+-- actor_on_first_update on their level. Leaving a level re-quarantines
+-- current-level gigants. Dangling client restrictors, a dead graph vertex
+-- or a missing smart terrain: alife_release (squad-safe) while offline.
 
 local LOG_TAG = "[fix_gigant_space_restriction]"
-local VERSION = "1.0.0"
+local VERSION = "1.1.0"
 local EVENT_ID = "fix_gigant_space_restriction"
 local PROCESS_ACTION = "process"
 local PROCESS_DELAY = 0.05
 local INVALID_ID = 65535
+-- bind_anomaly_field.script:569-575
 local RESTRICTOR_TYPE_IN = 4
 local RESTRICTOR_TYPE_OUT = 5
 
 local callbacks_registered = false
 local orig_can_switch_online = nil
+local level_ready = false
+local process_scheduled = false
+
+local known_ids = {}
 local known_names = {}
 local quarantined = {}
-local processed = {}
-local process_scheduled = false
+local dangling_seen = {}
+local released = {}
 
 local function log(fmt, ...)
 	printf(LOG_TAG .. " " .. fmt, ...)
 end
 
 local function reset_state()
+	known_ids = {}
 	known_names = {}
 	quarantined = {}
-	processed = {}
+	dangling_seen = {}
+	released = {}
+	level_ready = false
 	process_scheduled = false
 	if type(RemoveTimeEvent) == "function" then
 		pcall(RemoveTimeEvent, EVENT_ID, PROCESS_ACTION)
@@ -144,81 +150,13 @@ local function se_by_id(sim, id)
 end
 
 local function is_gigant(se_obj)
-	local section = object_section(se_obj)
-	if type(section) == "string" and string.find(section, "^gigant") then
-		return true
-	end
 	if clsid and clsid.gigant_s then
-		return object_clsid(se_obj) == clsid.gigant_s
-	end
-	return false
-end
-
-local function read_field_string(se_obj, field)
-	if not se_obj then
-		return nil, false
-	end
-	local ok, value = pcall(function()
-		return se_obj[field]
-	end)
-	if not ok then
-		return nil, false
-	end
-	if value == nil then
-		return nil, false
-	end
-	if type(value) == "string" then
-		return value, true
-	end
-	local as_text = tostring(value)
-	if as_text == nil or as_text == "nil" or string.find(as_text, "^userdata") then
-		return nil, true
-	end
-	return as_text, true
-end
-
-local function write_field_string(se_obj, field, value)
-	if not se_obj then
-		return false
-	end
-	local ok = pcall(function()
-		se_obj[field] = value
-	end)
-	if not ok then
-		return false
-	end
-	local now = read_field_string(se_obj, field)
-	if value == "" then
-		return now == nil or now == ""
-	end
-	return now == value
-end
-
-local function split_names(raw)
-	local names = {}
-	if type(raw) ~= "string" or raw == "" then
-		return names
-	end
-	for part in string.gmatch(raw, "[^,]+") do
-		local name = string.match(part, "^%s*(.-)%s*$")
-		if name and name ~= "" then
-			names[#names + 1] = name
+		if object_clsid(se_obj) == clsid.gigant_s then
+			return true
 		end
 	end
-	return names
-end
-
-local function restrictor_type(kind)
-	if RestrictionSpace then
-		if kind == "in" then
-			return RestrictionSpace.eRestrictorTypeIn or RESTRICTOR_TYPE_IN
-		end
-		return RestrictionSpace.eRestrictorTypeOut or RESTRICTOR_TYPE_OUT
-	end
-	if kind == "in" then
-		return RESTRICTOR_TYPE_IN
-	end
-	return RESTRICTOR_TYPE_OUT
+	local section = object_section(se_obj)
+	return type(section) == "string" and string.find(section, "^gigant") ~= nil
 end
 
 local function remember_name(se_obj)
@@ -229,33 +167,28 @@ local function remember_name(se_obj)
 	end
 end
 
-local function dangling_restrictors(sim, se_obj)
-	local out_raw, out_ok = read_field_string(se_obj, "m_out_space_restrictors")
-	local in_raw, in_ok = read_field_string(se_obj, "m_in_space_restrictors")
-	if not (out_ok or in_ok) then
-		return nil
+local function remember_gigant(se_obj)
+	local id = object_id(se_obj)
+	if id then
+		known_ids[id] = true
 	end
+	return id
+end
 
-	local gigant_level = object_level(sim, se_obj)
-	local missing = {}
-	local function check(raw)
-		local names = split_names(raw)
-		for i = 1, #names do
-			local name = names[i]
-			local rid = known_names[name]
-			if not rid then
-				missing[#missing + 1] = name
-			elseif gigant_level then
-				local other = se_by_id(sim, rid)
-				if object_level(sim, other) ~= gigant_level then
-					missing[#missing + 1] = name
-				end
-			end
-		end
+local function queued_ids()
+	local ids = {}
+	for id, _ in pairs(known_ids) do
+		ids[#ids + 1] = id
 	end
-	check(out_raw)
-	check(in_raw)
-	return missing
+	return ids
+end
+
+local function on_current_level(sim, se_obj)
+	local here = current_level_name()
+	if not here then
+		return false
+	end
+	return object_level(sim, se_obj) == here
 end
 
 local function graph_vertex_ok(se_obj)
@@ -283,36 +216,11 @@ local function smart_ok(sim, se_obj)
 	return se_by_id(sim, sid) ~= nil
 end
 
-local function on_current_level(sim, se_obj)
-	local here = current_level_name()
-	if not here then
-		return false
+local function restrictor_type(kind)
+	if kind == "in" then
+		return RESTRICTOR_TYPE_IN
 	end
-	return object_level(sim, se_obj) == here
-end
-
-local function needs_quarantine(sim, se_obj)
-	if not graph_vertex_ok(se_obj) then
-		return true, "invalid_game_vertex"
-	end
-	if not smart_ok(sim, se_obj) then
-		return true, "dangling_smart_terrain"
-	end
-
-	local out_raw, out_ok = read_field_string(se_obj, "m_out_space_restrictors")
-	local in_raw, in_ok = read_field_string(se_obj, "m_in_space_restrictors")
-	if not (out_ok or in_ok) then
-		-- Fields not exported: only current-level gigants are unsafe to spawn.
-		if on_current_level(sim, se_obj) then
-			return true, "restrictor_fields_unreadable"
-		end
-		return false, nil
-	end
-
-	if (out_raw and out_raw ~= "") or (in_raw and in_raw ~= "") then
-		return true, "has_static_restrictors"
-	end
-	return false, nil
+	return RESTRICTOR_TYPE_OUT
 end
 
 local function set_can_switch_online(sim, id, enabled)
@@ -328,46 +236,116 @@ local function set_can_switch_online(sim, id, enabled)
 	return ok
 end
 
-local function quarantine(sim, se_obj, reason)
-	local id = object_id(se_obj)
-	if not id or quarantined[id] then
-		return
-	end
-	quarantined[id] = reason or "queued"
-	set_can_switch_online(sim, id, false)
-	log(
-		"quarantine id=%s name=%s section=%s reason=%s",
-		tostring(id),
-		tostring(object_name(se_obj)),
-		tostring(object_section(se_obj)),
-		tostring(quarantined[id])
-	)
-end
-
-local function allow_online(sim, id)
+local function get_game_object(id)
 	if not id then
-		return
+		return nil
 	end
-	quarantined[id] = nil
-	set_can_switch_online(sim, id, true)
+	if level and type(level.object_by_id) == "function" then
+		local ok, go = pcall(level.object_by_id, id)
+		if ok and go then
+			return go
+		end
+	end
+	if db and db.storage and db.storage[id] then
+		return db.storage[id].object
+	end
+	return nil
 end
 
-local function clear_dynamic_restrictions(sim, id)
-	if not (sim and id and type(sim.remove_all_restrictions) == "function") then
-		return
+local function parse_restriction_names(raw)
+	local names = {}
+	if type(raw) ~= "string" or raw == "" then
+		return names
 	end
-	pcall(function()
-		sim:remove_all_restrictions(id, restrictor_type("in"))
-	end)
-	pcall(function()
-		sim:remove_all_restrictions(id, restrictor_type("out"))
-	end)
+	if type(parse_names) == "function" then
+		local ok, parsed = pcall(parse_names, raw)
+		if ok and type(parsed) == "table" then
+			for i = 1, #parsed do
+				local name = parsed[i]
+				if type(name) == "string" and name ~= "" then
+					names[#names + 1] = name
+				end
+			end
+			return names
+		end
+	end
+	for part in string.gmatch(raw, "[^,]+") do
+		local name = string.match(part, "^%s*(.-)%s*$")
+		if name and name ~= "" then
+			names[#names + 1] = name
+		end
+	end
+	return names
 end
 
-local function clear_static_restrictors(se_obj)
-	local out_ok = write_field_string(se_obj, "m_out_space_restrictors", "")
-	local in_ok = write_field_string(se_obj, "m_in_space_restrictors", "")
-	return out_ok and in_ok
+local function read_game_restriction_names(go)
+	local names = {}
+	if not go then
+		return names
+	end
+	local getters = {
+		"out_restrictions",
+		"in_restrictions",
+		"base_out_restrictions",
+		"base_in_restrictions",
+	}
+	for i = 1, #getters do
+		local getter = getters[i]
+		if type(go[getter]) == "function" then
+			local ok, raw = pcall(function()
+				return go[getter](go)
+			end)
+			if ok then
+				local parsed = parse_restriction_names(raw)
+				for j = 1, #parsed do
+					names[#names + 1] = parsed[j]
+				end
+			end
+		end
+	end
+	return names
+end
+
+local function dangling_client_restrictors(sim, se_obj, go)
+	local missing = {}
+	local names = read_game_restriction_names(go)
+	if #names == 0 then
+		return missing
+	end
+	local gigant_level = object_level(sim, se_obj)
+	for i = 1, #names do
+		local name = names[i]
+		local rid = known_names[name]
+		if not rid then
+			missing[#missing + 1] = name
+		elseif gigant_level then
+			local other = se_by_id(sim, rid)
+			if object_level(sim, other) ~= gigant_level then
+				missing[#missing + 1] = name
+			end
+		end
+	end
+	return missing
+end
+
+local function strip_dynamic_restrictions(sim, id)
+	if not (sim and id) then
+		return
+	end
+	if type(sim.remove_all_restrictions) == "function" then
+		pcall(function()
+			sim:remove_all_restrictions(id, restrictor_type("in"))
+		end)
+		pcall(function()
+			sim:remove_all_restrictions(id, restrictor_type("out"))
+		end)
+	end
+	local go = get_game_object(id)
+	if go and type(go.remove_all_restrictions) == "function" then
+		pcall(function()
+			go:remove_all_restrictions()
+		end)
+	end
 end
 
 local function clear_smart_if_dangling(sim, se_obj)
@@ -380,13 +358,42 @@ local function clear_smart_if_dangling(sim, se_obj)
 	return ok and smart_ok(sim, se_obj)
 end
 
+local function quarantine(sim, se_obj, reason)
+	local id = object_id(se_obj)
+	if not id or released[id] then
+		return
+	end
+	local first = quarantined[id] == nil
+	quarantined[id] = reason or "queued"
+	set_can_switch_online(sim, id, false)
+	if not first then
+		return
+	end
+	log(
+		"quarantine id=%s name=%s section=%s reason=%s",
+		tostring(id),
+		tostring(object_name(se_obj)),
+		tostring(object_section(se_obj)),
+		tostring(quarantined[id])
+	)
+end
+
+local function allow_online(sim, se_obj)
+	local id = object_id(se_obj)
+	if not id then
+		return
+	end
+	quarantined[id] = nil
+	set_can_switch_online(sim, id, true)
+end
+
 local function release_gigant(sim, se_obj, reason)
 	local id = object_id(se_obj)
 	if not (sim and se_obj and id) then
 		return false
 	end
 	if object_online(se_obj) == true then
-		log("skip release, already online id=%s", tostring(id))
+		log("skip release, still online id=%s", tostring(id))
 		return false
 	end
 
@@ -398,99 +405,133 @@ local function release_gigant(sim, se_obj, reason)
 		tostring(reason)
 	)
 
-	local ok = false
+	local released_ok = false
 	if type(alife_release) == "function" then
-		ok = pcall(alife_release, se_obj)
+		local ok, result = pcall(alife_release, se_obj)
+		released_ok = ok and result and true or false
 	end
-	if not ok then
-		ok = pcall(function()
+	if not released_ok then
+		released_ok = pcall(function()
 			sim:release(se_obj, true)
 		end)
 	end
 
 	quarantined[id] = nil
-	processed[id] = true
-	return ok
+	dangling_seen[id] = nil
+	if released_ok then
+		released[id] = true
+		known_ids[id] = nil
+	end
+	return released_ok
 end
 
--- ok, detail. Does not strip restrictors that still exist in ALife.
-local function heal_gigant(sim, se_obj)
+local function inspect_online(sim, se_obj)
 	local id = object_id(se_obj)
-	if not (sim and se_obj and id) then
-		return false, "no_object"
+	if not id then
+		return
 	end
-
-	if not graph_vertex_ok(se_obj) then
-		return false, "invalid_game_vertex"
+	local go = get_game_object(id)
+	local missing = dangling_client_restrictors(sim, se_obj, go)
+	if #missing > 0 then
+		dangling_seen[id] = table.concat(missing, ",")
+		strip_dynamic_restrictions(sim, id)
+		log(
+			"dangling restrictors id=%s names=%s",
+			tostring(id),
+			dangling_seen[id]
+		)
 	end
-
-	clear_smart_if_dangling(sim, se_obj)
-
-	local missing = dangling_restrictors(sim, se_obj)
-	if type(missing) == "table" and #missing == 0 then
-		return true, "restrictors_ok"
-	end
-
-	clear_dynamic_restrictions(sim, id)
-	local static_cleared = clear_static_restrictors(se_obj)
-
-	if type(missing) == "table" and #missing > 0 then
-		if static_cleared then
-			return true, "cleared_dangling:" .. table.concat(missing, ",")
-		end
-		return false, "dangling_restrictors:" .. table.concat(missing, ",")
-	end
-
-	if static_cleared then
-		return true, "cleared_unreadable_static"
-	end
-	return false, "static_restrictors_not_writable"
 end
 
 local function process_one(sim, se_obj, reason)
 	local id = object_id(se_obj)
-	if not id or processed[id] then
+	if not id or released[id] then
 		return
 	end
 	if not is_gigant(se_obj) then
-		processed[id] = true
+		known_ids[id] = nil
 		quarantined[id] = nil
 		return
 	end
+
+	if not graph_vertex_ok(se_obj) then
+		if object_online(se_obj) == true then
+			quarantine(sim, se_obj, "invalid_game_vertex")
+			return
+		end
+		if release_gigant(sim, se_obj, "invalid_game_vertex") then
+			log("removed unsafe gigant id=%s via=%s", tostring(id), tostring(reason))
+		end
+		return
+	end
+
+	if not clear_smart_if_dangling(sim, se_obj) then
+		if object_online(se_obj) == true then
+			quarantine(sim, se_obj, "dangling_smart_terrain")
+			return
+		end
+		if release_gigant(sim, se_obj, "dangling_smart_terrain") then
+			log("removed unsafe gigant id=%s via=%s", tostring(id), tostring(reason))
+		end
+		return
+	end
+
 	if object_online(se_obj) == true then
-		processed[id] = true
-		quarantined[id] = nil
-		log("already online, skip id=%s", tostring(id))
+		inspect_online(sim, se_obj)
+		if dangling_seen[id] then
+			quarantine(sim, se_obj, "dangling_restrictors:" .. dangling_seen[id])
+		end
 		return
 	end
 
-	local ok, detail = heal_gigant(sim, se_obj)
-	if ok then
-		allow_online(sim, id)
-		processed[id] = true
-		log(
-			"safe id=%s name=%s via=%s detail=%s",
-			tostring(id),
-			tostring(object_name(se_obj)),
-			tostring(reason),
-			tostring(detail)
-		)
+	if dangling_seen[id] then
+		strip_dynamic_restrictions(sim, id)
+		if release_gigant(sim, se_obj, "dangling_restrictors:" .. dangling_seen[id]) then
+			log("removed unsafe gigant id=%s via=%s", tostring(id), tostring(reason))
+		end
 		return
 	end
 
-	if release_gigant(sim, se_obj, detail) then
-		log("removed unsafe gigant id=%s via=%s", tostring(id), tostring(reason))
-	else
-		log("ERROR could not heal or release id=%s detail=%s", tostring(id), tostring(detail))
+	if not on_current_level(sim, se_obj) then
+		if not quarantined[id] then
+			quarantine(sim, se_obj, "off_level")
+		end
+		return
 	end
+
+	if not level_ready then
+		if not quarantined[id] then
+			quarantine(sim, se_obj, "level_not_ready")
+		end
+		return
+	end
+
+	allow_online(sim, se_obj)
+	log(
+		"safe id=%s name=%s via=%s",
+		tostring(id),
+		tostring(object_name(se_obj)),
+		tostring(reason)
+	)
 end
 
-local function queued_ids()
-	local ids = {}
-	for id, _ in pairs(quarantined) do
-		ids[#ids + 1] = id
+local function process_all(sim, reason)
+	if not sim then
+		return
 	end
-	return ids
+	local ids = queued_ids()
+	for i = 1, #ids do
+		local id = ids[i]
+		local se_obj = se_by_id(sim, id)
+		if se_obj then
+			process_one(sim, se_obj, reason)
+		else
+			known_ids[id] = nil
+			quarantined[id] = nil
+			dangling_seen[id] = nil
+			released[id] = true
+		end
+	end
 end
 
 function process_tick()
@@ -499,18 +540,7 @@ function process_tick()
 	if not sim then
 		return true
 	end
-
-	local ids = queued_ids()
-	for i = 1, #ids do
-		local id = ids[i]
-		local se_obj = se_by_id(sim, id)
-		if se_obj then
-			process_one(sim, se_obj, "queued")
-		else
-			quarantined[id] = nil
-			processed[id] = true
-		end
-	end
+	process_all(sim, "queued")
 	return true
 end
 
@@ -526,8 +556,28 @@ local function schedule_process()
 	CreateTimeEvent(EVENT_ID, PROCESS_ACTION, PROCESS_DELAY, process_tick)
 end
 
+local function quarantine_current_level(sim, reason)
+	if not sim then
+		return
+	end
+	level_ready = false
+	local ids = queued_ids()
+	for i = 1, #ids do
+		local id = ids[i]
+		if not released[id] then
+			local se_obj = se_by_id(sim, id)
+			if se_obj and is_gigant(se_obj) and on_current_level(sim, se_obj) then
+				if object_online(se_obj) == true then
+					inspect_online(sim, se_obj)
+				end
+				quarantine(sim, se_obj, reason)
+			end
+		end
+	end
+end
+
 function patched_can_switch_online(self, ...)
-	if self then
+	if select("#", ...) == 0 and self then
 		local id = self.id
 		if id and quarantined[id] then
 			return false
@@ -567,41 +617,45 @@ function server_entity_on_register(se_obj, type_name)
 		return
 	end
 
-	local id = object_id(se_obj)
-	if not id or processed[id] then
+	local id = remember_gigant(se_obj)
+	if not id or released[id] then
 		return
 	end
 
 	local sim = get_sim()
-	local risky, reason = needs_quarantine(sim, se_obj)
-	if not risky then
+	if not graph_vertex_ok(se_obj) then
+		quarantine(sim, se_obj, "invalid_game_vertex")
+		schedule_process()
 		return
 	end
-
-	quarantine(sim, se_obj, reason)
+	if not smart_ok(sim, se_obj) then
+		quarantine(sim, se_obj, "dangling_smart_terrain")
+		schedule_process()
+		return
+	end
+	if object_online(se_obj) == true then
+		return
+	end
+	if on_current_level(sim, se_obj) and level_ready then
+		process_one(sim, se_obj, "server_entity_on_register")
+		return
+	end
+	quarantine(sim, se_obj, on_current_level(sim, se_obj) and "level_not_ready" or "off_level")
 	schedule_process()
 end
 
 function actor_on_first_update()
-	schedule_process()
+	level_ready = true
+	local sim = get_sim()
+	process_all(sim, "actor_on_first_update")
 end
 
 function on_before_level_changing()
-	local sim = get_sim()
-	if not sim then
-		return
-	end
-	local ids = queued_ids()
-	for i = 1, #ids do
-		local id = ids[i]
-		local se_obj = se_by_id(sim, id)
-		if se_obj then
-			process_one(sim, se_obj, "on_before_level_changing")
-		else
-			quarantined[id] = nil
-			processed[id] = true
-		end
-	end
+	quarantine_current_level(get_sim(), "on_before_level_changing")
+end
+
+function on_level_changing()
+	quarantine_current_level(get_sim(), "on_level_changing")
 end
 
 function on_game_load()
@@ -617,6 +671,7 @@ function on_game_start()
 	RegisterScriptCallback("server_entity_on_register", server_entity_on_register)
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	RegisterScriptCallback("on_before_level_changing", on_before_level_changing)
+	RegisterScriptCallback("on_level_changing", on_level_changing)
 	RegisterScriptCallback("on_game_load", on_game_load)
 	callbacks_registered = true
 	log("loaded v%s", VERSION)
@@ -634,6 +689,7 @@ function on_game_end()
 	UnregisterScriptCallback("server_entity_on_register", server_entity_on_register)
 	UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	UnregisterScriptCallback("on_before_level_changing", on_before_level_changing)
+	UnregisterScriptCallback("on_level_changing", on_level_changing)
 	UnregisterScriptCallback("on_game_load", on_game_load)
 	callbacks_registered = false
 	reset_state()

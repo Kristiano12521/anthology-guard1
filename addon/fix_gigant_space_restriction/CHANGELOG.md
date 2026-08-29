@@ -1,5 +1,39 @@
 # Gigant Space Restriction Crash Fix
 
+## [1.1.0] — 2026-08-30
+
+**Изменено**
+
+- `gamedata/scripts/fix_gigant_space_restriction.script` — карантин больше не завязан на чтение CSE-строк рестрикторов. Гигант на чужой локации и offline-гигант на текущей не идут online до `actor_on_first_update` на их уровне. Уход с локации (`on_before_level_changing` и `on_level_changing`) снова сажает текущих гигантов в карантин. Висячие клиентские рестрикторы / битая вершина графа / мёртвый smart — `alife_release`, пока объект offline.
+
+**Причина**
+
+ZIP `Anthology_DeadCity_Gigant_Repair_id24062` удалял ALife id `24062`. Это тот же класс краша, что и Припять/`40604`: повторный вход (МГ → сосед → обратно) валит `CPseudoGigant::reinit` / `CSpaceRestrictionBridge::initialized`. Прямая загрузка сейва уже в МГ проходит. Числовой id после `id_cleaner` бессмысленен.
+
+v1.0.0 промахивался по этому репро: `m_out_space_restrictors` / `m_in_space_restrictors` нет в Lua (`lua_help`), online-гигант помечался `processed` и больше не трогался, `server_entity_on_register` при возврате не стреляет.
+
+**Как исправлено**
+
+Числовые id по-прежнему не используются. Wrap `se_monster.can_switch_online` не перехватывает setter (`can_switch_online(boolean)`). Рестрикторы снимаются только через `alife():remove_all_restrictions(id, 4/5)` и клиентский `game_object:remove_all_restrictions()`, и только если имена из `out/in_restrictions()` не находятся в ALife. CSE STATE не пишется. Тика `actor_on_update` нет.
+
+**Не затронуто**
+
+- остальные мутанты и сталкеры
+- здоровые гиганты: после `first_update` на их уровне снова online
+- `all.spawn`, LTX секций гиганта, `id_cleaner_anthology`
+- сохраняемые таблицы мода (своего `save_state` нет)
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции и без новой игры
+- В MO2 ниже сборки и `id_cleaner`. Выключить ZIP `Anthology_Central_Pripyat_Gigant_Save_Repair_v1.0.1`, `anthology_pripyat_gigant_repair.script` в `[DBG] Kristiano Fixes ALL IN ONE` и `Anthology_DeadCity_Gigant_Repair_id24062`
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_gigant_space_restriction`
+- В игре: не прогонялось. Загрузить сейв в Мёртвом городе или на Центральной Припяти, уйти на соседа и вернуться. Ожидание в логе: `quarantine` на уходе, `safe` или `release` на соседе / по возврату, без FATAL `CPseudoGigant::reinit`
+
 ## [1.0.0] — 2026-08-29
 
 **Изменено**
