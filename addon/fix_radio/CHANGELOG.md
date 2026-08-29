@@ -1,5 +1,20 @@
 # Radio Fix
 
+## [1.0.1] — 2026-08-30
+
+**Изменено**
+
+- Больше не подменяет `FS.file_list_open` на весь процесс. Фильтр `*.ogg` ставится только на время `placeable_radio_wrapper.__init` через временный `getFS()`.
+
+**Причина**
+
+Глобальный wrap ловил `getFS():file_list_open` у WTF (`modxml_wtf.get_dialog_xmls`) на `on_game_start`. Повторный вызов сохранённого C++-метода давал `pure virtual function called` и CTD.
+
+**Не затронуто**
+
+- Мировые приёмники: `sound/radio/zone`, hit/use
+- Сам `placeable_radio.script`
+
 ## [1.0.0] — 2026-08-29
 
 **Изменено**
