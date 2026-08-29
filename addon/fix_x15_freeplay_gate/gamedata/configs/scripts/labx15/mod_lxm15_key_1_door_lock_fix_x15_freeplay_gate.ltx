@@ -1,0 +1,6 @@
+; X-15 freeplay gate — patch lxm15_key_1_door_lock.ltx
+; Why: card reader waits for lx15m_t1_door_mojno_press_go (Afina + decoder).
+;      Other lab doors already unlock on -contract_for_a_new_life.
+
+![ph_button@quest]
+on_info3 = {-contract_for_a_new_life -lx15m_t1_knopka_door_opened} ph_button@press
