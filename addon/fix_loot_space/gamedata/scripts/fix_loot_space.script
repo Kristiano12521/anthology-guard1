@@ -1,0 +1,118 @@
+-- Loot Space Take-All Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- 1) Mutant dressing (UIMutantLoot): the window advertises ENTER/SPACE for
+--    "Loot all", but ui_mutant_loot.script:OnKeyboard only checks DIK_RETURN.
+--    SPACE is forwarded as RETURN so the original handler stays in charge.
+--
+-- 2) Corpse / stash loot (UIInventory, mode "loot"): take-all is SHIFT+T on
+--    key release. SPACE in loot mode calls LMode_TakeAll and is consumed so
+--    CUIScriptWnd does not activate a focused control. SHIFT+T is unchanged.
+--    Inventory / trade / repair are not patched.
+--
+-- ZIP v1.0.0-beta used a zzzz filename, remapped only mutant loot, installed
+-- at parse time, and never restored OnKeyboard. Disable that zip.
+
+local LOG_TAG = "[fix_loot_space]"
+local VERSION = "1.0.0"
+
+local orig = {}
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function module_of(name)
+	return rawget(_G, name)
+end
+
+local function class_of(mod_name, class_name)
+	local mod = module_of(mod_name)
+	return mod and mod[class_name] or nil
+end
+
+local function wrap_method(mod_name, class_name, method, wrapper, slot)
+	if orig[slot] then
+		return true
+	end
+	local cls = class_of(mod_name, class_name)
+	if not (cls and type(cls[method]) == "function") then
+		return false
+	end
+	orig[slot] = cls[method]
+	cls[method] = wrapper
+	return true
+end
+
+local function restore_method(mod_name, class_name, method, slot)
+	local cls = class_of(mod_name, class_name)
+	if cls and orig[slot] then
+		cls[method] = orig[slot]
+	end
+	orig[slot] = nil
+end
+
+local function mutant_on_keyboard(self, dik, keyboard_action)
+	local fn = orig.mutant_kb
+	if not fn then
+		return
+	end
+	if dik == DIK_keys.DIK_SPACE then
+		dik = DIK_keys.DIK_RETURN
+	end
+	return fn(self, dik, keyboard_action)
+end
+
+local function inventory_on_keyboard(self, dik, keyboard_action)
+	local fn = orig.inv_kb
+	if not fn then
+		return
+	end
+	if dik == DIK_keys.DIK_SPACE and self.mode == "loot" then
+		if keyboard_action == ui_events.WINDOW_KEY_PRESSED then
+			self:LMode_TakeAll()
+		end
+		return true
+	end
+	return fn(self, dik, keyboard_action)
+end
+
+local function install()
+	local mutant_ok = wrap_method(
+		"ui_mutant_loot",
+		"UIMutantLoot",
+		"OnKeyboard",
+		mutant_on_keyboard,
+		"mutant_kb"
+	)
+	local inv_ok = wrap_method(
+		"ui_inventory",
+		"UIInventory",
+		"OnKeyboard",
+		inventory_on_keyboard,
+		"inv_kb"
+	)
+	if mutant_ok and inv_ok then
+		log("loaded v%s mutant=SPACE->RETURN loot=SPACE take-all", VERSION)
+	else
+		log(
+			"partial v%s mutant=%s inventory=%s",
+			VERSION,
+			tostring(mutant_ok),
+			tostring(inv_ok)
+		)
+	end
+end
+
+local function uninstall()
+	restore_method("ui_mutant_loot", "UIMutantLoot", "OnKeyboard", "mutant_kb")
+	restore_method("ui_inventory", "UIInventory", "OnKeyboard", "inv_kb")
+end
+
+function on_game_start()
+	install()
+end
+
+function on_game_end()
+	uninstall()
+end

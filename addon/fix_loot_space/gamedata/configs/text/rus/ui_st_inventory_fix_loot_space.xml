@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!--
+  Overlay for ui_st_take_all_hint from ui_st_inventory.xml.
+  Adds SPACE next to SHIFT+T. Does not replace the inventory string file.
+-->
+<string_table>
+	<string id="ui_st_take_all_hint">
+		<text>Переместите все предметы в рюкзак (ПРОБЕЛ / SHIFT + T)</text>
+	</string>
+</string_table>
