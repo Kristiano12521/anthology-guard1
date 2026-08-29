@@ -1,0 +1,22 @@
+; Patch system.ltx sorter tabs for Bart's New Sorting Tabs (10 buttons).
+; Vanilla still ships an 8-tab kinds table, so food includes meds and tabs 9/10
+; have no section. Kinds follow ui_st_tab_* hints / Bart textures, not the BETA
+; zip (that one swapped misc and upgrades on 9/10). Tabs 1, 2, 4, 5 already match.
+
+![button_sort_tab_3]
+kinds = o_light, o_medium, o_sci, o_heavy, o_helmet, i_backpack, i_attach
+
+![button_sort_tab_6]
+kinds = i_device, i_tool, i_repair, i_kit
+
+![button_sort_tab_7]
+kinds = i_mutant_raw, i_mutant_cooked, i_food, i_drink
+
+![button_sort_tab_8]
+kinds = i_medical
+
+@[button_sort_tab_9]
+kinds = i_part, i_upgrade
+
+@[button_sort_tab_10]
+kinds = i_misc, i_letter, i_quest
