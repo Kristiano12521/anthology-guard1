@@ -1,0 +1,169 @@
+-- NTA Stashes Anthology Guard
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- NTA (iTheon New Tasks Addon) indexes treasure_manager.caches by level:
+--   lvl = alife():level_name(game_graph():vertex(gvid):level_id())
+--   stashes_by_level[lvl] = {}
+-- Anthology can leave a cache with an unresolvable game vertex
+-- (confirmed: id=6253, gvid=65535, level_id=168, level_name=nil).
+-- Lua then does stashes_by_level[nil] = {} and fatals during load
+-- (populate_stashes_by_levels_table, reported as actor_on_net_spawn).
+--
+-- ZIP v1.0.1 replaced z_nta_stashes_utils.script entirely. That fights
+-- iTheon Quest Pack in MO2, drops any extra NTA helpers, and can swap
+-- on_game_load vs actor_on_net_spawn depending on which pack copy was
+-- used as the base. Original populate cannot be pcall'd as a whole:
+-- the first bad cache aborts the rest of the table.
+--
+-- Wrap populate on the NTA module. Skip only entries with no level name.
+-- treasure_manager.caches and the alife objects are not modified.
+
+local LOG_TAG = "[fix_nta_stashes]"
+local VERSION = "1.0.0"
+
+local orig_populate = nil
+local callbacks_registered = false
+local warned_bad_stashes = {}
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function reset_warned()
+	warned_bad_stashes = {}
+end
+
+local function nta()
+	return z_nta_stashes_utils
+end
+
+local function resolve_level(se_obj)
+	if not se_obj then
+		return nil, nil, nil, "no_server_object"
+	end
+
+	local gvid = se_obj.m_game_vertex_id
+	if gvid == nil then
+		return nil, nil, nil, "no_game_vertex_id"
+	end
+
+	local level_id = nil
+	local ok, name = pcall(function()
+		local graph = game_graph()
+		local vertex = graph and graph:vertex(gvid) or nil
+		if not vertex then
+			return nil
+		end
+		level_id = vertex:level_id()
+		local sim = alife()
+		if not (sim and level_id ~= nil) then
+			return nil
+		end
+		return sim:level_name(level_id)
+	end)
+
+	if not ok then
+		return nil, gvid, level_id, "resolve_error"
+	end
+	if name == nil or name == "" then
+		return nil, gvid, level_id, "no_level_name"
+	end
+	return name, gvid, level_id, nil
+end
+
+local function skip_stash(id, gvid, level_id, reason)
+	if warned_bad_stashes[id] then
+		return
+	end
+	warned_bad_stashes[id] = true
+	log(
+		"skipped stash id=%s game_vertex=%s level_id=%s reason=%s",
+		tostring(id),
+		tostring(gvid),
+		tostring(level_id),
+		tostring(reason)
+	)
+end
+
+function patched_populate()
+	local mod = nta()
+	if type(mod) ~= "table" then
+		return
+	end
+
+	mod.stashes_by_level = {}
+
+	local caches = treasure_manager and treasure_manager.caches
+	if type(caches) ~= "table" then
+		log("treasure_manager.caches is unavailable; stash table left empty")
+		return
+	end
+
+	local skipped = 0
+	for id, _ in pairs(caches) do
+		local se_obj = alife_object(id)
+		if se_obj then
+			local lvl, gvid, level_id, reason = resolve_level(se_obj)
+			if lvl then
+				if not mod.stashes_by_level[lvl] then
+					mod.stashes_by_level[lvl] = {}
+				end
+				table.insert(mod.stashes_by_level[lvl], id)
+			else
+				skipped = skipped + 1
+				skip_stash(id, gvid, level_id, reason)
+			end
+		end
+	end
+
+	if skipped > 0 then
+		log("stash table built; skipped invalid/unresolved entries: %s", tostring(skipped))
+	end
+end
+
+local function install()
+	local mod = nta()
+	if type(mod) ~= "table" or type(mod.populate_stashes_by_levels_table) ~= "function" then
+		log("z_nta_stashes_utils.populate_stashes_by_levels_table not found - guard NOT installed")
+		return false
+	end
+	if mod.populate_stashes_by_levels_table == patched_populate then
+		return true
+	end
+	orig_populate = orig_populate or mod.populate_stashes_by_levels_table
+	mod.populate_stashes_by_levels_table = patched_populate
+	log("v%s populate wrapped", VERSION)
+	return true
+end
+
+local function uninstall()
+	local mod = nta()
+	if orig_populate and type(mod) == "table" and mod.populate_stashes_by_levels_table == patched_populate then
+		mod.populate_stashes_by_levels_table = orig_populate
+	end
+	orig_populate = nil
+end
+
+function on_game_load()
+	reset_warned()
+	install()
+end
+
+function on_game_start()
+	install()
+	if callbacks_registered then
+		return
+	end
+	RegisterScriptCallback("on_game_load", on_game_load)
+	callbacks_registered = true
+	log("loaded v%s", VERSION)
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		callbacks_registered = false
+	end
+	uninstall()
+	reset_warned()
+end
