@@ -1,5 +1,35 @@
 # Quest Stash Type Migration Fix
 
+## [1.0.2] — 2026-08-30
+
+**Изменено**
+
+- `gamedata/configs/mod_system_fix_quest_stash.ltx` — DLTX корня `system.ltx`: `#include` секций `1001`–`1038`.
+- `fix_quest_stash.script` — лог `section drx_sl_quest_item_1014 exist=yes|no` при `on_game_start`.
+
+**Причина**
+
+В `Xr_ini.cpp` `mod_*` ищутся только при `bIsRootFile`. `items_quest.ltx` приходит через `#include`, поэтому `mod_items_quest_fix_quest_stash.ltx` из 1.0.1 не подхватывался. `[QUE] wtf 4_2` оставляет слоты 1–3, сейв пишет `Can't create entity 'drx_sl_quest_item_1014'`, миграция не может восстановить КПК.
+
+**Как исправлено**
+
+Те же `@[drx_sl_quest_item_*]` вешаются на корень `system.ltx`, который DLTX точно сканирует. `@` не падает, если секции уже есть в Anthology.
+
+**Не затронуто**
+
+- логика миграции `stash_type`, `mod_treasure_manager_fix_quest_stash.ltx`
+- общие слоты 1–3, `tasks_stash.script`, `get_random_stash`, `all.spawn`
+
+**Совместимость**
+
+- Сейвы: новая игра не нужна. Грузить слот **до** провала, не сейв после `DRX SL task ended`
+- В MO2 ниже сборки
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_quest_stash`
+- В игре: не прогонялось. Ожидаемый лог: `loaded v1.0.2 section drx_sl_quest_item_1014 exist=yes`, нет `Can't create entity 'drx_sl_quest_item_1014'`
+
 ## [1.0.1] — 2026-08-30
 
 **Изменено**

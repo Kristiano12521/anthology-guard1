@@ -18,7 +18,7 @@
 -- are restored via DLTX. Does not wrap treasure_manager.get_random_stash.
 
 local LOG_TAG = "[fix_quest_stash]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 local EVENT_ID = "fix_quest_stash"
 local REPAIR_ACTION = "migrate"
 local REPAIR_DELAY = 1.0
@@ -503,7 +503,7 @@ function on_game_start()
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	RegisterScriptCallback("on_game_load", on_game_load)
 	callbacks_registered = true
-	log("loaded v%s", VERSION)
+	log("loaded v%s section %s exist=%s", VERSION, "drx_sl_quest_item_1014", section_exists("drx_sl_quest_item_1014") and "yes" or "no")
 end
 
 function on_game_end()

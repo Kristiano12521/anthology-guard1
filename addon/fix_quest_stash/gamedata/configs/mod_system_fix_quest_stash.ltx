@@ -1,0 +1,5 @@
+; Attach DRX PDA 1001-1038 to system.ltx (the CInifile root).
+; Why: LTXLoad discovers mod_* only when bIsRootFile. items_quest.ltx is
+;      only #included, so mod_items_quest_*.ltx never loads. WTF 4_2 then
+;      keeps slots 1-3 and save objects 1014/1023 fail Can't create entity.
+#include "items\items\mod_items_quest_fix_quest_stash.ltx"

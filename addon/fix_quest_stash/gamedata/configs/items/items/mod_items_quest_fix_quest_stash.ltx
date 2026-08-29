@@ -1,7 +1,7 @@
-; Restore Anthology DRX quest PDA sections 1001-1038 when another items_quest.ltx wins.
-; Why: [QUE] wtf 4_2 ships a full items_quest.ltx with only slots 1-3; save objects
-;      fail with Can't create entity and stash tasks cannot recover.
-; Safe-create (@): sections already exist in Anthology items_quest.ltx.
+; Section bodies for DRX PDA 1001-1038. Loaded via
+; configs/mod_system_fix_quest_stash.ltx — not as a sibling DLTX of
+; items_quest.ltx (that file is never a CInifile root).
+; Safe-create (@): no fatal if Anthology already has the sections.
 
 
 ; generated for jup_a6_freedom_trader_ashot_task_2, old stash slot 2
