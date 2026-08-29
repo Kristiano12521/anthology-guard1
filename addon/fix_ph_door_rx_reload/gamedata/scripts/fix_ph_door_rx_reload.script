@@ -1,0 +1,245 @@
+-- PH Door Stale Registry + RX Offline Planner Guard
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- ZIP [FIX] MTR Attribute Hotfix (slim) rewrote ph_door.try_to_open_door /
+-- try_to_close_door wholesale and guarded only rx_reload.add_to_binder.
+-- This addon keeps the original bodies and fixes the two nil races at
+-- their call boundaries.
+--
+-- ph_door.script:342 -- db.level_doors is filled in add_to_binder and
+-- never cleared. db.del_obj (bind_physic_object / xr_motivator
+-- net_destroy) nils db.storage[id]. The next stalker within 3m of the
+-- cached position indexes a nil storage. Same hole in try_to_close_door
+-- at line 356 (opened_doors still holds the id).
+--
+-- rx_reload.script:209 -- rx_ai.enable_schemes runs only for
+-- stype_stalker, then rx_reload / rx_facer / rx_bandage / rx_knife
+-- add_to_binder all do manager:add_evaluator without a nil check.
+-- Offline squad respawn can hand a stalker-typed object with no action
+-- planner. Guarding only rx_reload leaves the next scheme as the new
+-- crash.
+
+local LOG_TAG = "[fix_ph_door_rx_reload]"
+local VERSION = "1.0.0"
+local SKIP_LOG_LIMIT = 8
+
+local orig = {}
+local installed = {
+	door = false,
+	rx = false,
+}
+local callbacks_registered = false
+local skip_logged = 0
+local skip_seen = {}
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function module_of(name)
+	return rawget(_G, name)
+end
+
+local function object_label(obj)
+	if not obj then
+		return "nil"
+	end
+	local ok, name = pcall(function()
+		return obj:name()
+	end)
+	if ok and name then
+		return tostring(name)
+	end
+	ok, name = pcall(function()
+		return obj:id()
+	end)
+	if ok and name then
+		return "id=" .. tostring(name)
+	end
+	return "?"
+end
+
+local function has_planner(npc)
+	if not npc then
+		return false
+	end
+	local ok, manager = pcall(function()
+		return npc:motivation_action_manager()
+	end)
+	return ok and manager ~= nil
+end
+
+local function forget_door(id)
+	if id and db and db.level_doors then
+		db.level_doors[id] = nil
+	end
+end
+
+local function prune_level_doors()
+	if not (db and db.level_doors and db.storage) then
+		return
+	end
+	for id, _ in pairs(db.level_doors) do
+		if not db.storage[id] then
+			db.level_doors[id] = nil
+		end
+	end
+end
+
+local function prune_opened_doors(doors)
+	if not doors then
+		return
+	end
+	for id, _ in pairs(doors) do
+		if not (db and db.storage and db.storage[id]) then
+			doors[id] = nil
+			forget_door(id)
+		end
+	end
+end
+
+function patched_try_to_open_door(npc, opened_doors)
+	prune_level_doors()
+	return orig.open(npc, opened_doors)
+end
+
+function patched_try_to_close_door(npc, doors)
+	prune_opened_doors(doors)
+	return orig.close(npc, doors)
+end
+
+function patched_enable_schemes(ini, npc, section_logic)
+	if not has_planner(npc) then
+		local label = object_label(npc)
+		if not skip_seen[label] and skip_logged < SKIP_LOG_LIMIT then
+			skip_seen[label] = true
+			skip_logged = skip_logged + 1
+			log("skip rx schemes, no action planner (%s)", label)
+		end
+		return
+	end
+	return orig.enable(ini, npc, section_logic)
+end
+
+local function wrap(slot, module, name, patched)
+	if not (module and type(module[name]) == "function") then
+		return false
+	end
+	if module[name] == patched then
+		return true
+	end
+	orig[slot] = orig[slot] or module[name]
+	module[name] = patched
+	return true
+end
+
+local function install_door()
+	if installed.door then
+		return true
+	end
+
+	local ph_door = module_of("ph_door")
+	if not ph_door then
+		return false
+	end
+
+	local ok_open = wrap("open", ph_door, "try_to_open_door", patched_try_to_open_door)
+	local ok_close = wrap("close", ph_door, "try_to_close_door", patched_try_to_close_door)
+	if not (ok_open and ok_close) then
+		log("missing ph_door methods open=%s close=%s", tostring(ok_open), tostring(ok_close))
+		return false
+	end
+
+	installed.door = true
+	log("loaded v%s wrapped ph_door.try_to_open/close", VERSION)
+	return true
+end
+
+local function install_rx()
+	if installed.rx then
+		return true
+	end
+
+	local rx_ai = module_of("rx_ai")
+	if not (rx_ai and type(rx_ai.enable_schemes) == "function") then
+		return false
+	end
+
+	if not wrap("enable", rx_ai, "enable_schemes", patched_enable_schemes) then
+		log("rx_ai.enable_schemes not found - RX guard NOT installed")
+		return false
+	end
+
+	installed.rx = true
+	log("loaded v%s wrapped rx_ai.enable_schemes", VERSION)
+	return true
+end
+
+local function install()
+	local door = install_door()
+	local rx = install_rx()
+	return door and rx
+end
+
+local function uninstall_door()
+	local ph_door = module_of("ph_door")
+	if ph_door then
+		if orig.open then
+			ph_door.try_to_open_door = orig.open
+		end
+		if orig.close then
+			ph_door.try_to_close_door = orig.close
+		end
+	end
+	orig.open = nil
+	orig.close = nil
+	installed.door = false
+end
+
+local function uninstall_rx()
+	local rx_ai = module_of("rx_ai")
+	if rx_ai and orig.enable then
+		rx_ai.enable_schemes = orig.enable
+	end
+	orig.enable = nil
+	installed.rx = false
+end
+
+function game_object_on_net_destroy(obj)
+	if not obj then
+		return
+	end
+	local ok, id = pcall(function()
+		return obj:id()
+	end)
+	if ok and id then
+		forget_door(id)
+	end
+end
+
+function actor_on_first_update()
+	if not (installed.door and installed.rx) then
+		install()
+	end
+end
+
+function on_game_start()
+	skip_logged = 0
+	skip_seen = {}
+	install()
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		RegisterScriptCallback("game_object_on_net_destroy", game_object_on_net_destroy)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		UnregisterScriptCallback("game_object_on_net_destroy", game_object_on_net_destroy)
+		callbacks_registered = false
+	end
+	uninstall_door()
+	uninstall_rx()
+end
