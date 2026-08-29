@@ -3,13 +3,19 @@
 ;      workshop_autoinject.LoadRecipes, which CSI v4 no longer calls.
 ;      craft_-500 is Devices; craft_-510 is the empty Exo System tab
 ;      that CSI otherwise drops in check_empty_tabs.
+; Exo set is the 7-recipe list from the old archive: handmade / military /
+; proto / tank / sprint / jump / invis. Corpse drop of the military PSU
+; stays in exo_loot.script (10%/3%); craft is an extra path, not a replace.
 
 ![craft_-500]
 x_device_pda_milspec = 3, recipe_pda_milspec, device_pda_3,1,prt_o_ballistic_8,1,prt_i_transistors,20,prt_i_capacitors,25
 
 @[craft_-510]
 title = st_exo_system_craftingtitle
-x_exo_power_supply = 1, recipe_basic_3, itm_backpack,1,batteries_exo,1,prt_i_copper,4,prt_i_scrap,4
-x_exo_power_supply_proto = 1, recipe_exo_1, exo_power_supply_military,1,af_surge,1,af_dummy_battery_af_aam,1,prt_i_transistors,4
+x_exo_power_supply = 1, recipe_basic_3, equ_small_pack,1,batteries_exo,2,af_full_empty_af_aam,1,prt_i_resistors,10
+x_exo_power_supply_military = 1, recipe_basic_3, equ_small_military_pack,1,batteries_exo,3,af_cooler,1,prt_i_capacitors,12
+x_exo_power_supply_proto = 1, recipe_exo_1, exo_power_supply_military,2,af_surge_up,1,af_dummy_battery_af_aam,1,prt_i_transistors,10
 x_exo_power_supply_tank = 1, recipe_exo_2, exo_power_supply_military,1,af_surge,1,af_full_empty_af_aam,1,prt_i_resistors,4
 x_exo_power_supply_sprint = 1, recipe_exo_3, exo_power_supply_military,1,af_cooler,1,af_electra_flash_af_aam,1,prt_i_capacitors,4
+x_exo_power_supply_jump = 1, recipe_exo_3, exo_power_supply_military,1,af_cooler,1,af_electra_flash_af_aam,1,prt_i_resistors,4
+x_exo_power_supply_invisibility = 1, recipe_exo_1, exo_power_supply_military,1,af_surge,1,af_dummy_battery_af_aam,1,prt_i_capacitors,4
