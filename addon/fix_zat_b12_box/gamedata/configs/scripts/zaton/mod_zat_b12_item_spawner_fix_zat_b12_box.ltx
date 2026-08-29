@@ -1,0 +1,8 @@
+; Zaton B12 military box — patch zat_b12_item_spawner.ltx
+; Why: on_info3 checks -zat_b12_item_3_spawned but sets +zat_b12_item_5_spawned.
+;      The guard never latches, so spawn_object_in can fire again on logic re-init.
+;      on_info4 migrates saves that already have the typo flag, without a second spawn.
+
+![sr_idle@spawn_keys]
+on_info3 = {-zat_b12_item_3_spawned -zat_b12_item_5_spawned} %+zat_b12_item_3_spawned =spawn_object_in(ammo_5.45x39_fmj:zat_b12_millitary_box) =spawn_object_in(ammo_5.45x39_fmj:zat_b12_millitary_box) =spawn_object_in(ammo_5.45x39_ap:zat_b12_millitary_box) =spawn_object_in(ammo_9x18_fmj:zat_b12_millitary_box) =spawn_object_in(ammo_9x18_fmj:zat_b12_millitary_box) =spawn_object_in(ammo_9x18_fmj:zat_b12_millitary_box) =spawn_object_in(grenade_rgd5:zat_b12_millitary_box) =spawn_object_in(grenade_rgd5:zat_b12_millitary_box)%
+on_info4 = {-zat_b12_item_3_spawned +zat_b12_item_5_spawned} %+zat_b12_item_3_spawned%
