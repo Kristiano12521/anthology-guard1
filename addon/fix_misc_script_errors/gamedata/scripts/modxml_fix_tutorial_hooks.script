@@ -1,0 +1,56 @@
+-- Guard empty <guard_key/> for Game Tutorial Hooks
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Filename must start with modxml_ so dxml_core gathers this script and
+-- calls on_xml_read() before XML dispatch. Sorted before
+-- modxml_tutorial_hooks, so getText is wrapped first.
+--
+-- ZIP v1.0.0 BETA replaced modxml_tutorial_hooks.script. The author asks
+-- not to edit that file. dxml_core.getText prints:
+--   DXML Parser Error ... element <guard_key doesnt have children
+-- on self-closing nodes. Valid <guard_key>use</guard_key> is unchanged.
+
+local LOG_TAG = "[fix_misc_script_errors]"
+local TUTORIALS_XML = [[ui\game_tutorials.xml]]
+local wrapped_once = false
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function has_text_child(el)
+	return el and type(el.kids) == "table" and el.kids[1]
+end
+
+function on_xml_read_game_tutorials(xml_file_name, xml_obj, flags)
+	if xml_file_name ~= TUTORIALS_XML then
+		return
+	end
+	if not xml_obj or type(xml_obj.getText) ~= "function" then
+		return
+	end
+	if xml_obj._fix_misc_gettext_guard then
+		return
+	end
+
+	local orig_get_text = xml_obj.getText
+	xml_obj._fix_misc_gettext_guard = true
+	xml_obj.getText = function(self, el)
+		if not has_text_child(el) then
+			return nil
+		end
+		return orig_get_text(self, el)
+	end
+
+	if not wrapped_once then
+		wrapped_once = true
+		log("wrapped getText for %s", TUTORIALS_XML)
+	end
+end
+
+-- dxml_core calls this once while gathering modxml_*.script (sorted).
+-- Do not Unregister: tutorial_hooks never unregisters its handler either,
+-- and re-registering after on_game_end would run after it.
+function on_xml_read()
+	RegisterScriptCallback("on_xml_read", on_xml_read_game_tutorials)
+end
