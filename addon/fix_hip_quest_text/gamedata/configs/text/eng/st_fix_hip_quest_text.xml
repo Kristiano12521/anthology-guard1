@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!--
+  fix_hip_quest_text: overlay for Hip (devushka) fetch dialogue.
+  Names the unique TOZ-34 Bizon / Zubr (wpn_toz34_mark4) in the
+  offer line so it matches the journal, item inv_name, and the script
+  check. Does not replace st_dialogs_escape.xml / st_quests_escape.xml.
+  Does not change quest logic.
+-->
+<string_table>
+    <string id="devushka_1_start_2">
+		<text>There's not much I can tell you unless you're looking for work. I know a guy. He's rich in all senses of the word - silly and privileged in equal measure. He's out there, treating the Zone like a safari right now. He doesn't care for artefacts. All he wants to do is collect old guns... and shoot pigs with them. He even wants to find a scoped TOZ-34 "Bizon" that has "seen some genuine Zone action," as a souvenir! And what he wants to pay is absolutely through the roof!\n \nThe problem is, the last guy I met who knew where to find a TOZ-34 "Bizon" is Hunter, and he died years ago. None of the big-time traders below the Barrier seem interested in finding one, either - they don't seem to think it's worth their time.\n \nBut if you find one, bring me the TOZ-34 "Bizon" along with 20 rounds of 12x70 buckshot, and you'll be paid several times what it'd fetch you elsewhere.</text>
+	</string>
+</string_table>
