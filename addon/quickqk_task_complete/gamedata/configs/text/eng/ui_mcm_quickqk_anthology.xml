@@ -1,0 +1,375 @@
+<?xml version='1.0' encoding='windows-1251'?>
+<string_table>
+    <string id="ui_mcm_menu_quickqk">
+        <text>QuickQK Task Status Tool</text>
+    </string>
+    <string id="ui_mcm_menu_qq_general">
+        <text>Controls</text>
+    </string>
+    <string id="ui_mcm_menu_qq_safety">
+        <text>Safety</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_desc">
+        <text>Force-closes the task currently tracked in the PDA as completed or failed. This changes only the task status; rewards, dialogue, info portions, and later quest stages are not guaranteed.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_enable">
+        <text>Enable addon</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_enable_desc">
+        <text>Master switch for all QuickQK hotkeys.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_modifier">
+        <text>Modifier key</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_modifier_desc">
+        <text>Hold this key together with the force-complete or force-fail key.</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_f6">
+        <text>F6</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_f7">
+        <text>F7</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_f8">
+        <text>F8</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_f9">
+        <text>F9</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_complete_key">
+        <text>Force-close as completed key</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_complete_key_desc">
+        <text>Used with the modifier to mark the tracked task as completed through Task Manager. This is not the same as completing all quest scripts normally.</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_home">
+        <text>Home</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_pageup">
+        <text>Page Up</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_insert">
+        <text>Insert</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_fail_key">
+        <text>Force-close as failed key</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_fail_key_desc">
+        <text>Used with the modifier to mark the tracked task as failed through Task Manager.</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_end">
+        <text>End</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_pagedown">
+        <text>Page Down</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_delete">
+        <text>Delete</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_desc">
+        <text>Forced status changes can bypass dialogue, rewards, item hand-ins, info portions, and later quest stages. Keep confirmation enabled and make a separate save before use.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_require_confirm">
+        <text>Require a second hotkey press</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_require_confirm_desc">
+        <text>The first press displays a detailed warning. Repeat the same combination within the confirmation window to force the status change.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_confirm_window">
+        <text>Confirmation window, seconds</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_confirm_window_desc">
+        <text>How long the second identical hotkey press remains valid.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_cooldown">
+        <text>Action cooldown, seconds</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_cooldown_desc">
+        <text>Minimum delay between executed task changes.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_show_notifications">
+        <text>Show notifications</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_show_notifications_desc">
+        <text>Display confirmation, success, failure, and error messages.</text>
+    </string>
+    <string id="st_quickqk_confirm_complete">
+        <text>This will force-close the tracked task as completed. Rewards, dialogue, item hand-ins, and follow-up stages are not guaranteed. Repeat the hotkey to confirm.</text>
+    </string>
+    <string id="st_quickqk_confirm_fail">
+        <text>This will force-close the tracked task as failed. Quest consequences may be skipped. Repeat the hotkey to confirm.</text>
+    </string>
+    <string id="st_quickqk_task_completed">
+        <text>The task was force-closed as completed. Rewards and story events may have been skipped.</text>
+    </string>
+    <string id="st_quickqk_task_failed">
+        <text>The task was force-closed as failed.</text>
+    </string>
+    <string id="st_quickqk_no_active_task">
+        <text>No tracked active task was found.</text>
+    </string>
+    <string id="st_quickqk_task_manager_error">
+        <text>Task Manager is unavailable. No task was changed.</text>
+    </string>
+    <string id="st_quickqk_action_error">
+        <text>The task state could not be changed.</text>
+    </string>
+    <string id="st_quickqk_key_conflict">
+        <text>Complete and fail keys were identical. The fail key was restored to a free key.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_log_task_details">
+        <text>Write task details to the log</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_log_task_details_desc">
+        <text>Writes the task ID, detected title, requested action, result, and reward warning to xray.log. Useful for identifying missions that require a separate compatibility patch.</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_f10">
+        <text>F10</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_f11">
+        <text>F11</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_f12">
+        <text>F12</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_lshift">
+        <text>Left Shift</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_lctrl">
+        <text>Left Ctrl</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_lalt">
+        <text>Left Alt</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_q">
+        <text>Q</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_e">
+        <text>E</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_r">
+        <text>R</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_t">
+        <text>T</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_y">
+        <text>Y</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_u">
+        <text>U</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_i">
+        <text>I</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_o">
+        <text>O</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_p">
+        <text>P</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_a">
+        <text>A</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_s">
+        <text>S</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_d">
+        <text>D</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_f">
+        <text>F</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_g">
+        <text>G</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_h">
+        <text>H</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_j">
+        <text>J</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_k">
+        <text>K</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_l">
+        <text>L</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_z">
+        <text>Z</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_x">
+        <text>X</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_c">
+        <text>C</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_v">
+        <text>V</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_b">
+        <text>B</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_n">
+        <text>N</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_m">
+        <text>M</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_1">
+        <text>1</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_2">
+        <text>2</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_3">
+        <text>3</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_4">
+        <text>4</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_5">
+        <text>5</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_6">
+        <text>6</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_7">
+        <text>7</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_8">
+        <text>8</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_9">
+        <text>9</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_0">
+        <text>0</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_end">
+        <text>End</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_pagedown">
+        <text>Page Down</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_delete">
+        <text>Delete</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_q">
+        <text>Q</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_e">
+        <text>E</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_r">
+        <text>R</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_t">
+        <text>T</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_y">
+        <text>Y</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_u">
+        <text>U</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_i">
+        <text>I</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_o">
+        <text>O</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_p">
+        <text>P</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_a">
+        <text>A</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_s">
+        <text>S</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_d">
+        <text>D</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_f">
+        <text>F</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_g">
+        <text>G</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_h">
+        <text>H</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_j">
+        <text>J</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_k">
+        <text>K</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_l">
+        <text>L</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_z">
+        <text>Z</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_x">
+        <text>X</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_c">
+        <text>C</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_v">
+        <text>V</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_b">
+        <text>B</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_n">
+        <text>N</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_m">
+        <text>M</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_1">
+        <text>1</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_2">
+        <text>2</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_3">
+        <text>3</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_4">
+        <text>4</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_5">
+        <text>5</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_6">
+        <text>6</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_7">
+        <text>7</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_8">
+        <text>8</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_9">
+        <text>9</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_0">
+        <text>0</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_home">
+        <text>Home</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_pageup">
+        <text>Page Up</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_insert">
+        <text>Insert</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_hotkey_note">
+        <text>CONTROL REMINDER: track the required task in the PDA. Defaults: F7 + Q force-closes it as completed; F7 + E force-closes it as failed. If confirmation is enabled, repeat the same combination within the configured time. The currently assigned keys are shown below and can be changed.</text>
+    </string>
+</string_table>

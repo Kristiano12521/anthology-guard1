@@ -1,0 +1,112 @@
+-- MCM page for QuickQK Task Status Tool -- Anomaly Anthology 2.1
+
+local BANNER = "ui_options_slider_player"
+
+local ACTION_KEYS = {
+    {"q"},
+    {"e"},
+    {"r"},
+    {"t"},
+    {"y"},
+    {"u"},
+    {"i"},
+    {"o"},
+    {"p"},
+    {"a"},
+    {"s"},
+    {"d"},
+    {"f"},
+    {"g"},
+    {"h"},
+    {"j"},
+    {"k"},
+    {"l"},
+    {"z"},
+    {"x"},
+    {"c"},
+    {"v"},
+    {"b"},
+    {"n"},
+    {"m"},
+    {"1"},
+    {"2"},
+    {"3"},
+    {"4"},
+    {"5"},
+    {"6"},
+    {"7"},
+    {"8"},
+    {"9"},
+    {"0"},
+    {"home"},
+    {"end"},
+    {"pageup"},
+    {"pagedown"},
+    {"insert"},
+    {"delete"},
+}
+
+function on_mcm_load()
+    return {
+        id = "quickqk",
+        gr = {
+            { id = "qq_general", sh = true, gr = {
+                { id = "title", type = "slide", link = BANNER,
+                  text = "ui_mcm_menu_qq_general",
+                  size = {512,50}, spacing = 20 },
+
+                { id = "desc", type = "desc",
+                  text = "ui_mcm_quickqk_qq_general_desc" },
+
+                { id = "hotkey_note", type = "desc",
+                  text = "ui_mcm_quickqk_qq_general_hotkey_note" },
+
+                { id = "enable", type = "check", val = 1, def = true },
+
+                { id = "modifier", type = "list", val = 0, def = "f7",
+                  content = {
+                    {"f6"},
+                    {"f7"},
+                    {"f8"},
+                    {"f9"},
+                    {"f10"},
+                    {"f11"},
+                    {"f12"},
+                    {"lshift"},
+                    {"lctrl"},
+                    {"lalt"},
+                  }},
+
+                { id = "complete_key", type = "list", val = 0, def = "q",
+                  content = ACTION_KEYS },
+
+                { id = "fail_key", type = "list", val = 0, def = "e",
+                  content = ACTION_KEYS },
+            }},
+
+            { id = "qq_safety", sh = true, gr = {
+                { id = "title", type = "slide", link = BANNER,
+                  text = "ui_mcm_menu_qq_safety",
+                  size = {512,50}, spacing = 20 },
+
+                { id = "desc", type = "desc",
+                  text = "ui_mcm_quickqk_qq_safety_desc" },
+
+                { id = "require_confirm", type = "check",
+                  val = 1, def = true },
+
+                { id = "confirm_window", type = "track",
+                  val = 2, min = 1, max = 10, step = 1, def = 4 },
+
+                { id = "cooldown", type = "track",
+                  val = 2, min = 0, max = 5, step = 0.5, def = 1 },
+
+                { id = "show_notifications", type = "check",
+                  val = 1, def = true },
+
+                { id = "log_task_details", type = "check",
+                  val = 1, def = true },
+            }},
+        }
+    }
+end

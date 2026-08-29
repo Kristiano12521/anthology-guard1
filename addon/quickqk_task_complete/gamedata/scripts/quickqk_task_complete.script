@@ -1,0 +1,460 @@
+-- QuickQK Task Status Tool -- Anomaly Anthology 2.1
+-- v1.4.1
+--
+-- Default controls:
+--   F7 + Q -- force-close the currently tracked task as completed
+--   F7 + E -- force-close the currently tracked task as failed
+--
+-- This changes the task status through Task Manager. on_complete / on_fail
+-- condlists still run. Dialog rewards are not guaranteed.
+
+local DEF = {
+    enable             = true,
+    modifier           = "f7",
+    complete_key       = "q",
+    fail_key           = "e",
+    require_confirm    = true,
+    confirm_window     = 4,
+    cooldown           = 1,
+    show_notifications = true,
+    log_task_details   = true,
+}
+
+local OPT_PATH = {
+    enable             = "quickqk/qq_general/enable",
+    modifier           = "quickqk/qq_general/modifier",
+    complete_key       = "quickqk/qq_general/complete_key",
+    fail_key           = "quickqk/qq_general/fail_key",
+    require_confirm    = "quickqk/qq_safety/require_confirm",
+    confirm_window     = "quickqk/qq_safety/confirm_window",
+    cooldown           = "quickqk/qq_safety/cooldown",
+    show_notifications = "quickqk/qq_safety/show_notifications",
+    log_task_details   = "quickqk/qq_safety/log_task_details",
+}
+
+local OPTS = {}
+
+local KEY_FIELDS = {
+    f6       = "DIK_F6",
+    f7       = "DIK_F7",
+    f8       = "DIK_F8",
+    f9       = "DIK_F9",
+    f10      = "DIK_F10",
+    f11      = "DIK_F11",
+    f12      = "DIK_F12",
+    lshift   = "DIK_LSHIFT",
+    lctrl    = "DIK_LCONTROL",
+    lalt     = "DIK_LMENU",
+
+    q = "DIK_Q", e = "DIK_E", r = "DIK_R", t = "DIK_T", y = "DIK_Y",
+    u = "DIK_U", i = "DIK_I", o = "DIK_O", p = "DIK_P",
+    a = "DIK_A", s = "DIK_S", d = "DIK_D", f = "DIK_F", g = "DIK_G",
+    h = "DIK_H", j = "DIK_J", k = "DIK_K", l = "DIK_L",
+    z = "DIK_Z", x = "DIK_X", c = "DIK_C", v = "DIK_V", b = "DIK_B",
+    n = "DIK_N", m = "DIK_M",
+    ["1"] = "DIK_1", ["2"] = "DIK_2", ["3"] = "DIK_3", ["4"] = "DIK_4",
+    ["5"] = "DIK_5", ["6"] = "DIK_6", ["7"] = "DIK_7", ["8"] = "DIK_8",
+    ["9"] = "DIK_9", ["0"] = "DIK_0",
+
+    home     = "DIK_HOME",
+    ["end"]  = "DIK_END",
+    pageup   = "DIK_PRIOR",
+    pagedown = "DIK_NEXT",
+    insert   = "DIK_INSERT",
+    delete   = "DIK_DELETE",
+}
+
+local FALLBACK_TEXT = {
+    st_quickqk_confirm_complete =
+        "This will force-close the tracked task as completed. Rewards, dialogue, and follow-up stages are not guaranteed. Repeat the hotkey to confirm.",
+    st_quickqk_confirm_fail =
+        "This will force-close the tracked task as failed. Quest consequences may be skipped. Repeat the hotkey to confirm.",
+    st_quickqk_task_completed =
+        "The task was force-closed as completed. Rewards and story events may have been skipped.",
+    st_quickqk_task_failed =
+        "The task was force-closed as failed.",
+    st_quickqk_no_active_task =
+        "No tracked active task was found.",
+    st_quickqk_task_manager_error =
+        "Task Manager is unavailable. No task was changed.",
+    st_quickqk_action_error =
+        "The task state could not be changed.",
+    st_quickqk_key_conflict =
+        "Complete and fail keys were identical. The fail key was restored to a free key.",
+}
+
+local modifier_down = false
+local armed_action = nil
+local pending_action = nil
+local pending_until = 0
+local last_action_time = -1000000
+local key_conflict_fixed = false
+local callbacks_registered = false
+
+local function persist_opt(id, value)
+    local path = OPT_PATH[id]
+    if not path then return end
+    if not (ui_mcm and type(ui_mcm.set) == "function") then return end
+    pcall(ui_mcm.set, path, value)
+end
+
+local function resolve_key_conflict()
+    key_conflict_fixed = false
+    if OPTS.complete_key ~= OPTS.fail_key then
+        return
+    end
+
+    key_conflict_fixed = true
+
+    local fallback = DEF.fail_key
+    if fallback == OPTS.complete_key then
+        fallback = DEF.complete_key
+    end
+    if fallback == OPTS.complete_key then
+        fallback = (OPTS.complete_key == "q") and "e" or "q"
+    end
+
+    OPTS.fail_key = fallback
+    persist_opt("fail_key", fallback)
+end
+
+local function refresh_opts()
+    for id, def in pairs(DEF) do
+        local value = nil
+        if ui_mcm and type(ui_mcm.get) == "function" then
+            local ok, result = pcall(ui_mcm.get, OPT_PATH[id])
+            if ok then value = result end
+        end
+
+        if value == nil then value = def end
+        OPTS[id] = value
+    end
+
+    resolve_key_conflict()
+end
+
+local function opt(id)
+    local value = OPTS[id]
+    if value == nil then return DEF[id] end
+    return value
+end
+
+local function now_ms()
+    if type(time_global) == "function" then
+        local ok, value = pcall(time_global)
+        if ok and type(value) == "number" then
+            return value
+        end
+    end
+    return 0
+end
+
+local function translate(id)
+    if game and type(game.translate_string) == "function" then
+        local ok, value = pcall(game.translate_string, id)
+        if ok and type(value) == "string" and value ~= "" and value ~= id then
+            return value
+        end
+    end
+    return FALLBACK_TEXT[id] or id
+end
+
+local function notify_text(text)
+    if opt("show_notifications") then
+        local actor = db and db.actor
+        if actor and news_manager and type(news_manager.send_tip) == "function" then
+            local ok = pcall(news_manager.send_tip, actor, text, nil, nil, 6500)
+            if ok then return end
+        end
+    end
+
+    if type(printf) == "function" then
+        printf("[QuickQK / Anthology] %s", text)
+    end
+end
+
+local function notify(id)
+    notify_text(translate(id))
+end
+
+local function key_code(name)
+    local field = KEY_FIELDS[name]
+    if not (field and DIK_keys) then return nil end
+    return DIK_keys[field]
+end
+
+local function get_task_manager_safe()
+    if not (task_manager and type(task_manager.get_task_manager) == "function") then
+        return nil
+    end
+
+    local ok, tm = pcall(task_manager.get_task_manager)
+    if not ok then return nil end
+    return tm
+end
+
+local function safe_index(object, key)
+    if object == nil then return nil end
+    local ok, value = pcall(function()
+        return object[key]
+    end)
+    if ok then return value end
+    return nil
+end
+
+local function safe_method_result(object, method_name)
+    local method = safe_index(object, method_name)
+    if type(method) ~= "function" then return nil end
+
+    local ok, value = pcall(method, object)
+    if ok then return value end
+    return nil
+end
+
+local function normalize_task_title(value)
+    if type(value) ~= "string" or value == "" then return nil end
+
+    local translated = translate(value)
+    if type(translated) == "string" and translated ~= "" then
+        return translated
+    end
+
+    return value
+end
+
+local function get_task_title(task_id, task)
+    local game_task = safe_index(task, "t")
+    local candidates = {
+        safe_index(task, "current_title"),
+        game_task and safe_method_result(game_task, "get_title") or nil,
+        safe_index(task, "title"),
+    }
+
+    for _, candidate in ipairs(candidates) do
+        local title = normalize_task_title(candidate)
+        if title then return title end
+    end
+
+    return tostring(task_id)
+end
+
+local function log_task_action(action, phase, task_id, title, details)
+    if not opt("log_task_details") then return end
+    if type(printf) ~= "function" then return end
+
+    printf(
+        "[QuickQK] action=%s | phase=%s | task_id=%s | title=%s | details=%s",
+        tostring(action),
+        tostring(phase),
+        tostring(task_id),
+        tostring(title),
+        tostring(details or "none")
+    )
+end
+
+local function find_active_task(tm, actor)
+    if type(tm.task_info) ~= "table" then return nil, nil end
+    if type(actor.is_active_task) ~= "function" then return nil, nil end
+
+    for task_id, task in pairs(tm.task_info) do
+        local game_task = safe_index(task, "t")
+        if game_task then
+            local ok, active = pcall(actor.is_active_task, actor, game_task)
+            if ok and active then
+                return task_id, task
+            end
+        end
+    end
+
+    return nil, nil
+end
+
+local function change_active_task(success)
+    local actor = db and db.actor
+    local tm = get_task_manager_safe()
+
+    if not actor or not tm then
+        notify("st_quickqk_task_manager_error")
+        return false
+    end
+
+    if type(actor.alive) == "function" then
+        local ok, alive = pcall(actor.alive, actor)
+        if ok and not alive then
+            notify("st_quickqk_task_manager_error")
+            return false
+        end
+    end
+
+    local task_id, task = find_active_task(tm, actor)
+    if task_id == nil then
+        notify("st_quickqk_no_active_task")
+        return false
+    end
+
+    local title = get_task_title(task_id, task)
+    local action = success and "force_complete" or "force_fail"
+    local method = success and tm.set_task_completed or tm.set_task_failed
+
+    if type(method) ~= "function" then
+        log_task_action(action, "blocked", task_id, title, "missing_task_manager_method")
+        notify("st_quickqk_task_manager_error")
+        return false
+    end
+
+    log_task_action(
+        action,
+        "before",
+        task_id,
+        title,
+        success and "reward_not_guaranteed" or "quest_consequences_not_guaranteed"
+    )
+
+    local ok, result = pcall(method, tm, task_id)
+    if not ok then
+        log_task_action(action, "error", task_id, title, result)
+        notify("st_quickqk_action_error")
+        return false
+    end
+
+    log_task_action(action, "success", task_id, title, result)
+    notify(success and "st_quickqk_task_completed" or "st_quickqk_task_failed")
+    return true
+end
+
+local function request_action(success)
+    if not opt("enable") then return end
+
+    local action = success and "complete" or "fail"
+    local now = now_ms()
+    local cooldown_ms = math.max(0, tonumber(opt("cooldown")) or DEF.cooldown) * 1000
+
+    if now - last_action_time < cooldown_ms then
+        return
+    end
+
+    if opt("require_confirm") then
+        local window_ms =
+            math.max(1, tonumber(opt("confirm_window")) or DEF.confirm_window) * 1000
+
+        if pending_action ~= action or now > pending_until then
+            pending_action = action
+            pending_until = now + window_ms
+            notify(success and
+                "st_quickqk_confirm_complete" or
+                "st_quickqk_confirm_fail")
+            return
+        end
+    end
+
+    pending_action = nil
+    pending_until = 0
+    last_action_time = now
+    change_active_task(success)
+end
+
+local function reset_key_state()
+    modifier_down = false
+    armed_action = nil
+end
+
+local function reset_runtime_state()
+    reset_key_state()
+    pending_action = nil
+    pending_until = 0
+    last_action_time = -1000000
+    key_conflict_fixed = false
+end
+
+local function on_key_press(key)
+    if not opt("enable") then return end
+
+    local modifier = key_code(opt("modifier"))
+    local complete = key_code(opt("complete_key"))
+    local fail = key_code(opt("fail_key"))
+
+    if not (modifier and complete and fail) then return end
+
+    if key == modifier then
+        modifier_down = true
+        return
+    end
+
+    if not modifier_down then return end
+
+    if key == complete then
+        armed_action = "complete"
+    elseif key == fail then
+        armed_action = "fail"
+    end
+end
+
+local function on_key_release(key)
+    if not opt("enable") then return end
+
+    local modifier = key_code(opt("modifier"))
+    local complete = key_code(opt("complete_key"))
+    local fail = key_code(opt("fail_key"))
+
+    if key == modifier then
+        reset_key_state()
+        return
+    end
+
+    if armed_action == "complete" and key == complete then
+        armed_action = nil
+        request_action(true)
+    elseif armed_action == "fail" and key == fail then
+        armed_action = nil
+        request_action(false)
+    end
+end
+
+local function on_option_change()
+    refresh_opts()
+    reset_key_state()
+    pending_action = nil
+    pending_until = 0
+
+    if key_conflict_fixed then
+        notify("st_quickqk_key_conflict")
+    end
+end
+
+function on_game_load()
+    reset_runtime_state()
+    refresh_opts()
+end
+
+local function register_callbacks()
+    if callbacks_registered then return end
+    RegisterScriptCallback("on_key_press", on_key_press)
+    RegisterScriptCallback("on_key_release", on_key_release)
+    RegisterScriptCallback("on_option_change", on_option_change)
+    RegisterScriptCallback("on_game_load", on_game_load)
+    callbacks_registered = true
+end
+
+local function unregister_callbacks()
+    if not callbacks_registered then return end
+    UnregisterScriptCallback("on_key_press", on_key_press)
+    UnregisterScriptCallback("on_key_release", on_key_release)
+    UnregisterScriptCallback("on_option_change", on_option_change)
+    UnregisterScriptCallback("on_game_load", on_game_load)
+    callbacks_registered = false
+end
+
+function on_game_start()
+    reset_runtime_state()
+    refresh_opts()
+    register_callbacks()
+
+    if key_conflict_fixed then
+        notify("st_quickqk_key_conflict")
+    end
+end
+
+function on_game_end()
+    unregister_callbacks()
+    reset_runtime_state()
+end

@@ -1,0 +1,375 @@
+<?xml version='1.0' encoding='windows-1251'?>
+<string_table>
+    <string id="ui_mcm_menu_quickqk">
+        <text>QuickQK — принудительный статус заданий</text>
+    </string>
+    <string id="ui_mcm_menu_qq_general">
+        <text>Управление</text>
+    </string>
+    <string id="ui_mcm_menu_qq_safety">
+        <text>Безопасность</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_desc">
+        <text>Принудительно закрывает выбранное в КПК задание как выполненное или проваленное. Меняется только статус задания: награда, диалог, инфопорции и следующие этапы квеста не гарантируются.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_enable">
+        <text>Включить аддон</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_enable_desc">
+        <text>Главный переключатель всех горячих клавиш QuickQK.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_modifier">
+        <text>Клавиша-модификатор</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_modifier_desc">
+        <text>Удерживайте эту клавишу вместе с клавишей принудительного выполнения или провала.</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_f6">
+        <text>F6</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_f7">
+        <text>F7</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_f8">
+        <text>F8</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_f9">
+        <text>F9</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_complete_key">
+        <text>Закрыть как выполненное</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_complete_key_desc">
+        <text>Вместе с модификатором помечает выбранное задание выполненным через Task Manager. Это не равнозначно нормальному выполнению всех квестовых скриптов.</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_home">
+        <text>Home</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_pageup">
+        <text>Page Up</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_insert">
+        <text>Insert</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_fail_key">
+        <text>Закрыть как проваленное</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_fail_key_desc">
+        <text>Вместе с модификатором помечает выбранное задание проваленным через Task Manager.</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_end">
+        <text>End</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_pagedown">
+        <text>Page Down</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_delete">
+        <text>Delete</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_desc">
+        <text>Принудительное изменение статуса может пропустить диалог, награду, сдачу предметов, инфопорции и следующие этапы квеста. Оставьте подтверждение включённым и сделайте отдельное сохранение.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_require_confirm">
+        <text>Требовать повторное нажатие</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_require_confirm_desc">
+        <text>Первое нажатие показывает подробное предупреждение. Повторите ту же комбинацию в течение заданного времени для принудительного изменения статуса.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_confirm_window">
+        <text>Время подтверждения, сек.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_confirm_window_desc">
+        <text>Сколько времени действует возможность подтвердить действие повторным нажатием.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_cooldown">
+        <text>Задержка между действиями, сек.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_cooldown_desc">
+        <text>Минимальная задержка между выполненными изменениями заданий.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_show_notifications">
+        <text>Показывать уведомления</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_show_notifications_desc">
+        <text>Показывать сообщения о подтверждении, результате и ошибках.</text>
+    </string>
+    <string id="st_quickqk_confirm_complete">
+        <text>Задание будет принудительно закрыто как выполненное. Награда, диалог, сдача предметов и следующие этапы не гарантируются. Повторите комбинацию для подтверждения.</text>
+    </string>
+    <string id="st_quickqk_confirm_fail">
+        <text>Задание будет принудительно закрыто как проваленное. Квестовые последствия могут быть пропущены. Повторите комбинацию для подтверждения.</text>
+    </string>
+    <string id="st_quickqk_task_completed">
+        <text>Задание принудительно закрыто как выполненное. Награда и сюжетные события могли быть пропущены.</text>
+    </string>
+    <string id="st_quickqk_task_failed">
+        <text>Задание принудительно закрыто как проваленное.</text>
+    </string>
+    <string id="st_quickqk_no_active_task">
+        <text>Активное выбранное задание не найдено.</text>
+    </string>
+    <string id="st_quickqk_task_manager_error">
+        <text>Менеджер заданий недоступен. Состояние задания не изменено.</text>
+    </string>
+    <string id="st_quickqk_action_error">
+        <text>Не удалось изменить состояние задания.</text>
+    </string>
+    <string id="st_quickqk_key_conflict">
+        <text>Клавиши завершения и провала совпали. Для провала восстановлена свободная клавиша.</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_log_task_details">
+        <text>Записывать данные задания в лог</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_safety_log_task_details_desc">
+        <text>Записывает в xray.log ID задания, найденное название, действие, результат и предупреждение о награде. Помогает определять миссии, которым нужен отдельный патч совместимости.</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_f10">
+        <text>F10</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_f11">
+        <text>F11</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_f12">
+        <text>F12</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_lshift">
+        <text>Левый Shift</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_lctrl">
+        <text>Левый Ctrl</text>
+    </string>
+    <string id="quickqk_qq_general_modifier_lst_lalt">
+        <text>Левый Alt</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_q">
+        <text>Q</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_e">
+        <text>E</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_r">
+        <text>R</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_t">
+        <text>T</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_y">
+        <text>Y</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_u">
+        <text>U</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_i">
+        <text>I</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_o">
+        <text>O</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_p">
+        <text>P</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_a">
+        <text>A</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_s">
+        <text>S</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_d">
+        <text>D</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_f">
+        <text>F</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_g">
+        <text>G</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_h">
+        <text>H</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_j">
+        <text>J</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_k">
+        <text>K</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_l">
+        <text>L</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_z">
+        <text>Z</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_x">
+        <text>X</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_c">
+        <text>C</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_v">
+        <text>V</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_b">
+        <text>B</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_n">
+        <text>N</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_m">
+        <text>M</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_1">
+        <text>1</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_2">
+        <text>2</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_3">
+        <text>3</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_4">
+        <text>4</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_5">
+        <text>5</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_6">
+        <text>6</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_7">
+        <text>7</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_8">
+        <text>8</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_9">
+        <text>9</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_0">
+        <text>0</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_end">
+        <text>End</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_pagedown">
+        <text>Page Down</text>
+    </string>
+    <string id="quickqk_qq_general_complete_key_lst_delete">
+        <text>Delete</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_q">
+        <text>Q</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_e">
+        <text>E</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_r">
+        <text>R</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_t">
+        <text>T</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_y">
+        <text>Y</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_u">
+        <text>U</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_i">
+        <text>I</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_o">
+        <text>O</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_p">
+        <text>P</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_a">
+        <text>A</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_s">
+        <text>S</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_d">
+        <text>D</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_f">
+        <text>F</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_g">
+        <text>G</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_h">
+        <text>H</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_j">
+        <text>J</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_k">
+        <text>K</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_l">
+        <text>L</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_z">
+        <text>Z</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_x">
+        <text>X</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_c">
+        <text>C</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_v">
+        <text>V</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_b">
+        <text>B</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_n">
+        <text>N</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_m">
+        <text>M</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_1">
+        <text>1</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_2">
+        <text>2</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_3">
+        <text>3</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_4">
+        <text>4</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_5">
+        <text>5</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_6">
+        <text>6</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_7">
+        <text>7</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_8">
+        <text>8</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_9">
+        <text>9</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_0">
+        <text>0</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_home">
+        <text>Home</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_pageup">
+        <text>Page Up</text>
+    </string>
+    <string id="quickqk_qq_general_fail_key_lst_insert">
+        <text>Insert</text>
+    </string>
+    <string id="ui_mcm_quickqk_qq_general_hotkey_note">
+        <text>ПАМЯТКА ПО УПРАВЛЕНИЮ: в КПК сделайте нужное задание отслеживаемым. По умолчанию F7 + Q — закрыть как выполненное, F7 + E — закрыть как проваленное. Если включено подтверждение, повторите ту же комбинацию в течение заданного времени. Текущие назначенные клавиши показаны ниже и могут быть изменены.</text>
+    </string>
+</string_table>
