@@ -63,7 +63,8 @@ python3 tools/build_addon.py my_fix_weapon_jam --zip
 
 | Команда | Зачем |
 | --- | --- |
-| `tools/xraylog.py <log>` | сжимает многомегабайтный лог игры в карточку вылета: класс ошибки, стек, warning'и перед падением |
+| `tools/xraylog.py <log> [--archive]` | сжимает лог игры в карточку вылета: класс ошибки, стек, warning'и. `--archive` пишет копию в `logs/cards/YYYY-MM-DD_<имя>.md` |
+| `tools/prune_logs.py [--dry-run\|--yes] [--keep N]` | оставляет N самых свежих `logs/*.log` (по умолчанию 3). Без `--yes` ничего не удаляет. `logs/samples/` не трогает |
 | `tools/xdb_unpack.py <archive> [--list\|--out]` | распаковка `.db`/`.dbN`/`.xdb`: TOC через LZHUF, файлы через LZO1X |
 | `tools/fill_reference.py <игра> [--dry-run]` | наполняет `reference/anomaly/` и `reference/anthology/` из `<игра>/db`: только `scripts/`, `configs/`, `text/` |
 | `tools/refindex.py build\|find\|section\|callback\|stats` | индекс по `reference/`: проверка, что функция/секция/callback реально существуют |
@@ -87,7 +88,7 @@ Markdown в [`.cursor/commands/`](.cursor/commands/), вызов через `/` 
 | Команда | Что делает |
 | --- | --- |
 | `/check` | тесты, `lint_addon.py --cross`, `check_changelog_tools.py`, git status/log; сводка, без правок |
-| `/crash <лог>` | карточка `xraylog.py` (`--errors-only`, если FATAL нет), этапы 1–3 [`docs/plans/crash.md`](docs/plans/crash.md) |
+| `/crash <лог>` | карточка `xraylog.py --archive` (`--errors-only`, если FATAL нет), сверка с `logs/cards/`, этапы 1–3 [`docs/plans/crash.md`](docs/plans/crash.md) |
 | `/newmod <mod_id>` | `new_addon.py`, дальше [`.cursor/rules/workflow-addon.mdc`](.cursor/rules/workflow-addon.mdc); в конце lint, `--cross`, `build_addon.py` |
 
 Промпты из [`docs/prompts.md`](docs/prompts.md), ставшие командами, вызываются через `/`.

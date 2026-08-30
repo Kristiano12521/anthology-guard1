@@ -4,6 +4,8 @@ description: Разбор лога X-Ray. Аргумент — путь к ло�
 
 Разбор вылета. Аргумент после `/crash` — путь к логу. Нет пути — спроси и остановись.
 
-Собери карточку: `python3 tools/xraylog.py <лог> --out logs/card.md`. Если FATAL ERROR нет — `python3 tools/xraylog.py <лог> --errors-only`. Дальше — по карточке, не по сырому логу.
+Перед сборкой карточки просмотри `logs/cards/` на похожую сигнатуру (класс, culprit, FATAL Description, заголовок группы нефатальных ошибок). Если находишь — скажи об этом в начале: повторный вылет разбирать с нуля не нужно, опирайся на старую карточку.
+
+Собери карточку: `python3 tools/xraylog.py <лог> --out logs/card.md --archive`. Если FATAL ERROR нет — `python3 tools/xraylog.py <лог> --errors-only --out logs/card.md --archive`. `--archive` пишет копию в `logs/cards/YYYY-MM-DD_<имя>.md` и печатает путь. Дальше — по карточке, не по сырому логу.
 
 Веди по [`docs/plans/crash.md`](../../docs/plans/crash.md), этапы 1–3 (правило [`.cursor/rules/workflow-crash.mdc`](../rules/workflow-crash.mdc)). Плейбук не переписывай. Ничего не исправляй. Закончи тем, чего не хватает для подтверждения причины.

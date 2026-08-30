@@ -7,6 +7,7 @@
 а не весь файл.
 
     python3 tools/xraylog.py logs/xray_ivan.log --out logs/card.md
+    python3 tools/xraylog.py logs/xray_ivan.log --archive
     python3 tools/xraylog.py logs/xray_ivan.log --warnings-only
     python3 tools/xraylog.py logs/xray_ivan.log --errors-only
     python3 tools/xraylog.py logs/xray_ivan.log --json
@@ -19,11 +20,14 @@ import json
 import re
 import sys
 from collections import Counter, deque
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _common import decode_bytes, rel  # noqa: E402
+from _common import REPO_ROOT, decode_bytes, rel  # noqa: E402
+
+DEFAULT_ARCHIVE_DIR = REPO_ROOT / "logs" / "cards"
 
 FATAL_RE = re.compile(r"^\s*(?:-+\s*)?fatal error\s*(?:-+)?\s*$", re.I)
 FIELD_RE = re.compile(
@@ -476,17 +480,25 @@ class LogReport:
             "stack": self.stack_lines[:30],
         }
 
-    def to_markdown(self, max_warnings: int, warnings_only: bool, errors_only: bool = False) -> str:
+    def to_markdown(
+        self,
+        max_warnings: int,
+        warnings_only: bool,
+        errors_only: bool = False,
+        analyzed_on: date | None = None,
+    ) -> str:
         crash_class, hints = self.classify()
         hide_crash = warnings_only or errors_only
         if self.size >= 1024 * 1024:
             size = f"{self.size / (1024 * 1024):.1f} МБ"
         else:
             size = f"{self.size / 1024:.0f} КБ"
+        day = (analyzed_on or date.today()).isoformat()
         out: list[str] = []
         out.append(f"# Карточка лога — {self.path.name}")
         out.append("")
-        out.append(f"- Файл: `{rel(self.path)}` ({size}, {self.line_count} строк)")
+        out.append(f"- Файл: `{self.path.name}` ({size}, {self.line_count} строк)")
+        out.append(f"- Дата разбора: {day}")
         out.append(f"- Класс: **{crash_class}**")
         env = []
         if self.engine_build:
@@ -577,10 +589,47 @@ class LogReport:
         return "\n".join(out)
 
 
+def unique_archive_path(
+    dest_dir: Path,
+    log_path: Path,
+    analyzed_on: date | None = None,
+) -> Path:
+    """Имя карточки: YYYY-MM-DD_<stem>.md, при занятом имени — суффикс -2, -3, …"""
+    stem = f"{(analyzed_on or date.today()).isoformat()}_{log_path.stem}"
+    candidate = dest_dir / f"{stem}.md"
+    if not candidate.exists():
+        return candidate
+    n = 2
+    while True:
+        candidate = dest_dir / f"{stem}-{n}.md"
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+
+def write_archive(
+    text: str,
+    log_path: Path,
+    dest_dir: Path,
+    analyzed_on: date | None = None,
+) -> Path:
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    path = unique_archive_path(dest_dir, log_path, analyzed_on)
+    path.write_text(text + "\n", encoding="utf-8")
+    return path
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Карточка вылета из лога X-Ray/Anomaly")
     parser.add_argument("log", type=Path, help="путь к xray_*.log или тексту крэша")
     parser.add_argument("--out", type=Path, help="записать карточку в файл")
+    parser.add_argument("--archive", action="store_true", help="записать карточку в logs/cards/")
+    parser.add_argument(
+        "--archive-dir",
+        type=Path,
+        default=None,
+        help="каталог архива (по умолчанию logs/cards/)",
+    )
     parser.add_argument("--context", type=int, default=40, help="строк контекста перед падением")
     parser.add_argument("--max-warnings", type=int, default=15, help="сколько предупреждений показать")
     parser.add_argument("--warnings-only", action="store_true", help="без блока вылета")
@@ -594,17 +643,29 @@ def main(argv: list[str] | None = None) -> int:
 
     report = LogReport(args.log)
     report.parse(context_lines=max(5, args.context))
+    analyzed_on = date.today()
 
     if args.json:
         text = json.dumps(report.to_dict(args.max_warnings), ensure_ascii=False, indent=2)
     else:
-        text = report.to_markdown(args.max_warnings, args.warnings_only, args.errors_only)
+        text = report.to_markdown(
+            args.max_warnings, args.warnings_only, args.errors_only, analyzed_on=analyzed_on
+        )
+
+    if args.archive:
+        dest_dir = args.archive_dir if args.archive_dir is not None else DEFAULT_ARCHIVE_DIR
+        card_md = report.to_markdown(
+            args.max_warnings, args.warnings_only, args.errors_only, analyzed_on=analyzed_on
+        )
+        archive_path = write_archive(card_md, args.log, dest_dir, analyzed_on)
+        sink = sys.stderr if args.json else sys.stdout
+        print(rel(archive_path), file=sink)
 
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(text + "\n", encoding="utf-8")
         print(f"Карточка записана: {rel(args.out)}")
-    else:
+    elif not args.archive or args.json:
         print(text)
     return 0
 

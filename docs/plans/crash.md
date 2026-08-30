@@ -7,11 +7,11 @@
 ## Этап 0. Сжать лог
 
 ```bash
-python3 tools/xraylog.py logs/xray_ivan.log --out logs/card.md
+python3 tools/xraylog.py logs/xray_ivan.log --out logs/card.md --archive
 python3 tools/xraylog.py logs/xray_ivan.log --errors-only
 ```
 
-Карточка: класс, блок `FATAL ERROR` если он есть, иначе секция «Нефатальные ошибки». FATAL может отсутствовать — для этой сборки основной класс проблем как раз повторяющиеся traceback'и. `--errors-only` показывает только эту секцию, без вылета и warning'ов. Дальше работаем по карточке.
+Карточка: класс, блок `FATAL ERROR` если он есть, иначе секция «Нефатальные ошибки». FATAL может отсутствовать — для этой сборки основной класс проблем как раз повторяющиеся traceback'и. `--errors-only` показывает только эту секцию, без вылета и warning'ов. Дальше работаем по карточке. Сырые логи временные; постоянная база разборов — `logs/cards/` (`--archive`).
 
 ## Этап 1. Классификация
 

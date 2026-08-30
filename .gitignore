@@ -12,6 +12,7 @@ build/*
 logs/*
 !logs/README.md
 !logs/samples/
+!logs/cards/
 !logs/.gitkeep
 
 # Распакованные чужие моды для ревью — не в git.

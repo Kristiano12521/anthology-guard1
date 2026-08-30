@@ -1,6 +1,11 @@
+import contextlib
+import io
 import json
+import shutil
 import sys
+import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -221,12 +226,76 @@ class CliTests(unittest.TestCase):
         self.assertNotIn("## FATAL ERROR", card)
 
     def test_missing_file_returns_error_code(self):
-        import contextlib
-        import io
-
         with contextlib.redirect_stderr(io.StringIO()):
             code = xraylog.main([str(SAMPLES / "nope.log")])
         self.assertEqual(code, 2)
+
+
+class ArchiveCardTests(unittest.TestCase):
+    def test_name_includes_date_and_source_stem(self):
+        path = xraylog.unique_archive_path(
+            Path("logs/cards"),
+            Path(r"C:\Users\someone\AppData\xray_barkid.log"),
+            analyzed_on=date(2026, 8, 31),
+        )
+        self.assertEqual(path.name, "2026-08-31_xray_barkid.md")
+
+    def test_collision_adds_numeric_suffix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            (dest / "2026-08-31_xray_barkid.md").write_text("first\n", encoding="utf-8")
+            second = xraylog.unique_archive_path(
+                dest, Path("xray_barkid.log"), analyzed_on=date(2026, 8, 31)
+            )
+            self.assertEqual(second.name, "2026-08-31_xray_barkid-2.md")
+            second.write_text("second\n", encoding="utf-8")
+            third = xraylog.unique_archive_path(
+                dest, Path("xray_barkid.log"), analyzed_on=date(2026, 8, 31)
+            )
+            self.assertEqual(third.name, "2026-08-31_xray_barkid-3.md")
+
+    def test_markdown_header_has_filename_not_absolute_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / "Users" / "UniqueUserXYZ" / "AppData"
+            fake.mkdir(parents=True)
+            src = SAMPLES / "crash_lua_nil.log"
+            dest = fake / "xray_barkid.log"
+            shutil.copy(src, dest)
+            report = xraylog.LogReport(dest)
+            report.parse(context_lines=40)
+            card = report.to_markdown(
+                max_warnings=10, warnings_only=False, analyzed_on=date(2026, 8, 31)
+            )
+            header = "\n".join(card.splitlines()[:8])
+            self.assertIn("- Файл: `xray_barkid.log`", header)
+            self.assertIn("- Дата разбора: 2026-08-31", header)
+            self.assertNotIn("UniqueUserXYZ", header)
+            self.assertNotIn("Users", header)
+            self.assertNotIn(str(dest), header)
+            self.assertNotIn(dest.as_posix(), header)
+
+    def test_archive_flag_writes_card_and_prints_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                code = xraylog.main(
+                    [
+                        str(SAMPLES / "crash_lua_nil.log"),
+                        "--archive",
+                        "--archive-dir",
+                        str(dest),
+                    ]
+                )
+            self.assertEqual(code, 0)
+            files = list(dest.glob("*.md"))
+            self.assertEqual(len(files), 1)
+            expected = f"{date.today().isoformat()}_crash_lua_nil.md"
+            self.assertEqual(files[0].name, expected)
+            self.assertIn(expected, buffer.getvalue())
+            card = files[0].read_text(encoding="utf-8")
+            self.assertIn("- Дата разбора:", card)
+            self.assertIn("- Файл: `crash_lua_nil.log`", card)
 
 
 if __name__ == "__main__":
