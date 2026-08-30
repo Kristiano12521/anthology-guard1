@@ -14,10 +14,12 @@
 -- so the local count decrements). On se_invbox unregister do the same,
 -- but not during Disconnect / actor net_destroy (alife teardown wipes
 -- every box and would empty the treasure pool).
+-- Filter se_invbox by callback typ before any CGameObject method:
+-- pcall(db.actor:id()) still prints a full engine traceback.
 -- One delayed repair: drop desynced cache ids, then scan leftover spots.
 
 local LOG_TAG = "[fix_stash_id_desync]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 local EVENT_ID = "fix_stash_id_desync"
 local REPAIR_ACTION = "repair"
 local REPAIR_DELAY = 1.0
@@ -314,25 +316,26 @@ local function mark_session_dead()
 	session_live = false
 end
 
-local function actor_present()
-	if not db.actor then
-		return false
+local function is_invbox_unregister(se_obj, typ)
+	if typ == "se_invbox" then
+		return true
 	end
-	local ok, id = pcall(function()
-		return db.actor:id()
-	end)
-	return ok and id ~= nil
+	-- Callers that omit typ: clsid on the server entity, not CScriptGameObject.
+	if typ == nil then
+		return is_invbox_se(se_obj)
+	end
+	return false
 end
 
 function server_entity_on_unregister(se_obj, typ)
-	if not session_live or not actor_present() then
+	if not session_live then
 		return
 	end
-	if not se_obj then
+	-- Typ first. Item/NPC unregister is the hot path; do not touch db.actor.
+	if not is_invbox_unregister(se_obj, typ) then
 		return
 	end
-	local invbox = typ == "se_invbox" or is_invbox_se(se_obj)
-	if not invbox then
+	if not se_obj or not db.actor then
 		return
 	end
 	install()

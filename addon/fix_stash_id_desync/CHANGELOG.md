@@ -1,5 +1,34 @@
 # Stash ID Desync Fix
 
+## [1.0.2] — 2026-08-30
+
+**Изменено**
+
+- `gamedata/scripts/fix_stash_id_desync.script` — `server_entity_on_unregister` сначала смотрит `typ == "se_invbox"` и выходит. `pcall(db.actor:id())` убран.
+
+**Причина**
+
+Хук висит на всех unregister (предметы, НПС, актор). `actor_present()` звал `db.actor:id()` до фильтра ящика. В X-Ray `pcall` не глушит `cannot access class member CScriptGameObject::ID!` / `destroyed object [0]` — полный traceback на каждый вызов. В логе mg9000 это ~24700 ошибок и десятки МБ. Пока `:id()` падал, хук ещё и не чистил реальные ящики.
+
+**Как исправлено**
+
+Не-ящики отсекаются по строке `typ` без методов `CScriptGameObject`. Живая сессия по-прежнему `session_live` + `db.actor ~= nil`, без `:id()`.
+
+**Не затронуто**
+
+- обёртка `release_stash_by_id`, отложенный repair, `get_random_stash`
+- флаги `actor_on_first_update` / `actor_on_net_destroy` / `on_game_load`
+
+**Совместимость**
+
+- Сейвы: без миграции
+- В MO2 как раньше
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_stash_id_desync`
+- В игре: не прогонялось. В логе не должно быть `fix_stash_id_desync.script` / `actor_present` на unregister предметов
+
 ## [1.0.1] — 2026-08-30
 
 **Изменено**
