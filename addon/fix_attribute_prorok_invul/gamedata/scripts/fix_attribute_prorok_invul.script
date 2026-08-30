@@ -1,0 +1,162 @@
+-- Attribute Prophet Stuck Invulnerability Clear
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- cd_p30_prorok starts on walker@start with invulnerable = true, then
+-- switches to move@fight (invulnerable = false) on +cld_bs_run_start.
+--
+-- stalker_generic.reset_invulnerability ignores its section argument and
+-- reads the OLD active_section (xr_logic.activate_by_section calls reset
+-- before writing active_section). disable_invulnerability is a no-op
+-- (npc:invulnerable(false) is commented out). If the engine getter then
+-- reports false while the C++ flag is still true, update_invulnerability
+-- never calls the setter. Combat already runs (combat_ignore is false).
+-- F5/F9 rebinds the object and the flag is rebuilt as false.
+--
+-- This addon does not replace schemes. After the intro info it forces
+-- invulnerable(false) on this story id, without trusting the getter.
+
+local LOG_TAG = "[fix_attribute_prorok_invul]"
+local VERSION = "1.0.0"
+local STORY_ID = "cd_p30_prorok"
+local INFO_FIGHT = "cld_bs_run_start"
+local INFO_DEAD = "cld_p30_prorok_squad_is_dead"
+
+local orig_reset = nil
+local patched = false
+local callbacks_registered = false
+local logged_clear = false
+local last_tick = 0
+local TICK_MS = 100
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function fight_started()
+	return has_alife_info(INFO_FIGHT) and not has_alife_info(INFO_DEAD)
+end
+
+local function is_prorok(npc)
+	if not npc then
+		return false
+	end
+	local ok, sid = pcall(function()
+		return get_object_story_id(npc:id())
+	end)
+	if ok and sid == STORY_ID then
+		return true
+	end
+	ok, sid = pcall(function()
+		return npc:section()
+	end)
+	return ok and sid == STORY_ID
+end
+
+local function npc_alive(npc)
+	if not npc then
+		return false
+	end
+	local ok, alive = pcall(function()
+		return npc:alive()
+	end)
+	return ok and alive and true or false
+end
+
+local function force_vulnerable(npc)
+	if not npc_alive(npc) then
+		return false
+	end
+	local ok = pcall(function()
+		npc:invulnerable(false)
+	end)
+	if ok and not logged_clear then
+		logged_clear = true
+		log("cleared invulnerable on %s", STORY_ID)
+	end
+	return ok
+end
+
+local function patched_reset_invulnerability(npc, ini, section)
+	if orig_reset then
+		orig_reset(npc, ini, section)
+	end
+	if fight_started() and is_prorok(npc) then
+		force_vulnerable(npc)
+	end
+end
+
+local function install_reset_wrap()
+	if patched then
+		return
+	end
+	if type(stalker_generic) ~= "table" or type(stalker_generic.reset_invulnerability) ~= "function" then
+		log("stalker_generic.reset_invulnerability not found")
+		return
+	end
+	if stalker_generic.reset_invulnerability == patched_reset_invulnerability then
+		patched = true
+		return
+	end
+	orig_reset = orig_reset or stalker_generic.reset_invulnerability
+	stalker_generic.reset_invulnerability = patched_reset_invulnerability
+	patched = true
+	log("wrapped stalker_generic.reset_invulnerability")
+end
+
+local function uninstall_reset_wrap()
+	if orig_reset and type(stalker_generic) == "table" then
+		stalker_generic.reset_invulnerability = orig_reset
+	end
+	orig_reset = nil
+	patched = false
+end
+
+function actor_on_update()
+	if not fight_started() then
+		return
+	end
+	local now = time_global()
+	if now - last_tick < TICK_MS then
+		return
+	end
+	last_tick = now
+	if type(get_story_object) ~= "function" then
+		return
+	end
+	local npc = get_story_object(STORY_ID)
+	if npc then
+		force_vulnerable(npc)
+	end
+end
+
+function on_game_load()
+	logged_clear = false
+	last_tick = 0
+end
+
+function actor_on_first_update()
+	install_reset_wrap()
+end
+
+function on_game_start()
+	install_reset_wrap()
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_update", actor_on_update)
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		RegisterScriptCallback("on_game_load", on_game_load)
+		callbacks_registered = true
+	end
+	log("loaded v%s", VERSION)
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_update", actor_on_update)
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		callbacks_registered = false
+	end
+	uninstall_reset_wrap()
+	logged_clear = false
+	last_tick = 0
+end
