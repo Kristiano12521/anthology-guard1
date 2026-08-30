@@ -7,6 +7,7 @@
 ## Что внутри
 
 ```
+.cursor/commands/       slash-команды чата (/check, /crash, /newmod)
 .cursor/rules/          правила Cursor (.mdc)
   anomaly-core.mdc          always-apply, короткое: стек, границы, запреты
   no-hallucinated-api.mdc   always-apply, короткое: протокол проверки API
@@ -66,7 +67,7 @@ python3 tools/build_addon.py my_fix_weapon_jam --zip
 | `tools/xdb_unpack.py <archive> [--list\|--out]` | распаковка `.db`/`.dbN`/`.xdb`: TOC через LZHUF, файлы через LZO1X |
 | `tools/fill_reference.py <игра> [--dry-run]` | наполняет `reference/anomaly/` и `reference/anthology/` из `<игра>/db`: только `scripts/`, `configs/`, `text/` |
 | `tools/refindex.py build\|find\|section\|callback\|stats` | индекс по `reference/`: проверка, что функция/секция/callback реально существуют |
-| `tools/lint_addon.py [mod_id] [--cross]` | проверяет мод на правила: замена файлов сборки, дубли DLTX-секций, кодировка, анонимные callback'и. `ORDER-001` — ошибка на `zzz`/`aaa` у `.ltx`; `ORDER-002` — предупреждение у `.script`, снимается комментарием `-- load-order: после <что>` в первых 10 строках. `--cross` — предупреждения `CROSS-001`, если два мода патчат одну секцию в одном пути внутри gamedata. `vendor_fork=1` в `meta.ini` глушит `LUA-001`, `LTX-001` и `STRUCT-005` на форках чужих модов |
+| `tools/lint_addon.py [mod_id] [--cross] [--unverified]` | проверяет мод на правила: замена файлов сборки, дубли DLTX-секций, кодировка, анонимные callback'и. `ORDER-001` — ошибка на `zzz`/`aaa` у `.ltx`; `ORDER-002` — предупреждение у `.script`, снимается комментарием `-- load-order: после <что>` в первых 10 строках. `--cross` — предупреждения `CROSS-001`, если два мода патчат одну секцию в одном пути внутри gamedata. `vendor_fork=1` в `meta.ini` глушит `LUA-001`, `LTX-001` и `STRUCT-005` на форках чужих модов. `VERIFY-001` — предупреждение, если мод не проверялся в игре или файлы в `gamedata/` новее `verified_date`. `--unverified` печатает только такие моды |
 | `tools/new_addon.py <mod_id>` | создаёт скелет мода из `templates/addon-skeleton` |
 | `tools/build_addon.py <mod_id>` | собирает мод в `build/`, опционально в zip или сразу в папку модов MO2 |
 | `tools/to_cp1251.ps1 <file>…` | UTF-8 → Windows-1251 для игровых файлов; отказывается писать, если символ не входит в cp1251 |
@@ -78,6 +79,18 @@ python3 tools/build_addon.py my_fix_weapon_jam --zip
 | `tools/_pack_kristiano_aio.py` | одноразовый пакер: zip `[DBG] Kristiano Fixes ALL IN ONE` из всех модов в `addon/` с `gamedata/` (кроме трёх отдельных и снятого `fix_bhs_fdda_loot`) плюс три отдельных архива — Context Menu Overhaul, QuickQK Task Complete, ST2 Footstep — в `build/` |
 
 Python-инструменты — 3.9+, без зависимостей. Кодировка и DDS — PowerShell (`*.ps1`). На Windows — `py -3` вместо `python3`.
+
+## Команды чата
+
+Markdown в [`.cursor/commands/`](.cursor/commands/), вызов через `/` в чате агента:
+
+| Команда | Что делает |
+| --- | --- |
+| `/check` | тесты, `lint_addon.py --cross`, `check_changelog_tools.py`, git status/log; сводка, без правок |
+| `/crash <лог>` | карточка `xraylog.py` (`--errors-only`, если FATAL нет), этапы 1–3 [`docs/plans/crash.md`](docs/plans/crash.md) |
+| `/newmod <mod_id>` | `new_addon.py`, дальше [`.cursor/rules/workflow-addon.mdc`](.cursor/rules/workflow-addon.mdc); в конце lint, `--cross`, `build_addon.py` |
+
+Промпты из [`docs/prompts.md`](docs/prompts.md), ставшие командами, вызываются через `/`.
 
 ## Как работать с агентом
 

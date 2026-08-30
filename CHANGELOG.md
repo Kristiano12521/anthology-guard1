@@ -2,6 +2,14 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.17] — verified_* в meta.ini; VERIFY-001 и --unverified
+
+Необязательные ключи `verified_date` / `verified_build` / `verified_note`: человек ставит после проверки в игре, агент не проставляет (`anomaly-core.mdc`). Линтер: предупреждение `VERIFY-001`, если ключей нет или файлы в `gamedata/` новее даты; `vendor_fork=1` не глушит. `python3 tools/lint_addon.py --unverified` — список на сессию. Формат в `docs/mo2.md` и закомментированных строках скелета. Строка в этапах проверки `workflow-fix`, `workflow-addon` и плейбуках.
+
+## [0.1.16] — slash-команды /check, /crash, /newmod
+
+`.cursor/commands/`: `/check` (тесты, `lint_addon.py --cross`, `check_changelog_tools.py`, git status/log), `/crash` (`xraylog.py`, этапы 1–3 crash-плейбука), `/newmod` (`new_addon.py`, дальше workflow-addon, lint и `build_addon.py --zip`). Раздел в README рядом с таблицей инструментов; в `docs/prompts.md` пометка, что промпты, ставшие командами, вызываются через `/`.
+
 ## [0.1.15] — MIT + NOTICE; --cross в workflow-fix
 
 Корневой `LICENSE` — MIT только на оригинальное (tools, docs, правила, собственные фиксы). Форки в `addon/` и `reference/` вынесены в `NOTICE`; указатель в README. Этап 6 в `workflow-fix.mdc` и `docs/plans/fix.md`: `lint_addon.py --cross`.

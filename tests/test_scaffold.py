@@ -70,7 +70,13 @@ class NewAddonTests(unittest.TestCase):
     def test_generated_addon_passes_lint(self):
         mod = self.create("clean_mod")
         findings = lint_addon.lint(mod, lint_addon.ReferenceView())
-        self.assertEqual([f.format() for f in findings], [])
+        errors = [f for f in findings if f.severity == "error"]
+        warns = [f for f in findings if f.severity == "warn"]
+        self.assertEqual(errors, [], msg=[f.format() for f in errors])
+        self.assertEqual({f.code for f in warns}, {"VERIFY-001"})
+        meta = (mod / "meta.ini").read_text(encoding="utf-8")
+        self.assertIn("; verified_date=", meta)
+        self.assertNotRegex(meta, r"(?m)^verified_date=")
 
     def test_rejects_load_order_prefix(self):
         code, out = run(

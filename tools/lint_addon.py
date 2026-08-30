@@ -7,6 +7,7 @@ zzz-префиксы у .ltx, анонимные callback'и, дубли DLTX-с
     python3 tools/lint_addon.py                 # все моды
     python3 tools/lint_addon.py my_fix_weapon_jam
     python3 tools/lint_addon.py --cross         # плюс конфликты секций между модами
+    python3 tools/lint_addon.py --unverified    # только непроверенные в игре / устаревшие
     python3 tools/lint_addon.py my_fix --json
 """
 
@@ -17,6 +18,7 @@ import json
 import re
 import sys
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -38,6 +40,8 @@ ALLOWED_TOP_LEVEL = {"meta.ini", "changelog.md", "readme.md", ".gitignore"}
 LOAD_ORDER_HACK_RE = re.compile(r"^(z{3,}|a{3,})", re.I)
 LOAD_ORDER_JUSTIFICATION_RE = re.compile(r"--\s*load-order:\s*после\s+\S+", re.I)
 VENDOR_FORK_RE = re.compile(r"^vendor_fork\s*=\s*1$", re.I)
+VERIFIED_DATE_RE = re.compile(r"^verified_date\s*=\s*(\S+)$", re.I)
+VERIFY_SKIP_NAMES = frozenset({"meta.ini", "changelog.md", "readme.md"})
 FORK_SILENCED_CODES = frozenset({"LUA-001", "LTX-001", "STRUCT-005"})
 ANON_CALLBACK_RE = re.compile(
     r"RegisterScriptCallback\s*\(\s*[\"'][\w_]+[\"']\s*,\s*function", re.M
@@ -113,20 +117,74 @@ class ReferenceView:
         return self.sections.get(name, set())
 
 
-def is_vendor_fork(addon_dir: Path) -> bool:
-    """True, если в meta.ini стоит необязательный ключ vendor_fork=1."""
+def _meta_active_lines(addon_dir: Path) -> list[str]:
+    """Строки meta.ini без комментариев `;` / `#` и без заголовков секций."""
     meta = addon_dir / "meta.ini"
     if not meta.is_file():
-        return False
+        return []
     try:
         text = decode_bytes(meta.read_bytes())
     except OSError:
-        return False
+        return []
+    lines: list[str] = []
     for raw in text.splitlines():
-        line = raw.split(";", 1)[0].strip()
-        if VENDOR_FORK_RE.match(line):
-            return True
-    return False
+        line = raw.split(";", 1)[0].split("#", 1)[0].strip()
+        if not line or line.startswith("["):
+            continue
+        lines.append(line)
+    return lines
+
+
+def is_vendor_fork(addon_dir: Path) -> bool:
+    """True, если в meta.ini стоит необязательный ключ vendor_fork=1."""
+    return any(VENDOR_FORK_RE.match(line) for line in _meta_active_lines(addon_dir))
+
+
+def read_verified_date(addon_dir: Path) -> date | None:
+    """Дата проверки в игре из verified_date. Закомментированные ключи не считаются."""
+    for line in _meta_active_lines(addon_dir):
+        match = VERIFIED_DATE_RE.match(line)
+        if not match:
+            continue
+        try:
+            return date.fromisoformat(match.group(1).strip().strip("\"'"))
+        except ValueError:
+            return None
+    return None
+
+
+def newest_gamedata_date(addon_dir: Path) -> date | None:
+    """Самая свежая дата файлов внутри gamedata/. Служебные имена пропускаются."""
+    gamedata = addon_dir / "gamedata"
+    if not gamedata.is_dir():
+        return None
+    newest: date | None = None
+    for path in iter_files(gamedata):
+        if path.name.lower() in VERIFY_SKIP_NAMES:
+            continue
+        try:
+            stamp = datetime.fromtimestamp(path.stat().st_mtime).date()
+        except OSError:
+            continue
+        if newest is None or stamp > newest:
+            newest = stamp
+    return newest
+
+
+def verify_finding(addon_dir: Path) -> Finding | None:
+    """VERIFY-001, если мод не проверялся в игре или изменён после verified_date."""
+    verified = read_verified_date(addon_dir)
+    if verified is None:
+        return Finding("VERIFY-001", "warn", "в игре не проверялся", rel(addon_dir))
+    newest = newest_gamedata_date(addon_dir)
+    if newest is not None and newest > verified:
+        return Finding(
+            "VERIFY-001",
+            "warn",
+            f"изменён после последней проверки в игре: {verified.isoformat()}",
+            rel(addon_dir),
+        )
+    return None
 
 
 def has_load_order_justification(text: str) -> bool:
@@ -312,6 +370,11 @@ class AddonLinter:
                 self.add("STRUCT-004", "warn", f"Каталог {entry.name}/ вне gamedata/ в мод не попадёт.", entry)
             if entry.is_file() and entry.name.lower() not in ALLOWED_TOP_LEVEL:
                 self.add("STRUCT-005", "warn", f"Файл {entry.name} вне gamedata/ в мод не попадёт.", entry)
+
+    def check_verified(self) -> None:
+        finding = verify_finding(self.dir)
+        if finding:
+            self.findings.append(finding)
 
     # -- проверки уровня файла ----------------------------------------
 
@@ -519,6 +582,7 @@ class AddonLinter:
 
     def run(self) -> list[Finding]:
         self.check_structure()
+        self.check_verified()
         for path in iter_files(self.dir):
             self.check_file(path)
         return self.findings
@@ -540,6 +604,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="искать конфликты секций между модами (один путь внутри gamedata + одно имя)",
     )
+    parser.add_argument(
+        "--unverified",
+        action="store_true",
+        help="только моды без проверки в игре или изменённые после verified_date",
+    )
     args = parser.parse_args(argv)
 
     if args.mod_id:
@@ -556,6 +625,17 @@ def main(argv: list[str] | None = None) -> int:
         if not missing:
             print("В addon/ пока нет модов. Создать: python3 tools/new_addon.py <mod_id>")
         return 2 if missing else 0
+
+    if args.unverified:
+        listed = 0
+        for target in targets:
+            finding = verify_finding(target)
+            if finding:
+                print(f"{target.name}: {finding.message}")
+                listed += 1
+        if not listed:
+            print("Все выбранные моды проверены в игре.")
+        return 0
 
     reference = ReferenceView.load(args.reference)
     results: dict[str, list[Finding]] = {}

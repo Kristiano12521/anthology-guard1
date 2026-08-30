@@ -1,8 +1,10 @@
 import contextlib
 import io
+import os
 import sys
 import tempfile
 import unittest
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -88,9 +90,9 @@ class GoodAddonTests(unittest.TestCase):
         errors = [f for f in self.findings if f.severity == "error"]
         self.assertEqual(errors, [], msg=[f.format() for f in errors])
 
-    def test_no_warnings_either(self):
+    def test_no_warnings_except_unverified(self):
         warns = [f for f in self.findings if f.severity == "warn"]
-        self.assertEqual(warns, [], msg=[f.format() for f in warns])
+        self.assertEqual({f.code for f in warns}, {"VERIFY-001"}, msg=[f.format() for f in warns])
 
 
 class EncodingTests(unittest.TestCase):
@@ -212,6 +214,7 @@ class VendorForkTests(unittest.TestCase):
             addon = self._make_noisy_fork(Path(tmp), vendor_fork=True)
             codes = {f.code for f in lint_addon.lint(addon, build_reference())}
             self.assertIn("LUA-002", codes)
+            self.assertIn("VERIFY-001", codes)
 
     def test_without_flag_still_reports_noise(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -329,6 +332,90 @@ class CrossModTests(unittest.TestCase):
             out = buf.getvalue()
             self.assertNotIn("CROSS-001", out)
             self.assertNotIn("Перекрёстные конфликты", out)
+
+
+class VerifiedMetaTests(unittest.TestCase):
+    def _addon_with_script(self, root: Path, name: str, *, meta_extra: str = "") -> tuple[Path, Path]:
+        addon = _minimal_addon(root, name, meta_extra=meta_extra)
+        script = addon / "gamedata" / "scripts" / f"{name}.script"
+        script.write_text("function on_game_start() end\n", encoding="utf-8")
+        return addon, script
+
+    def _stamp(self, path: Path, when: date) -> None:
+        ts = datetime.combine(when, datetime.min.time()).timestamp()
+        os.utime(path, (ts, ts))
+
+    def test_missing_keys_warns_unverified(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon, _ = self._addon_with_script(Path(tmp), "never_played")
+            findings = [f for f in lint_addon.lint(addon, lint_addon.ReferenceView()) if f.code == "VERIFY-001"]
+            self.assertEqual(len(findings), 1)
+            self.assertEqual(findings[0].severity, "warn")
+            self.assertEqual(findings[0].message, "в игре не проверялся")
+
+    def test_fresh_keys_no_verify_warning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            today = date.today()
+            extra = (
+                f"verified_date={today.isoformat()}\n"
+                "verified_build=Anthology 2.1 / Modded Exes MT test\n"
+                "verified_note=загрузка сейва и меню\n"
+            )
+            addon, script = self._addon_with_script(Path(tmp), "fresh_mod", meta_extra=extra)
+            self._stamp(script, today)
+            changelog = addon / "CHANGELOG.md"
+            self._stamp(changelog, today + timedelta(days=30))
+            findings = [f for f in lint_addon.lint(addon, lint_addon.ReferenceView()) if f.code == "VERIFY-001"]
+            self.assertEqual(findings, [])
+
+    def test_stale_after_verified_date_warns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            verified = date.today() - timedelta(days=7)
+            extra = (
+                f"verified_date={verified.isoformat()}\n"
+                "verified_build=Anthology 2.1 / Modded Exes MT test\n"
+                "verified_note=старый прогон\n"
+            )
+            addon, script = self._addon_with_script(Path(tmp), "stale_mod", meta_extra=extra)
+            self._stamp(script, date.today())
+            findings = [f for f in lint_addon.lint(addon, lint_addon.ReferenceView()) if f.code == "VERIFY-001"]
+            self.assertEqual(len(findings), 1)
+            self.assertEqual(
+                findings[0].message,
+                f"изменён после последней проверки в игре: {verified.isoformat()}",
+            )
+
+    def test_unverified_cli_lists_only_pending(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            today = date.today()
+            old = today - timedelta(days=10)
+            missing, _ = self._addon_with_script(root, "aaa_missing")
+            fresh, fresh_script = self._addon_with_script(
+                root,
+                "bbb_fresh",
+                meta_extra=f"verified_date={today.isoformat()}\n",
+            )
+            self._stamp(fresh_script, today)
+            stale, stale_script = self._addon_with_script(
+                root,
+                "ccc_stale",
+                meta_extra=f"verified_date={old.isoformat()}\n",
+            )
+            self._stamp(stale_script, today)
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                code = lint_addon.main(
+                    ["--unverified", "--addon-root", str(root), "--reference", str(root / "none")]
+                )
+            out = buf.getvalue()
+            self.assertEqual(code, 0)
+            self.assertIn("aaa_missing: в игре не проверялся", out)
+            self.assertIn(f"ccc_stale: изменён после последней проверки в игре: {old.isoformat()}", out)
+            self.assertNotIn("bbb_fresh", out)
+            self.assertIsNotNone(missing)
+            self.assertIsNotNone(fresh)
+            self.assertIsNotNone(stale)
 
 
 if __name__ == "__main__":
