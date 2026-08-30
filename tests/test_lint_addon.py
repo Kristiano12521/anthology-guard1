@@ -1,3 +1,5 @@
+import contextlib
+import io
 import sys
 import tempfile
 import unittest
@@ -55,8 +57,17 @@ class BadAddonTests(unittest.TestCase):
     def test_option_without_val_is_error(self):
         self.assertIn("MCM-003", self.codes)
 
-    def test_load_order_prefix_is_error(self):
+    def test_load_order_prefix_on_ltx_is_error(self):
         self.assertIn("ORDER-001", self.codes)
+        finding = next(f for f in self.findings if f.code == "ORDER-001")
+        self.assertEqual(finding.severity, "error")
+        self.assertTrue(finding.path.endswith(".ltx"))
+
+    def test_script_load_order_prefix_is_warning(self):
+        self.assertIn("ORDER-002", self.codes)
+        finding = next(f for f in self.findings if f.code == "ORDER-002")
+        self.assertEqual(finding.severity, "warn")
+        self.assertTrue(finding.path.endswith(".script"))
 
     def test_missing_meta_and_changelog_warn(self):
         self.assertIn("STRUCT-002", self.codes)
@@ -118,6 +129,206 @@ class EmptyReferenceTests(unittest.TestCase):
         # А эти проверки не зависят от reference/ и должны сработать всё равно.
         self.assertIn("LUA-002", codes)
         self.assertIn("ORDER-001", codes)
+        self.assertIn("ORDER-002", codes)
+
+
+def _minimal_addon(root: Path, name: str, *, meta_extra: str = "") -> Path:
+    addon = root / name
+    scripts = addon / "gamedata" / "scripts"
+    configs = addon / "gamedata" / "configs" / "items"
+    scripts.mkdir(parents=True)
+    configs.mkdir(parents=True)
+    (addon / "meta.ini").write_text(
+        "[General]\nversion=1.0.0\n" + meta_extra, encoding="utf-8"
+    )
+    (addon / "CHANGELOG.md").write_text("# fixture\n", encoding="utf-8")
+    return addon
+
+
+class LoadOrderScriptTests(unittest.TestCase):
+    def test_justification_in_first_ten_lines_suppresses_warning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = _minimal_addon(Path(tmp), "order_ok")
+            script = addon / "gamedata" / "scripts" / "zzzz_after_magazine.script"
+            script.write_text(
+                "-- load-order: после sequential_load_magazine.script\n"
+                "function on_game_start() end\n",
+                encoding="cp1251",
+            )
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView())
+            self.assertNotIn("ORDER-002", {f.code for f in findings})
+            self.assertNotIn("ORDER-001", {f.code for f in findings})
+
+    def test_justification_after_line_ten_does_not_suppress(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = _minimal_addon(Path(tmp), "order_late")
+            script = addon / "gamedata" / "scripts" / "zzzz_late.script"
+            header = "\n".join(f"-- pad {i}" for i in range(1, 11))
+            script.write_text(
+                header + "\n-- load-order: после foo.script\nfunction on_game_start() end\n",
+                encoding="cp1251",
+            )
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView())
+            self.assertIn("ORDER-002", {f.code for f in findings})
+
+    def test_comment_without_target_does_not_suppress(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = _minimal_addon(Path(tmp), "order_empty")
+            script = addon / "gamedata" / "scripts" / "zzzz_empty.script"
+            script.write_text(
+                "-- load-order: после\nfunction on_game_start() end\n",
+                encoding="cp1251",
+            )
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView())
+            self.assertIn("ORDER-002", {f.code for f in findings})
+
+
+class VendorForkTests(unittest.TestCase):
+    def _make_noisy_fork(self, root: Path, *, vendor_fork: bool) -> Path:
+        extra = "vendor_fork=1\n" if vendor_fork else ""
+        addon = _minimal_addon(root, "fork_mod" if vendor_fork else "plain_mod", meta_extra=extra)
+        (addon / "NOTES.txt").write_text("extra docs\n", encoding="utf-8")
+        (addon / "gamedata" / "scripts" / "itms_manager.script").write_text(
+            "function on_game_start()\n"
+            '  RegisterScriptCallback("actor_on_first_update", function() end)\n'
+            "end\n",
+            encoding="utf-8",
+        )
+        (addon / "gamedata" / "configs" / "items" / "items_food.ltx").write_text(
+            "[food]\ncalories = 1\n", encoding="utf-8"
+        )
+        return addon
+
+    def test_silences_replacement_and_stray_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._make_noisy_fork(Path(tmp), vendor_fork=True)
+            codes = {f.code for f in lint_addon.lint(addon, build_reference())}
+            self.assertNotIn("LUA-001", codes)
+            self.assertNotIn("LTX-001", codes)
+            self.assertNotIn("STRUCT-005", codes)
+
+    def test_keeps_other_checks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._make_noisy_fork(Path(tmp), vendor_fork=True)
+            codes = {f.code for f in lint_addon.lint(addon, build_reference())}
+            self.assertIn("LUA-002", codes)
+
+    def test_without_flag_still_reports_noise(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._make_noisy_fork(Path(tmp), vendor_fork=False)
+            codes = {f.code for f in lint_addon.lint(addon, build_reference())}
+            self.assertIn("LUA-001", codes)
+            self.assertIn("LTX-001", codes)
+            self.assertIn("STRUCT-005", codes)
+            self.assertIn("LUA-002", codes)
+
+    def test_summary_mentions_fork_profile(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._make_noisy_fork(root, vendor_fork=True)
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                lint_addon.main(
+                    [
+                        "fork_mod",
+                        "--addon-root",
+                        str(root),
+                        "--reference",
+                        str(FIXTURE_REFERENCE),
+                    ]
+                )
+            self.assertIn("профиле форка", buf.getvalue())
+
+
+class CrossModTests(unittest.TestCase):
+    _CMO_DIR = Path("gamedata") / "configs" / "plugins" / "context_menu_overhaul"
+    _BASE = "[functor_icons]\na=1\n[label_icons]\na=1\n[groups]\na=1\n[colors]\na=1\n"
+    _PATCH = "![functor_icons]\na=1\n![label_icons]\na=1\n![groups]\na=1\n![colors]\na=1\n"
+
+    def _cmo_pair(self, root: Path) -> tuple[Path, Path]:
+        cmo = _minimal_addon(root, "context_menu_overhaul_anthology")
+        burn = _minimal_addon(root, "burnshit_inventory_destroy")
+        (cmo / self._CMO_DIR).mkdir(parents=True, exist_ok=True)
+        (cmo / self._CMO_DIR / "menu.ltx").write_text(self._BASE, encoding="utf-8")
+        (burn / self._CMO_DIR).mkdir(parents=True, exist_ok=True)
+        (burn / self._CMO_DIR / "mod_menu_burnshit_inventory_destroy.ltx").write_text(
+            self._PATCH, encoding="utf-8"
+        )
+        return cmo, burn
+
+    def test_resolve_dltx_maps_patch_to_original(self):
+        target = lint_addon.resolve_dltx_target(
+            "configs/plugins/context_menu_overhaul/mod_menu_burnshit_inventory_destroy.ltx",
+            {"configs/plugins/context_menu_overhaul": {"menu"}},
+            set(),
+        )
+        self.assertEqual(target, "configs/plugins/context_menu_overhaul/menu.ltx")
+
+    def test_conflict_on_same_gamedata_path_and_section(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cmo, burn = self._cmo_pair(Path(tmp))
+            findings = lint_addon.cross_conflicts([cmo, burn])
+            self.assertEqual(len(findings), 1)
+            finding = findings[0]
+            self.assertEqual(finding.code, "CROSS-001")
+            self.assertEqual(finding.severity, "warn")
+            self.assertEqual(finding.path, "configs/plugins/context_menu_overhaul/menu.ltx")
+            for section in ("colors", "groups", "functor_icons", "label_icons"):
+                self.assertIn(f"[{section}]", finding.message)
+            self.assertIn("burnshit_inventory_destroy", finding.message)
+            self.assertIn("context_menu_overhaul_anthology", finding.message)
+            self.assertIn("MO2", finding.message)
+
+    def test_same_section_in_different_files_is_not_conflict(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            escape = _minimal_addon(root, "fix_escape")
+            garbage = _minimal_addon(root, "fix_garbage")
+            scripts = Path("gamedata") / "configs" / "scripts"
+            (escape / scripts).mkdir(parents=True, exist_ok=True)
+            (garbage / scripts).mkdir(parents=True, exist_ok=True)
+            (escape / scripts / "l01_escape.ltx").write_text("[sr_idle]\na=1\n", encoding="utf-8")
+            (garbage / scripts / "l02_garbage.ltx").write_text("[sr_idle]\na=1\n", encoding="utf-8")
+            self.assertEqual(lint_addon.cross_conflicts([escape, garbage]), [])
+
+    def test_cli_cross_reports_conflict(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._cmo_pair(root)
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                code = lint_addon.main(
+                    [
+                        "--cross",
+                        "--addon-root",
+                        str(root),
+                        "--reference",
+                        str(root / "missing_reference"),
+                    ]
+                )
+            out = buf.getvalue()
+            self.assertEqual(code, 0)
+            self.assertIn("CROSS-001", out)
+            self.assertIn("Перекрёстные конфликты", out)
+            self.assertIn("порядок в MO2", out)
+
+    def test_without_flag_does_not_report_cross(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._cmo_pair(root)
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                lint_addon.main(
+                    [
+                        "--addon-root",
+                        str(root),
+                        "--reference",
+                        str(root / "missing_reference"),
+                    ]
+                )
+            out = buf.getvalue()
+            self.assertNotIn("CROSS-001", out)
+            self.assertNotIn("Перекрёстные конфликты", out)
 
 
 if __name__ == "__main__":

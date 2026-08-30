@@ -49,7 +49,7 @@ def iter_files(root: Path, suffixes: Iterable[str] | None = None) -> Iterator[Pa
     """Обходит дерево, пропуская служебные каталоги."""
     wanted = {s.lower() for s in suffixes} if suffixes else None
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
         for name in sorted(filenames):
             path = Path(dirpath) / name
             if wanted is None or path.suffix.lower() in wanted:

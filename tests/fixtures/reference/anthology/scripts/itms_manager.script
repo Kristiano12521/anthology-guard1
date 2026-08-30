@@ -1,0 +1,4 @@
+-- Fixture: anthology override of a vanilla helper. Used to test source ranking.
+
+function play_item_fx(section)
+end

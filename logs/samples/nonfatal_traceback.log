@@ -1,0 +1,43 @@
+* Detected CPU: AMD Ryzen 7 5800X3D [AuthenticAMD], F19/M33/S2, 3400.00 mhz, 34-clk 'rdtsc'
+'xrCore' build 8028, Jan 29 2021
+Initializing File System...
+using fs-ltx fsgame.ltx
+-----loading c:/games/anomaly/gamedata\configs\system.ltx
+Starting engine...
+* phase time: 1102 ms
+* phase cmem: 1836211 K
+! Can't find texture 'anth\ui\ui_icon_anth_pda'
+![axr_main callback_set] trying to set callback actor_on_item_use to nil function!
+~ ------------------------------------------------------------------------
+~ STACK TRACEBACK:
+
+	... axr_main.script (line: 253) in function 'callback_set'
+	... _g.script (line: 104) in function 'RSC'
+	... dxml_core.script (line: 27) in function 'RegisterScriptCallback'
+	... mas_scope_detach.script (line: 106) in function 'on_game_start'
+	... axr_main.script (line: 359) in function 'on_game_start'
+	... _g.script (line: 82) in function <... _g.script:73>
+~ ------------------------------------------------------------------------
+~ [my_fix_weapon_jam] loaded
+![axr_main callback_set] trying to set callback actor_on_item_use to nil function!
+~ ------------------------------------------------------------------------
+~ STACK TRACEBACK:
+
+	... axr_main.script (line: 250) in function 'callback_set'
+	... _g.script (line: 104) in function 'RSC'
+	... dxml_core.script (line: 27) in function 'RegisterScriptCallback'
+	... mas_scope_detach.script (line: 99) in function 'on_game_start'
+	... axr_main.script (line: 359) in function 'on_game_start'
+	... _g.script (line: 82) in function <... _g.script:73>
+~ ------------------------------------------------------------------------
+* [x-ray]: DLTX Cache: detailed stats skipped
+~ ------------------------------------------------------------------------
+~ STACK TRACEBACK:
+
+	... _g.script (line: 672) in function 'abort'
+	... sound_theme.script (line: 644) in function <... sound_theme.script:614>
+	[C]: in function 'object_sound'
+	... sound_theme.script (line: 877) in function <... sound_theme.script:868>
+~ ------------------------------------------------------------------------
+There are no sound collection with path: semitone\anomalies\generators
+* Quitting...

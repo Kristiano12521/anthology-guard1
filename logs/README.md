@@ -14,6 +14,7 @@ python3 tools/xraylog.py logs/xray_ivan.log --out logs/card.md
 
 ```bash
 python3 tools/xraylog.py logs/xray_ivan.log --warnings-only   # только предупреждения, без вылета
+python3 tools/xraylog.py logs/xray_ivan.log --errors-only     # только нефатальные STACK TRACEBACK
 python3 tools/xraylog.py logs/xray_ivan.log --context 80      # больше строк перед падением
 python3 tools/xraylog.py logs/xray_ivan.log --json            # машиночитаемо
 ```

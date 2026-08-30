@@ -166,6 +166,68 @@ class Index:
         return close
 
 
+# Порядок истины внутри reference/: anomaly → anthology → addons → прочее.
+# docs/setup.md. На выводе, не в .cache/refindex.json.
+_SOURCE_RANK = {
+    "anomaly": 0,
+    "anthology": 1,
+    "addons": 2,
+}
+_SOURCE_LABEL = {
+    "anomaly": "ваниль",
+    "anthology": "anthology",
+    "addons": "аддон",
+    "other": "прочее",
+}
+_SOURCE_PRINT_ORDER = ("anomaly", "anthology", "addons", "other")
+
+
+def source_kind(relpath: str) -> str:
+    """Ключ источника по пути внутри reference/: anomaly / anthology / addons / other."""
+    parts = relpath.replace("\\", "/").split("/")
+    known = _SOURCE_RANK
+    try:
+        idx = parts.index("reference")
+    except ValueError:
+        idx = -1
+    if idx >= 0 and idx + 1 < len(parts) and parts[idx + 1] in known:
+        return parts[idx + 1]
+    for part in parts:
+        if part in known:
+            return part
+    return "other"
+
+
+def source_priority(relpath: str) -> int:
+    """Чем меньше число, тем раньше строка в find / section / callback."""
+    return _SOURCE_RANK.get(source_kind(relpath), 3)
+
+
+def source_label(relpath: str) -> str:
+    return _SOURCE_LABEL[source_kind(relpath)]
+
+
+def rank_entries(entries: list) -> list:
+    """Сортировка для вывода: приоритет источника, затем путь, затем номер строки."""
+    return sorted(entries, key=lambda e: (source_priority(e[0]), e[0], e[1]))
+
+
+def format_omitted(omitted: list) -> str | None:
+    """Сводка срезанных лимитом записей: сколько и из каких источников."""
+    if not omitted:
+        return None
+    counts: dict[str, int] = {}
+    for entry in omitted:
+        kind = source_kind(entry[0])
+        counts[kind] = counts.get(kind, 0) + 1
+    parts = [
+        f"{counts[kind]} [{_SOURCE_LABEL[kind]}]"
+        for kind in _SOURCE_PRINT_ORDER
+        if counts.get(kind)
+    ]
+    return f"  ещё {len(omitted)}: {', '.join(parts)}"
+
+
 def find_usages(root: Path, name: str, limit: int) -> list[tuple[str, int, str]]:
     """Живой grep по reference/: где символ реально вызывается."""
     short = re.split(r"[.:]", name)[-1]
@@ -224,9 +286,13 @@ def cmd_find(args: argparse.Namespace) -> int:
     entries = index.lookup("functions", name)
 
     if entries:
-        print(f"ОПРЕДЕЛЕНИЯ: {name} — найдено {len(entries)}")
-        for relpath, lineno, kind, signature in entries[: args.limit]:
-            print(f"  {relpath}:{lineno}  [{kind}]  {signature}")
+        ranked = rank_entries(entries)
+        print(f"ОПРЕДЕЛЕНИЯ: {name} — найдено {len(ranked)}")
+        for relpath, lineno, kind, signature in ranked[: args.limit]:
+            print(f"  [{source_label(relpath)}]  {relpath}:{lineno}  [{kind}]  {signature}")
+        omitted = format_omitted(ranked[args.limit :])
+        if omitted:
+            print(omitted)
     else:
         print(f"ОПРЕДЕЛЕНИЙ НЕТ: {name}")
         suggestions = index.suggest("functions", name)
@@ -257,10 +323,14 @@ def cmd_section(args: argparse.Namespace) -> int:
         print("  DLTX-патч в несуществующую секцию даёт CInifile::r_section при запуске.")
         return 1
 
-    print(f"СЕКЦИЯ [{args.name}] — {len(entries)} объявлений")
-    for relpath, lineno, kind, parents in entries[: args.limit]:
+    ranked = rank_entries(entries)
+    print(f"СЕКЦИЯ [{args.name}] — {len(ranked)} объявлений")
+    for relpath, lineno, kind, parents in ranked[: args.limit]:
         suffix = f" : {parents}" if parents else ""
-        print(f"  {relpath}:{lineno}  [{kind}]{suffix}")
+        print(f"  [{source_label(relpath)}]  {relpath}:{lineno}  [{kind}]{suffix}")
+    omitted = format_omitted(ranked[args.limit :])
+    if omitted:
+        print(omitted)
     kinds = {entry[2] for entry in entries}
     if "base" in kinds and len([e for e in entries if e[2] == "base"]) > 1:
         print("  ВНИМАНИЕ: несколько базовых объявлений — движок падает на дубле базовой секции.")
@@ -278,10 +348,14 @@ def cmd_callback(args: argparse.Namespace) -> int:
         print("  Регистрация несуществующего callback'а не выдаёт ошибку — обработчик просто не вызовется.")
         return 1
 
-    sends = [e for e in entries if e[2] == "send"]
-    print(f"CALLBACK {args.name} — {len(entries)} упоминаний, из них диспатчей: {len(sends)}")
-    for relpath, lineno, kind in entries[: args.limit]:
-        print(f"  {relpath}:{lineno}  [{kind}]")
+    ranked = rank_entries(entries)
+    sends = [e for e in ranked if e[2] == "send"]
+    print(f"CALLBACK {args.name} — {len(ranked)} упоминаний, из них диспатчей: {len(sends)}")
+    for relpath, lineno, kind in ranked[: args.limit]:
+        print(f"  [{source_label(relpath)}]  {relpath}:{lineno}  [{kind}]")
+    omitted = format_omitted(ranked[args.limit :])
+    if omitted:
+        print(omitted)
     if not sends:
         print("  ВНИМАНИЕ: нет ни одного SendScriptCallback — callback может быть от модифицированных exe или не существовать.")
     return 0

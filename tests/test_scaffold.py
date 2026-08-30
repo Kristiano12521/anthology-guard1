@@ -157,8 +157,9 @@ class BuildAddonTests(unittest.TestCase):
         self.assertTrue((mods / "my_test_mod" / "gamedata" / "scripts" / "my_test_mod.script").exists())
 
     def test_lint_errors_block_the_build(self):
-        broken = self.addon_root / "my_test_mod" / "gamedata" / "scripts" / "zzzz_bad.script"
-        broken.write_text("function on_game_start() end\n", encoding="cp1251")
+        broken = self.addon_root / "my_test_mod" / "gamedata" / "configs" / "zzzz_bad.ltx"
+        broken.parent.mkdir(parents=True, exist_ok=True)
+        broken.write_text("[dummy]\nkey = 1\n", encoding="cp1251")
         code, out = self.build()
         self.assertEqual(code, 1)
         self.assertIn("ORDER-001", out)

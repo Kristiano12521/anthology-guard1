@@ -2,10 +2,11 @@
 """Проверяет мод в addon/ на нарушения правил проекта.
 
 Делает правила проверяемыми, а не декларативными: полная замена файлов сборки,
-zzz-префиксы, анонимные callback'и, дубли DLTX-секций, кодировка, контракт MCM.
+zzz-префиксы у .ltx, анонимные callback'и, дубли DLTX-секций, кодировка, контракт MCM.
 
     python3 tools/lint_addon.py                 # все моды
     python3 tools/lint_addon.py my_fix_weapon_jam
+    python3 tools/lint_addon.py --cross         # плюс конфликты секций между модами
     python3 tools/lint_addon.py my_fix --json
 """
 
@@ -35,6 +36,9 @@ ADDON_ROOT = REPO_ROOT / "addon"
 ALLOWED_TOP_LEVEL = {"meta.ini", "changelog.md", "readme.md", ".gitignore"}
 
 LOAD_ORDER_HACK_RE = re.compile(r"^(z{3,}|a{3,})", re.I)
+LOAD_ORDER_JUSTIFICATION_RE = re.compile(r"--\s*load-order:\s*после\s+\S+", re.I)
+VENDOR_FORK_RE = re.compile(r"^vendor_fork\s*=\s*1$", re.I)
+FORK_SILENCED_CODES = frozenset({"LUA-001", "LTX-001", "STRUCT-005"})
 ANON_CALLBACK_RE = re.compile(
     r"RegisterScriptCallback\s*\(\s*[\"'][\w_]+[\"']\s*,\s*function", re.M
 )
@@ -109,6 +113,159 @@ class ReferenceView:
         return self.sections.get(name, set())
 
 
+def is_vendor_fork(addon_dir: Path) -> bool:
+    """True, если в meta.ini стоит необязательный ключ vendor_fork=1."""
+    meta = addon_dir / "meta.ini"
+    if not meta.is_file():
+        return False
+    try:
+        text = decode_bytes(meta.read_bytes())
+    except OSError:
+        return False
+    for raw in text.splitlines():
+        line = raw.split(";", 1)[0].strip()
+        if VENDOR_FORK_RE.match(line):
+            return True
+    return False
+
+
+def has_load_order_justification(text: str) -> bool:
+    """Комментарий `-- load-order: после <что>` в первых 10 строках снимает ORDER-002."""
+    for line in text.splitlines()[:10]:
+        if LOAD_ORDER_JUSTIFICATION_RE.search(line):
+            return True
+    return False
+
+
+def gamedata_relpath(path: Path) -> str:
+    """Путь внутри gamedata/: 'configs/plugins/foo/menu.ltx'."""
+    parts = path.parts
+    lower = [p.lower() for p in parts]
+    try:
+        idx = lower.index("gamedata")
+    except ValueError:
+        return path_tail(path)
+    rest = parts[idx + 1 :]
+    if not rest:
+        return ""
+    return "/".join(rest).replace("\\", "/")
+
+
+def ltx_sections(path: Path) -> set[str]:
+    try:
+        text = decode_bytes(path.read_bytes())
+    except OSError:
+        return set()
+    names: set[str] = set()
+    for line in text.splitlines():
+        stripped = line.split(";", 1)[0].strip()
+        match = SECTION_RE.match(stripped)
+        if match:
+            names.add(match.group(2))
+    return names
+
+
+def resolve_dltx_target(
+    relpath: str,
+    stems_by_dir: dict[str, set[str]],
+    global_stems: set[str],
+) -> str:
+    """mod_<оригинал>_<суффикс>.ltx → <dir>/<оригинал>.ltx, иначе путь как есть."""
+    posix = relpath.replace("\\", "/").lower()
+    path = Path(posix)
+    stem = path.stem
+    suffix = path.suffix
+    parent = path.parent.as_posix()
+    if parent == ".":
+        parent = ""
+    if not stem.startswith("mod_"):
+        return posix
+    rest = stem[4:]
+    parts = rest.split("_")
+    if len(parts) < 2:
+        return posix
+    dir_stems = stems_by_dir.get(parent, set()) | global_stems
+    for i in range(len(parts) - 1, 0, -1):
+        original = "_".join(parts[:i])
+        if original in dir_stems:
+            if parent:
+                return f"{parent}/{original}{suffix}"
+            return f"{original}{suffix}"
+    return posix
+
+
+def collect_mod_ltx(addon_dir: Path) -> dict[str, set[str]]:
+    """Путь внутри gamedata → имена секций в этом файле."""
+    gamedata = addon_dir / "gamedata"
+    found: dict[str, set[str]] = {}
+    if not gamedata.is_dir():
+        return found
+    for path in iter_files(gamedata, {".ltx"}):
+        relpath = gamedata_relpath(path)
+        if not relpath:
+            continue
+        sections = ltx_sections(path)
+        if sections:
+            found[relpath.replace("\\", "/")] = sections
+    return found
+
+
+def cross_conflicts(addon_dirs: list[Path], reference: ReferenceView | None = None) -> list[Finding]:
+    """Два мода патчат одну секцию в одном пути внутри gamedata."""
+    if len(addon_dirs) < 2:
+        return []
+
+    per_mod: dict[str, dict[str, set[str]]] = {}
+    stems_by_dir: dict[str, set[str]] = {}
+    for addon_dir in addon_dirs:
+        files = collect_mod_ltx(addon_dir)
+        per_mod[addon_dir.name] = files
+        for relpath in files:
+            posix = relpath.replace("\\", "/").lower()
+            path = Path(posix)
+            parent = path.parent.as_posix()
+            if parent == ".":
+                parent = ""
+            if not path.stem.startswith("mod_"):
+                stems_by_dir.setdefault(parent, set()).add(path.stem)
+
+    global_stems = set(reference.ltx_stems) if reference else set()
+
+    owners: dict[tuple[str, str], set[str]] = {}
+    for mod_id, files in per_mod.items():
+        seen: set[tuple[str, str]] = set()
+        for relpath, sections in files.items():
+            target = resolve_dltx_target(relpath, stems_by_dir, global_stems)
+            for section in sections:
+                key = (target, section)
+                if key in seen:
+                    continue
+                seen.add(key)
+                owners.setdefault(key, set()).add(mod_id)
+
+    grouped: dict[tuple[str, str, str], set[str]] = {}
+    for (target, section), mods in owners.items():
+        if len(mods) < 2:
+            continue
+        names = sorted(mods)
+        for i, left in enumerate(names):
+            for right in names[i + 1 :]:
+                grouped.setdefault((left, right, target), set()).add(section)
+
+    findings: list[Finding] = []
+    for left, right, target in sorted(grouped):
+        listed = ", ".join(f"[{name}]" for name in sorted(grouped[(left, right, target)]))
+        findings.append(
+            Finding(
+                "CROSS-001",
+                "warn",
+                f"{left} и {right}: {listed}. Исход решает порядок в MO2.",
+                target,
+            )
+        )
+    return findings
+
+
 def iter_innermost_tables(text: str):
     """Отдаёт содержимое самых вложенных {...} — это элементы дерева опций MCM."""
     stack: list[int] = []
@@ -126,9 +283,12 @@ class AddonLinter:
     def __init__(self, addon_dir: Path, reference: ReferenceView) -> None:
         self.dir = addon_dir
         self.reference = reference
+        self.vendor_fork = is_vendor_fork(addon_dir)
         self.findings: list[Finding] = []
 
     def add(self, code: str, severity: str, message: str, path: Path | None = None, line: int = 0) -> None:
+        if self.vendor_fork and code in FORK_SILENCED_CODES:
+            return
         self.findings.append(
             Finding(code, severity, message, rel(path) if path else rel(self.dir), line)
         )
@@ -157,13 +317,14 @@ class AddonLinter:
 
     def check_file(self, path: Path) -> None:
         name = path.name.lower()
+        suffix = path.suffix.lower()
         if name == "all.spawn":
             self.add("SPAWN-001", "error", "all.spawn в моде запрещён правилами проекта.", path)
-        if LOAD_ORDER_HACK_RE.match(name):
+        if suffix == ".ltx" and LOAD_ORDER_HACK_RE.match(name):
             self.add(
                 "ORDER-001",
                 "error",
-                "Префикс ради порядка загрузки. Порядок задаётся списком модов MO2, а не именем файла.",
+                "Префикс ради порядка загрузки. Порядок .ltx задаётся списком модов MO2, а не именем файла.",
                 path,
             )
 
@@ -251,6 +412,15 @@ class AddonLinter:
                 )
 
     def check_script(self, path: Path, text: str) -> None:
+        if LOAD_ORDER_HACK_RE.match(path.name.lower()) and not has_load_order_justification(text):
+            self.add(
+                "ORDER-002",
+                "warn",
+                "Префикс задаёт порядок выполнения скриптов. Если гонка загрузки намеренная, "
+                "добавь в первые 10 строк комментарий `-- load-order: после <что>`.",
+                path,
+            )
+
         existing = self.reference.has_file(path)
         if existing:
             self.add(
@@ -365,6 +535,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reference", type=Path, default=DEFAULT_ROOT)
     parser.add_argument("--strict", action="store_true", help="считать warning'и ошибками")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--cross",
+        action="store_true",
+        help="искать конфликты секций между модами (один путь внутри gamedata + одно имя)",
+    )
     args = parser.parse_args(argv)
 
     if args.mod_id:
@@ -384,8 +559,14 @@ def main(argv: list[str] | None = None) -> int:
 
     reference = ReferenceView.load(args.reference)
     results: dict[str, list[Finding]] = {}
+    fork_profile: dict[str, bool] = {}
     for target in targets:
         results[target.name] = lint(target, reference)
+        fork_profile[target.name] = is_vendor_fork(target)
+
+    cross_findings: list[Finding] = []
+    if args.cross:
+        cross_findings = cross_conflicts(targets, reference)
 
     if args.json:
         payload = {
@@ -394,6 +575,8 @@ def main(argv: list[str] | None = None) -> int:
                 name: [finding.__dict__ for finding in findings] for name, findings in results.items()
             },
         }
+        if args.cross:
+            payload["cross"] = [finding.__dict__ for finding in cross_findings]
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         if not reference.populated:
@@ -405,13 +588,24 @@ def main(argv: list[str] | None = None) -> int:
             errors = [f for f in findings if f.severity == "error"]
             warns = [f for f in findings if f.severity == "warn"]
             status = "OK" if not findings else f"{len(errors)} ошибок, {len(warns)} предупреждений"
+            if fork_profile.get(name):
+                status = f"{status} — проверен в профиле форка"
             print(f"{name}: {status}")
             for finding in findings:
                 print(finding.format())
             print()
+        if args.cross:
+            if cross_findings:
+                print(f"Перекрёстные конфликты: {len(cross_findings)} предупреждений")
+                for finding in cross_findings:
+                    print(finding.format())
+            else:
+                print("Перекрёстные конфликты: нет")
+            print()
 
     total_errors = sum(1 for fs in results.values() for f in fs if f.severity == "error")
     total_warns = sum(1 for fs in results.values() for f in fs if f.severity == "warn")
+    total_warns += len(cross_findings)
     if total_errors or (args.strict and total_warns):
         return 1
     return 0
