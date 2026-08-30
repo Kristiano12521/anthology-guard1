@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.5] — инструменты в README и правилах
+
+В таблицу README добавлены `to_cp1251.ps1`, `check_encoding.ps1`, `dds_tool.ps1`, `draw_cmo_unique_icons.ps1`, `pack_bhs.py`. В `anomaly-core.mdc` — одна строка: перекодировку, проверку кодировки и DDS брать из готовых скриптов, не писать одноразовые.
+
 ## [0.1.4] — .cursorignore
 
 `.cursorignore` исключает сырые логи, карточку xraylog, `.cache/`, `build/` и бинарники (`*.dds`, `*.png`, `*.ogg`, `*.bin`, `*.seq`) внутри `addon/` и `reference/`. Каталог `reference/` целиком не исключается — это эталон для поиска.

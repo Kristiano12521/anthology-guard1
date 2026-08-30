@@ -66,8 +66,13 @@ python3 tools/build_addon.py my_fix_weapon_jam --zip
 | `tools/lint_addon.py <mod_id>` | проверяет мод на нарушения правил проекта: полная замена файлов сборки, `zzz`-префиксы, анонимные callback'и, дубли DLTX-секций, кодировка |
 | `tools/new_addon.py <mod_id>` | создаёт скелет мода из `templates/addon-skeleton` |
 | `tools/build_addon.py <mod_id>` | собирает мод в `build/`, опционально в zip или сразу в папку модов MO2 |
+| `tools/to_cp1251.ps1 <file>…` | UTF-8 → Windows-1251 для игровых файлов; отказывается писать, если символ не входит в cp1251 |
+| `tools/check_encoding.ps1 <folder>` | отчёт по кодировке `.script`/`.ltx`/`.xml`/`.txt`/`.ini`/`.seq` в папке: ascii, cp1251 или utf-8, плюс BOM |
+| `tools/dds_tool.ps1 decode\|encode` | DDS ↔ PNG для UI-иконок: DXT1/DXT5 и несжатый A8R8G8B8; encode пишет DXT5 без мипов |
+| `tools/draw_cmo_unique_icons.ps1` | рисует уникальные 64×64 силуэты CMO и кодирует их в DXT5 DDS через `dds_tool.ps1` |
+| `tools/pack_bhs.py` | собирает zip Anthology Busy Hands Stability Fix из `reference/` + оверлеи `addon/anthology_busyhands_stability_fix` |
 
-Всё на чистом Python 3.9+, без зависимостей. На Windows — `py -3` вместо `python3`.
+Python-инструменты — 3.9+, без зависимостей. Кодировка и DDS — PowerShell (`*.ps1`). На Windows — `py -3` вместо `python3`.
 
 ## Как работать с агентом
 
