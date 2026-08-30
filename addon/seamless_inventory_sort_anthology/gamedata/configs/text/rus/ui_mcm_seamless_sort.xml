@@ -4,6 +4,7 @@
 	
 	<string id="ui_mcm_menu_seamless_sort"><text>Бесшовная сортировка инвентаря</text></string>
 	<string id="ui_mcm_menu_siss_general"><text>Основные настройки</text></string>
+	<string id="ui_mcm_menu_siss_auto"><text>Совместимые припасы</text></string>
 	<string id="ui_mcm_menu_siss_gaps"><text>Пустые ячейки и разборка</text></string>
 	<string id="ui_mcm_menu_siss_loot"><text>Обыск и тела</text></string>
 	<string id="ui_mcm_menu_siss_hl"><text>Подсветка добычи</text></string>
@@ -29,7 +30,7 @@
 	</string>
 	<string id="ui_mcm_seamless_sort_siss_general_win_trade"><text>Сортировать в окне торговли</text></string>
 	<string id="ui_mcm_seamless_sort_siss_general_win_trade_desc">
-		<text>Сохранять порядок в сумках продажи при перемещении предметов в торговую корзину и обратно.</text>
+		<text>Держит сортировку в сетке торговца, вашем инвентаре и обеих корзинах сделки. Если выключить, предметы в окне торговли остаются в конце списка до повторного открытия окна.</text>
 	</string>
 	<string id="ui_mcm_seamless_sort_siss_general_fav_junk"><text>Пересортировать избранное и мусор</text></string>
 	<string id="ui_mcm_seamless_sort_siss_general_fav_junk_desc">
@@ -41,6 +42,19 @@
 	</string>
 
 	
+
+	<string id="ui_mcm_seamless_sort_siss_auto_desc">
+		<text>Временно поднимает патроны и навесное, совместимые с экипированным оружием. Сохранённое избранное SortingPlus не меняется.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_auto_auto_fav"><text>Поднимать совместимые припасы</text></string>
+	<string id="ui_mcm_seamless_sort_siss_auto_auto_fav_desc">
+		<text>Главный переключатель. Совместимые патроны, прицелы, глушители и подствольники попадают в группу избранного и подсвечиваются.</text>
+	</string>
+	<string id="ui_mcm_seamless_sort_siss_auto_auto_fav_own"><text>Применять к моему инвентарю</text></string>
+	<string id="ui_mcm_seamless_sort_siss_auto_auto_fav_own_desc">
+		<text>Применять приоритет и подсветку к своему инвентарю и торговой корзине. Если выключить, ваши предметы сортируются как обычно, а припасы в луте и у торговца остаются приоритетными.</text>
+	</string>
+
 	<string id="ui_mcm_seamless_sort_siss_gaps_desc">
 		<text>Настройки поведения свободных ячеек, разборки предметов и отдельной группы компонентов боеприпасов.</text>
 	</string>

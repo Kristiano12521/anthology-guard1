@@ -454,33 +454,31 @@ local function retry_install()
     return false
 end
 
--- "on_game_end" is a regular callback, not an auto-called script entry point
--- (unlike on_game_start), so it has to be registered like any other. The method
--- wrappers themselves are deliberately left in place: they are idempotent and
+-- Engine entry point, like on_game_start. axr_main has no callback named
+-- on_game_end. The method wrappers stay in place: they are idempotent and
 -- reinstalling them on every load would stack a new layer each time.
-local function on_game_end()
+function on_game_end()
     if SESSION.active then finish_session("game_end") end
     clear_table(highlighted)
     if UnregisterScriptCallback and CALLBACKS then
         CALLBACKS = false
         UnregisterScriptCallback("on_option_change", refresh_opts)
-        UnregisterScriptCallback("on_game_end", on_game_end)
     end
 end
 
 function on_game_start()
     refresh_opts()
 
-    -- Патч откладывается на следующий тик через таймер вместо синхронного
-    -- вызова install() здесь. Раньше "патчим последним, снаружи Seamless/
-    -- Antifreeze" обеспечивалось только префиксом "zzzzzzz_" в имени файла
-    -- (больше z => позже грузится => на момент патча профайлера чужие
-    -- обёртки CC.Update/TMode_Init уже на месте, и наша обёртка их
-    -- окружает). Это ломается, если у кого-то ещё окажется имя файла
-    -- с не меньшим числом z. Таймер с задержкой 0 гарантирует то же самое
-    -- свойство (профайлер патчит строго ПОСЛЕ того, как отработают все
-    -- on_game_start остальных скриптов в этот же тик), но не зависит от
-    -- имени файла вообще.
+    -- ГЏГ ГІГ· Г®ГІГЄГ«Г Г¤Г»ГўГ ГҐГІГ±Гї Г­Г  Г±Г«ГҐГ¤ГіГѕГ№ГЁГ© ГІГЁГЄ Г·ГҐГ°ГҐГ§ ГІГ Г©Г¬ГҐГ° ГўГ¬ГҐГ±ГІГ® Г±ГЁГ­ГµГ°Г®Г­Г­Г®ГЈГ®
+    -- ГўГ»Г§Г®ГўГ  install() Г§Г¤ГҐГ±Гј. ГђГ Г­ГјГёГҐ "ГЇГ ГІГ·ГЁГ¬ ГЇГ®Г±Г«ГҐГ¤Г­ГЁГ¬, Г±Г­Г Г°ГіГ¦ГЁ Seamless/
+    -- Antifreeze" Г®ГЎГҐГ±ГЇГҐГ·ГЁГўГ Г«Г®Г±Гј ГІГ®Г«ГјГЄГ® ГЇГ°ГҐГґГЁГЄГ±Г®Г¬ "zzzzzzz_" Гў ГЁГ¬ГҐГ­ГЁ ГґГ Г©Г«Г 
+    -- (ГЎГ®Г«ГјГёГҐ z => ГЇГ®Г§Г¦ГҐ ГЈГ°ГіГ§ГЁГІГ±Гї => Г­Г  Г¬Г®Г¬ГҐГ­ГІ ГЇГ ГІГ·Г  ГЇГ°Г®ГґГ Г©Г«ГҐГ°Г  Г·ГіГ¦ГЁГҐ
+    -- Г®ГЎВёГ°ГІГЄГЁ CC.Update/TMode_Init ГіГ¦ГҐ Г­Г  Г¬ГҐГ±ГІГҐ, ГЁ Г­Г ГёГ  Г®ГЎВёГ°ГІГЄГ  ГЁГµ
+    -- Г®ГЄГ°ГіГ¦Г ГҐГІ). ГќГІГ® Г«Г®Г¬Г ГҐГІГ±Гї, ГҐГ±Г«ГЁ Гі ГЄГ®ГЈГ®-ГІГ® ГҐГ№Вё Г®ГЄГ Г¦ГҐГІГ±Гї ГЁГ¬Гї ГґГ Г©Г«Г 
+    -- Г± Г­ГҐ Г¬ГҐГ­ГјГёГЁГ¬ Г·ГЁГ±Г«Г®Г¬ z. Г’Г Г©Г¬ГҐГ° Г± Г§Г Г¤ГҐГ°Г¦ГЄГ®Г© 0 ГЈГ Г°Г Г­ГІГЁГ°ГіГҐГІ ГІГ® Г¦ГҐ Г±Г Г¬Г®ГҐ
+    -- Г±ГўГ®Г©Г±ГІГўГ® (ГЇГ°Г®ГґГ Г©Г«ГҐГ° ГЇГ ГІГ·ГЁГІ Г±ГІГ°Г®ГЈГ® ГЏГЋГ‘Г‹Г… ГІГ®ГЈГ®, ГЄГ ГЄ Г®ГІГ°Г ГЎГ®ГІГ ГѕГІ ГўГ±ГҐ
+    -- on_game_start Г®Г±ГІГ Г«ГјГ­Г»Гµ Г±ГЄГ°ГЁГЇГІГ®Гў Гў ГЅГІГ®ГІ Г¦ГҐ ГІГЁГЄ), Г­Г® Г­ГҐ Г§Г ГўГЁГ±ГЁГІ Г®ГІ
+    -- ГЁГ¬ГҐГ­ГЁ ГґГ Г©Г«Г  ГўГ®Г®ГЎГ№ГҐ.
     if CreateTimeEvent and not RETRY_ARMED then
         RETRY_ARMED = true
         CreateTimeEvent("trade_ui_profiler", "deferred_install", 0, function()
@@ -489,8 +487,8 @@ function on_game_start()
                 if diag_on() then install_diag() end
                 return true
             end
-            -- Целевые классы UI ещё не готовы (например, не тот момент
-            -- загрузки) - повторим попытку ещё через секунду.
+            -- Г–ГҐГ«ГҐГўГ»ГҐ ГЄГ«Г Г±Г±Г» UI ГҐГ№Вё Г­ГҐ ГЈГ®ГІГ®ГўГ» (Г­Г ГЇГ°ГЁГ¬ГҐГ°, Г­ГҐ ГІГ®ГІ Г¬Г®Г¬ГҐГ­ГІ
+            -- Г§Г ГЈГ°ГіГ§ГЄГЁ) - ГЇГ®ГўГІГ®Г°ГЁГ¬ ГЇГ®ГЇГ»ГІГЄГі ГҐГ№Вё Г·ГҐГ°ГҐГ§ Г±ГҐГЄГіГ­Г¤Гі.
             RETRY_ARMED = true
             CreateTimeEvent("trade_ui_profiler", "late_install", 1, retry_install)
             return true
@@ -500,6 +498,5 @@ function on_game_start()
     if RegisterScriptCallback and not CALLBACKS then
         CALLBACKS = true
         RegisterScriptCallback("on_option_change", refresh_opts)
-        RegisterScriptCallback("on_game_end", on_game_end)
     end
 end

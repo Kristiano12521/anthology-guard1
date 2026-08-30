@@ -257,9 +257,9 @@ function on_option_change()
 end
 
 
--- Regular callback, not an auto-called script entry point. The Pass/OnKeyboard/
--- Show hooks stay installed (they are one-time and guarded); only the tooltip
--- delays we overwrote are handed back to their owners.
+-- Engine entry point, like on_game_start. The Pass/OnKeyboard/Show hooks stay
+-- installed (they are one-time and guarded); only the tooltip delays we
+-- overwrote are handed back to their owners.
 function on_game_end()
 	restore_all_delays()
 	if not (UnregisterScriptCallback and callbacks_registered) then return end
@@ -268,7 +268,6 @@ function on_game_end()
 	UnregisterScriptCallback("GUI_on_show", on_GUI_show)
 	UnregisterScriptCallback("GUI_on_hide", on_GUI_hide)
 	UnregisterScriptCallback("on_key_press", on_key_press)
-	UnregisterScriptCallback("on_game_end", on_game_end)
 end
 
 function on_game_start()
@@ -287,7 +286,6 @@ function on_game_start()
 		RegisterScriptCallback("GUI_on_show", on_GUI_show)
 		RegisterScriptCallback("GUI_on_hide", on_GUI_hide)
 		RegisterScriptCallback("on_key_press", on_key_press)
-		RegisterScriptCallback("on_game_end", on_game_end)
 		callbacks_registered = true
 	end
 

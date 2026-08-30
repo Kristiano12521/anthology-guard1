@@ -8,6 +8,75 @@
 - **Flueno** — Tooltip Control 1.1.2 и оригинальные фиксы залипших подсказок (CC BY-NC-SA 3.0, заголовок сохранён в исходниках)
 - **Razfarg** — Scroll Fix v3, сброс кэша медленного скролла
 
+## [1.5.6] — 2026-08-30
+
+**Изменено**
+
+- `gamedata/scripts/seamless_inventory_sort_anthology.script` — опциональные хуки не держат retry; `on_game_end` как точка входа скрипта
+- `gamedata/scripts/inventory_antifreeze_anthology.script`, `tooltip_control.script`, `trade_ui_profiler.script` — убрана регистрация несуществующего callback `on_game_end`
+
+**Причина**
+
+1. `install_hooks()` считал обязательными `seax_sortingplus_opt_sort_by_kind` и `ammo_maker.breakdown`. Их нет в Anthology, таймер 10 с писал WARNING про SortingPlus, хотя модуль уже был найден.
+2. `RegisterScriptCallback("on_game_end")` в `axr_main` отсутствует (`callback on_game_end doesn't exist`). В сборке `on_game_end` — автовызываемая точка входа скрипта, как `on_game_start`.
+
+**Как исправлено**
+
+- Обязательные хуки: оружие, SortingPlus, `FindFreeCell` / `Reinit`. `item_parts`, `ammo_maker`, sea-ex, `GetSortOrder` ставятся если есть и не валят retry.
+- Во всех четырёх скриптах `function on_game_end()` больше не регистрируется как callback; движок вызывает её сам.
+
+**Не затронуто**
+
+- Логика сортировки, auto_fav, Antifreeze, Tooltip, профайлер
+- Сохраняемые структуры
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: совместим
+
+**Проверено**
+
+- Линтер проекта: см. прогон после правки
+- В игре: не прогонялось. В xray.log не должно быть `callback on_game_end doesn't exist` от этих четырёх скриптов и ложного WARNING про item_parts/ammo_maker/SortingPlus. Строка запуска — `1.5.6-hook-cleanup`
+
+## [1.5.5] — 2026-08-30
+
+**Изменено**
+
+- `gamedata/scripts/seamless_inventory_sort_anthology.script` — soft-sort видимых сеток торговли; рабочая категория частей патронов; совместимые припасы с апстрима от 27.08.2026
+- `gamedata/scripts/seamless_inventory_sort_anthology_mcm.script` — страница MCM Compatible Supplies
+- `gamedata/configs/text/eng|rus/ui_mcm_seamless_sort.xml` — тексты торговли и совместимых припасов
+
+**Причина**
+
+1. В трёхколоночной торговле Anthology видимые сетки — `actor_bag` / `npc_bag`. Seamless сортировал только корзины `*_trade_bag`, поэтому купленный предмет оставался в конце списка до закрытия окна.
+2. SortingPlus держит `item_order` локальной таблицей. Запись в `rax.item_order` не попадала в компаратор, `get_sort_kind` → `ammo_parts` сбрасывался в `"na"`.
+3. Апстрим Seamless от 27.08.2026 добавил временное избранное для патронов и навесного под экипированное оружие, не трогая сохранённую таблицу SortingPlus.
+
+**Как исправлено**
+
+- `TMode_ResetInventories` / `TMode_RefreshInventories` обрабатывают все четыре контейнера (`SHOWN_BAGS`). `Reinit` по-прежнему не вызывается.
+- Категория частей патронов: обёртки `sort_by_kind` и `FindFreeCell` плюс ранги из `sortingplus.ltx`. `get_sort_kind` оставлен для sea-ex и форков, которые экспортируют `item_order`.
+- Совместимые припасы: kind `"favorites"` через обёртки `get_sort_kind`, `sort_by_kind` и `FindFreeCell` (кэш `ab_k` SortingPlus не сбрасывается при смене оружия). Подсветка и иконка через `rax_persistent_highlight` / `rax_icon_layers`; обновление по `actor_item_to_slot` / `to_ruck` / `item_drop`. Контекст сумки задаётся в `soft_resort`, `FindFreeCell` и обёртке `Reinit`.
+
+**Не затронуто**
+
+- Antifreeze, Tooltip Control, профайлер, `keep_gaps` по умолчанию (у нас по-прежнему включён; в апстриме GAMMA он выключен)
+- Сохраняемые таблицы SortingPlus (избранное игрока не переписывается)
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: совместим, своих сохраняемых структур нет
+- SortingPlus отдельно и выше Seamless. Убрать `mod_system_zzzzzz_anthology_sorting_plus_categories_fix.ltx` из папки Sorting Plus, вкладки — через `fix_sort_tabs`
+- Kristiano AIO со старой копией Seamless держать вместе нельзя
+
+**Проверено**
+
+- Линтер проекта: см. прогон после правки
+- В игре: не прогонялось. Купить/продать у торговца — предмет должен встать в свою группу SortingPlus без закрытия окна; части патронов — отдельной полосой после ammo; сменить оружие в слоте — совместимые патроны/навесное подсвечиваются и уходят в избранное, ручные K-избранные не сбрасываются
+
 ## [1.5.4] — 2026-08-28
 
 **Изменено**

@@ -1,6 +1,20 @@
 INVENTORY / UI PERFORMANCE CORE — ANOMALY ANTHOLOGY 2.1
-Версия: 1.5.2 TRADE HIGHLIGHT OPTIMIZATION RC
-Дата: 06.08.2026
+Версия: 1.5.6
+Дата: 30.08.2026
+
+
+ИЗМЕНЕНИЯ 1.5.6
+----------------
+- Ложный WARNING про хуки SortingPlus: item_parts / ammo_maker / sea-ex больше не считаются обязательными.
+- `on_game_end` — точка входа скрипта, не callback (убрана регистрация, из-за которой axr_main писал "doesn't exist").
+
+
+ИЗМЕНЕНИЯ 1.5.5
+----------------
+- Торговля Anthology: soft-sort видимых сеток `actor_bag` / `npc_bag`, не только корзин.
+- Части патронов: рабочая категория через обёртки компаратора (у SortingPlus `item_order` локальный).
+- Совместимые припасы с апстрима Seamless от 27.08.2026: временное избранное для патронов и навесного под экипированное оружие, без записи в сохранённые избранные SortingPlus. Страница MCM Compatible Supplies.
+- `keep_gaps` по умолчанию включён (в апстриме GAMMA выключен).
 
 
 ИЗМЕНЕНИЯ 1.5.2
@@ -185,6 +199,9 @@ Tooltip Control:
 - UI Rework и других адаптаций ui_inventory/utils_ui;
 - Looting Takes Time, если используется.
 
+Из папки Sorting Plus убрать `mod_system_zzzzzz_anthology_sorting_plus_categories_fix.ltx`,
+если он туда попал: это чужой патч вкладок, он конфликтует с `fix_sort_tabs`.
+
 Не объединять папки старой и новой версий. Полностью перезапустить игру.
 Новая игра не требуется.
 
@@ -201,8 +218,12 @@ Tooltip Control:
    ammo_parts_row и заморозка сумки на время разборки по-прежнему работают
    (это теперь ставится через on_game_start + повтор, а не через порядок
    файлов — см. CHANGELOG v1.5.3).
+8. Купить/продать у торговца — предмет должен встать в свою группу SortingPlus
+   без закрытия окна.
+9. Сменить оружие в слоте — совместимые патроны и навесное подсвечиваются и
+   уходят в избранное; ручные K-избранные не сбрасываются.
 
 Строки запуска в xray.log:
 [Inventory Antifreeze / Anthology 1.1.2-trade-toggle-test]
-[Seamless Inventory Sort / Anthology 1.5.3-hook-order-independence]
+[Seamless Inventory Sort / Anthology 1.5.6-hook-cleanup]
 [Tooltip Control / Anthology UI Core 1.4.1-hotfix] initialized

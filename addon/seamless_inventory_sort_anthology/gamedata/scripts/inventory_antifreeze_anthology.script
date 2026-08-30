@@ -682,15 +682,14 @@ function GUI_on_hide(name)
     if gui then gui.SortJunkTradeReady = false end
 end
 
--- Regular callback, not an auto-called script entry point. The UICellContainer
--- patch itself stays installed: it is applied once and guarded by API.patched.
+-- Engine entry point, like on_game_start. The UICellContainer patch stays
+-- installed: it is applied once and guarded by API.patched.
 function on_game_end()
     if not (UnregisterScriptCallback and API.callbacks_registered) then return end
     API.callbacks_registered = false
     UnregisterScriptCallback("GUI_on_show", GUI_on_show)
     UnregisterScriptCallback("GUI_on_hide", GUI_on_hide)
     UnregisterScriptCallback("on_option_change", refresh_opts)
-    UnregisterScriptCallback("on_game_end", on_game_end)
 end
 
 function on_game_start()
@@ -700,7 +699,6 @@ function on_game_start()
         RegisterScriptCallback("GUI_on_show", GUI_on_show)
         RegisterScriptCallback("GUI_on_hide", GUI_on_hide)
         RegisterScriptCallback("on_option_change", refresh_opts)
-        RegisterScriptCallback("on_game_end", on_game_end)
         API.callbacks_registered = true
     end
     log("enabled=%s trade=%s limit=%s budget_ms=%s sort_step=%s icon_step=%s indicator=%s safe_compare=%s scroll_fix=true",
