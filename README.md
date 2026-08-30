@@ -63,7 +63,7 @@ python3 tools/build_addon.py my_fix_weapon_jam --zip
 | --- | --- |
 | `tools/xraylog.py <log>` | сжимает многомегабайтный лог игры в карточку вылета: класс ошибки, стек, warning'и перед падением |
 | `tools/refindex.py build\|find\|section\|callback\|stats` | индекс по `reference/`: проверка, что функция/секция/callback реально существуют |
-| `tools/lint_addon.py <mod_id>` | проверяет мод на нарушения правил проекта: полная замена файлов сборки, `zzz`-префиксы, анонимные callback'и, дубли DLTX-секций, кодировка |
+| `tools/lint_addon.py [mod_id] [--cross]` | проверяет мод на правила: замена файлов сборки, дубли DLTX-секций, кодировка, анонимные callback'и. `ORDER-001` — ошибка на `zzz`/`aaa` у `.ltx`; `ORDER-002` — предупреждение у `.script`, снимается комментарием `-- load-order: после <что>` в первых 10 строках. `--cross` — предупреждения `CROSS-001`, если два мода патчат одну секцию в одном пути внутри gamedata. `vendor_fork=1` в `meta.ini` глушит `LUA-001`, `LTX-001` и `STRUCT-005` на форках чужих модов |
 | `tools/new_addon.py <mod_id>` | создаёт скелет мода из `templates/addon-skeleton` |
 | `tools/build_addon.py <mod_id>` | собирает мод в `build/`, опционально в zip или сразу в папку модов MO2 |
 | `tools/to_cp1251.ps1 <file>…` | UTF-8 → Windows-1251 для игровых файлов; отказывается писать, если символ не входит в cp1251 |
@@ -71,6 +71,7 @@ python3 tools/build_addon.py my_fix_weapon_jam --zip
 | `tools/dds_tool.ps1 decode\|encode` | DDS ↔ PNG для UI-иконок: DXT1/DXT5 и несжатый A8R8G8B8; encode пишет DXT5 без мипов |
 | `tools/draw_cmo_unique_icons.ps1` | рисует уникальные 64×64 силуэты CMO и кодирует их в DXT5 DDS через `dds_tool.ps1` |
 | `tools/pack_bhs.py` | собирает zip Anthology Busy Hands Stability Fix из `reference/` + оверлеи `addon/anthology_busyhands_stability_fix` |
+| `tools/_pack_kristiano_aio.py` | одноразовый пакер: zip `[DBG] Kristiano Fixes ALL IN ONE` из всех модов в `addon/` с `gamedata/` (кроме трёх отдельных и снятого `fix_bhs_fdda_loot`) плюс три отдельных архива — Context Menu Overhaul, QuickQK Task Complete, ST2 Footstep — в `build/` |
 
 Python-инструменты — 3.9+, без зависимостей. Кодировка и DDS — PowerShell (`*.ps1`). На Windows — `py -3` вместо `python3`.
 

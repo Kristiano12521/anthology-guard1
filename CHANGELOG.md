@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.9] — CHANGELOG только после факта; --cross в процессе аддона
+
+Правило в `anomaly-core.mdc` и `AGENTS.md`: запись в CHANGELOG после применения правки и тестов, только выполненное. README: lint — `ORDER-001`/`ORDER-002`, `--cross`, `vendor_fork=1`; добавлен `_pack_kristiano_aio.py`. В `workflow-addon`, `docs/plans/addon.md` и `docs/mo2.md` `--cross` перед установкой в MO2.
+
 ## [0.1.8] — xraylog: заголовок группы не из abort()
 
 `tools/xraylog.py`: заголовок «Нефатальные ошибки» берёт первый Lua-кадр не из инфраструктурных `_g.script` / `axr_main.script`, минуя `[C]: in function`. `abort()` в `_g.script` — обёртка, поэтому стек через `sound_theme` называется `sound_theme.script`. Если отказ в `axr_main.callback_set`, заголовок остаётся `axr_main.script`. Список обёрток — константа `INFRA_SCRIPTS`.
