@@ -1,0 +1,238 @@
+-- Milspec PDA + Exo PSU recipes for Banjaji CSI v4.
+-- DLTX into craft_-500 / craft_-510 does not reach the craft window
+-- on this load order. CSI builds the menu from LoadRecipesLTX memory
+-- tables; this wrap injects after that, same as the old archive script.
+
+local LOG_TAG = "[fix_milspec_exo_craft]"
+local VERSION = "1.0.2"
+
+local DEVICE_TAB_TITLE = "st_ui_craft_device"
+local EXO_TAB_TITLE = "st_exo_system_craftingtitle"
+
+local orig_load = nil
+local installed = false
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function tab_index_by_title(tabs, title)
+	if not tabs then
+		return nil
+	end
+	for i, tab_title in pairs(tabs) do
+		if tab_title == title then
+			return i
+		end
+	end
+	return nil
+end
+
+local function has_identificator(list, identificator)
+	if not list then
+		return false
+	end
+	for i = 1, #list do
+		local recipe = list[i]
+		if recipe and recipe.identificator == identificator then
+			return true
+		end
+	end
+	return false
+end
+
+local function append_recipe(list, recipe)
+	if has_identificator(list, recipe.identificator) then
+		return false
+	end
+	list[#list + 1] = recipe
+	return true
+end
+
+local function milspec_recipe()
+	return {
+		identificator = "device_pda_milspec",
+		results = {["device_pda_milspec"] = 1},
+		notes = {["recipe_pda_milspec"] = 1},
+		tools = {},
+		components = {
+			["device_pda_3"] = 1,
+			["prt_o_ballistic_8"] = 1,
+			["prt_i_transistors"] = 20,
+			["prt_i_capacitors"] = 25,
+		},
+	}
+end
+
+local function exo_recipes()
+	return {
+		{
+			identificator = "exo_power_supply",
+			results = {["exo_power_supply"] = 1},
+			notes = {["recipe_basic_3"] = 1},
+			tools = {},
+			components = {
+				["equ_small_pack"] = 1,
+				["batteries_exo"] = 2,
+				["af_full_empty_af_aam"] = 1,
+				["prt_i_resistors"] = 10,
+			},
+		},
+		{
+			identificator = "exo_power_supply_military",
+			results = {["exo_power_supply_military"] = 1},
+			notes = {["recipe_basic_3"] = 1},
+			tools = {},
+			components = {
+				["equ_small_military_pack"] = 1,
+				["batteries_exo"] = 3,
+				["af_cooler"] = 1,
+				["prt_i_capacitors"] = 12,
+			},
+		},
+		{
+			identificator = "exo_power_supply_proto",
+			results = {["exo_power_supply_proto"] = 1},
+			notes = {["recipe_exo_1"] = 1},
+			tools = {},
+			components = {
+				["exo_power_supply_military"] = 2,
+				["af_surge_up"] = 1,
+				["af_dummy_battery_af_aam"] = 1,
+				["prt_i_transistors"] = 10,
+			},
+		},
+		{
+			identificator = "exo_power_supply_tank",
+			results = {["exo_power_supply_tank"] = 1},
+			notes = {["recipe_exo_2"] = 1},
+			tools = {},
+			components = {
+				["exo_power_supply_military"] = 1,
+				["af_surge"] = 1,
+				["af_full_empty_af_aam"] = 1,
+				["prt_i_resistors"] = 4,
+			},
+		},
+		{
+			identificator = "exo_power_supply_sprint",
+			results = {["exo_power_supply_sprint"] = 1},
+			notes = {["recipe_exo_3"] = 1},
+			tools = {},
+			components = {
+				["exo_power_supply_military"] = 1,
+				["af_cooler"] = 1,
+				["af_electra_flash_af_aam"] = 1,
+				["prt_i_capacitors"] = 4,
+			},
+		},
+		{
+			identificator = "exo_power_supply_jump",
+			results = {["exo_power_supply_jump"] = 1},
+			notes = {["recipe_exo_3"] = 1},
+			tools = {},
+			components = {
+				["exo_power_supply_military"] = 1,
+				["af_cooler"] = 1,
+				["af_electra_flash_af_aam"] = 1,
+				["prt_i_resistors"] = 4,
+			},
+		},
+		{
+			identificator = "exo_power_supply_invisibility",
+			results = {["exo_power_supply_invisibility"] = 1},
+			notes = {["recipe_exo_1"] = 1},
+			tools = {},
+			components = {
+				["exo_power_supply_military"] = 1,
+				["af_surge"] = 1,
+				["af_dummy_battery_af_aam"] = 1,
+				["prt_i_capacitors"] = 4,
+			},
+		},
+	}
+end
+
+local function inject_recipes()
+	local csi = aa_load_recipes_Banjaji_CSI
+	local recipes = csi and csi.all_recipes
+	local tabs = csi and csi.all_recipe_tabs
+	if not (recipes and tabs) then
+		log("ABORT: all_recipes/all_recipe_tabs missing after LoadRecipesLTX")
+		return
+	end
+
+	local added = 0
+
+	local device_tab = tab_index_by_title(tabs, DEVICE_TAB_TITLE)
+	if device_tab then
+		recipes[device_tab] = recipes[device_tab] or {}
+		if append_recipe(recipes[device_tab], milspec_recipe()) then
+			added = added + 1
+		end
+	else
+		log("WARN: Devices tab %s not found", DEVICE_TAB_TITLE)
+	end
+
+	local exo_tab = tab_index_by_title(tabs, EXO_TAB_TITLE)
+	if not exo_tab then
+		exo_tab = #tabs + 1
+		tabs[exo_tab] = EXO_TAB_TITLE
+	end
+	recipes[exo_tab] = recipes[exo_tab] or {}
+
+	local exo_list = exo_recipes()
+	for i = 1, #exo_list do
+		if append_recipe(recipes[exo_tab], exo_list[i]) then
+			added = added + 1
+		end
+	end
+
+	log("injected %s new recipes, exo tab %s now has %s", tostring(added), tostring(exo_tab), tostring(#recipes[exo_tab]))
+end
+
+local function wrapped_LoadRecipesLTX(...)
+	local result = orig_load(...)
+	inject_recipes()
+	return result
+end
+
+local function uninstall()
+	local csi = aa_load_recipes_Banjaji_CSI
+	if installed and csi and orig_load and csi.LoadRecipesLTX == wrapped_LoadRecipesLTX then
+		csi.LoadRecipesLTX = orig_load
+	end
+	orig_load = nil
+	installed = false
+end
+
+local function install()
+	if installed then
+		return
+	end
+	if not aa_load_recipes_Banjaji_CSI then
+		log("ABORT: aa_load_recipes_Banjaji_CSI not found")
+		return
+	end
+	if type(aa_load_recipes_Banjaji_CSI.LoadRecipesLTX) ~= "function" then
+		log("ABORT: LoadRecipesLTX not found")
+		return
+	end
+
+	orig_load = aa_load_recipes_Banjaji_CSI.LoadRecipesLTX
+	aa_load_recipes_Banjaji_CSI.LoadRecipesLTX = wrapped_LoadRecipesLTX
+	installed = true
+	log("LoadRecipesLTX wrapped v%s", VERSION)
+
+	if aa_load_recipes_Banjaji_CSI.all_recipes and aa_load_recipes_Banjaji_CSI.all_recipe_tabs then
+		inject_recipes()
+	end
+end
+
+function on_game_start()
+	install()
+end
+
+function on_game_end()
+	uninstall()
+end

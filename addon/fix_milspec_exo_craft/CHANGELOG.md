@@ -1,5 +1,37 @@
 # Milspec and Exo Craft Fix
 
+## [1.0.2] — 2026-08-30
+
+**Изменено**
+
+- `gamedata/scripts/fix_milspec_exo_craft.script` — обёртка `aa_load_recipes_Banjaji_CSI.LoadRecipesLTX`, как в старом архиве: ПДА в «Устройства», семь БП во вкладке Exo System.
+- DLTX `mod_craft_device_fix_milspec_exo.ltx` оставлен. Если строки уже попали в таблицы CSI, скрипт их не дублирует.
+
+**Причина**
+
+1.0.1 писал рецепты только в `craft_-500` / `craft_-510`. В игре вкладка Exo System открывалась пустой: после `LoadRecipesLTX` + `check_empty_tabs` в памяти не было ни одной строки. В логе нет ошибок разбора этих рецептов — DLTX до окна крафта не дошёл. Старый скрипт добавлял те же таблицы уже после сборки меню.
+
+**Как исправлено**
+
+Monkey-patch `LoadRecipesLTX`: вызывается оригинал, затем в `all_recipes` / `all_recipe_tabs` дописываются те же семь БП и Milspec PDA. Если таблицы уже собраны к `on_game_start`, инъекция сразу. Ингредиенты и записки — как в старом архиве.
+
+**Не затронуто**
+
+- `exo_loot.script` и шансы лута
+- `workshop_autoinject.script`, файлы Catspaw / Exo / Banjaji / R.A.K
+- Предметы, торговцы, сейвы
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+- В MO2 ниже R.A.K, Catspaw All Pack и Exo System. Старый ZIP `workshop_autoinject_banjaji_compat.script` в Kristiano выключить — иначе дубли, если тот скрипт всё ещё активен
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_milspec_exo_craft`
+- В игре: не прогонялось. В логе после открытия верстака должно быть `[fix_milspec_exo_craft] injected ...`
+
 ## [1.0.1] — 2026-08-30
 
 **Изменено**
