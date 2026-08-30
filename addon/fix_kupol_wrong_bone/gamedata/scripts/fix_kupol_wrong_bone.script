@@ -23,7 +23,7 @@
 -- This addon writes the packet once per load, then stops.
 
 local LOG_TAG = "[fix_kupol_wrong_bone]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 
 local TARGET_LEVEL = "az_radar"
 local TARGET_NAME = "cit_physic_object_0014"
@@ -194,6 +194,27 @@ local function scan_alife(reason)
 			return patched_this_load
 		end
 		cached_id = nil
+	end
+
+	local function visit(se_obj)
+		if patched_this_load or not se_obj then
+			return
+		end
+		try_fix_object(se_obj, reason)
+	end
+
+	if type(sim.iterate_objects) == "function" then
+		local ok = pcall(function()
+			sim:iterate_objects(function(se_obj)
+				visit(se_obj)
+			end)
+		end)
+		if ok then
+			if not patched_this_load then
+				log("target not in ALife yet reason=%s", tostring(reason))
+			end
+			return patched_this_load
+		end
 	end
 
 	for id = 1, MAX_ALIFE_ID do
