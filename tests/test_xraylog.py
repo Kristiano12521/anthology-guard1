@@ -274,6 +274,19 @@ class ArchiveCardTests(unittest.TestCase):
             self.assertNotIn(str(dest), header)
             self.assertNotIn(dest.as_posix(), header)
 
+    def test_markdown_header_strips_windows_path(self):
+        report = parse("crash_lua_nil.log")
+        report.path = Path(r"C:\Users\someone\AppData\xray_barkid.log")
+        card = report.to_markdown(
+            max_warnings=10, warnings_only=False, analyzed_on=date(2026, 8, 31)
+        )
+        header = "\n".join(card.splitlines()[:8])
+        self.assertIn("# Карточка лога — xray_barkid.log", header)
+        self.assertIn("- Файл: `xray_barkid.log`", header)
+        self.assertNotIn("Users", header)
+        self.assertNotIn("someone", header)
+        self.assertNotIn("AppData", header)
+
     def test_archive_flag_writes_card_and_prints_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp)

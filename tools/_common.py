@@ -56,6 +56,16 @@ def iter_files(root: Path, suffixes: Iterable[str] | None = None) -> Iterator[Pa
                 yield path
 
 
+def filename(path: Path | str) -> str:
+    """Последний компонент пути. Режет и ``/``, и ``\\``.
+
+    pathlib и ``os.path.basename`` на POSIX не считают обратный слэш
+    разделителем: ``C:\\Users\\me\\xray.log`` целиком оказывается в ``.name``.
+    """
+    text = os.fspath(path).replace("\\", "/")
+    return text.rsplit("/", 1)[-1]
+
+
 def rel(path: Path, base: Path | None = None) -> str:
     """Путь для вывода: относительный от корня репозитория, со слэшами."""
     base = base or REPO_ROOT

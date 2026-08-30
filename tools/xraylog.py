@@ -25,7 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _common import REPO_ROOT, decode_bytes, rel  # noqa: E402
+from _common import REPO_ROOT, decode_bytes, filename, rel  # noqa: E402
 
 DEFAULT_ARCHIVE_DIR = REPO_ROOT / "logs" / "cards"
 
@@ -494,10 +494,11 @@ class LogReport:
         else:
             size = f"{self.size / 1024:.0f} КБ"
         day = (analyzed_on or date.today()).isoformat()
+        log_name = filename(self.path)
         out: list[str] = []
-        out.append(f"# Карточка лога — {self.path.name}")
+        out.append(f"# Карточка лога — {log_name}")
         out.append("")
-        out.append(f"- Файл: `{self.path.name}` ({size}, {self.line_count} строк)")
+        out.append(f"- Файл: `{log_name}` ({size}, {self.line_count} строк)")
         out.append(f"- Дата разбора: {day}")
         out.append(f"- Класс: **{crash_class}**")
         env = []
@@ -595,7 +596,8 @@ def unique_archive_path(
     analyzed_on: date | None = None,
 ) -> Path:
     """Имя карточки: YYYY-MM-DD_<stem>.md, при занятом имени — суффикс -2, -3, …"""
-    stem = f"{(analyzed_on or date.today()).isoformat()}_{log_path.stem}"
+    source = Path(filename(log_path)).stem
+    stem = f"{(analyzed_on or date.today()).isoformat()}_{source}"
     candidate = dest_dir / f"{stem}.md"
     if not candidate.exists():
         return candidate
