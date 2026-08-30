@@ -10,7 +10,7 @@
 -- quests actually look up. Does not rewind NPC XR logic.
 
 local LOG_TAG = "[fix_quest_story_id]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local TASK_ID_LEVSHA = "yan_quest_levsha"
 local LEVSHA_SECTION = "yan_stalker_levsha"
 local EVENT_ID = "fix_quest_story_id"
@@ -285,10 +285,12 @@ function repair_levsha_task_tick()
 		log("Levsha task repair was not completed after %s attempts", repair_attempts)
 		return true
 	end
-	if type(CreateTimeEvent) == "function" then
-		CreateTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY, repair_levsha_task_tick)
+	-- CreateTimeEvent with the same ids is a no-op while this slot is live
+	-- (_g.script). Reset the timer and keep the action; return true would drop it.
+	if type(ResetTimeEvent) == "function" then
+		pcall(ResetTimeEvent, EVENT_ID, REPAIR_ACTION, REPAIR_DELAY)
 	end
-	return true
+	return false
 end
 
 local function schedule_levsha_repair()

@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.19] — lint: LUA-006 / LUA-007 / LUA-008
+
+`tools/lint_addon.py`: предупреждения по контракту `CreateTimeEvent` из `_g.script` — именованный functor без `return true` (слот не снимается), retry через Create тех же id и `return true` (Create — no-op), полный цикл `for id = 1, 65534`. Комментарии и строки не считаются. Тесты в `tests/test_lint_addon.py`.
+
 ## [0.1.18] — VERIFY-001 не в CI: --no-verify и автоотключение
 
 `lint_addon.py --no-verify` отключает проверку в игре. То же само, если выставлена `CI` или `GITHUB_ACTIONS`: после clone mtime у всех файлов равен чекауту и сверка с `verified_date` бесполезна. В сводке одна строка, почему пропущено. `--unverified` в таком окружении всё равно печатает список и предупреждает, что mtime недостоверен. Шаг Lint addons в CI — явно `--cross --no-verify`. Ограничение в `docs/mo2.md`.

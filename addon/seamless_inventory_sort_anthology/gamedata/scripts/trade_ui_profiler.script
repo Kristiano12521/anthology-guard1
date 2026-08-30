@@ -3,7 +3,7 @@
 -- It does not cache prices or trade status yet; the purpose is to identify the
 -- first real hot path before changing trade semantics.
 
-local VERSION = "1.5.4-persistent-highlight-fix"
+local VERSION = "1.5.7-time-event-return"
 
 local DEF = {
     trade_diag_enabled    = false,
@@ -448,10 +448,10 @@ local function retry_install()
     RETRY_ARMED = false
     if install() then
         if diag_on() then install_diag() end
-        return false
+        return true
     end
     log("WARNING UI classes still unavailable; profiler disabled for this launch")
-    return false
+    return true
 end
 
 -- Engine entry point, like on_game_start. axr_main has no callback named

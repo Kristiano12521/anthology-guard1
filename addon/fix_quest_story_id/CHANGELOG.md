@@ -1,5 +1,34 @@
 # Quest Story ID Collision Fix
 
+## [1.0.1] — 2026-08-30
+
+**Изменено**
+
+- `gamedata/scripts/fix_quest_story_id.script` — retry ремонта `yan_quest_levsha` через `ResetTimeEvent` + `return false`, а не повторный `CreateTimeEvent` тех же id.
+
+**Причина**
+
+Пока слот жив, `CreateTimeEvent` с той же парой id — no-op (`_g.script`). Следом `return true` снимал действие, поэтому вторая и дальнейшие попытки не запускались, если task manager ещё не был готов.
+
+**Как исправлено**
+
+Тот же приём, что у остальных `fix_*` repair: `ResetTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY)` и `return false`. Слот остаётся, таймер сдвигается на 1 с, до `REPAIR_MAX_ATTEMPTS`.
+
+**Не затронуто**
+
+- DLTX, обёртка `story_objects.register`, предпочтения story_id
+- XR-логика Левши, `all.spawn`
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_quest_story_id --no-verify`
+- В игре: не прогонялось
+
 ## [1.0.0] — 2026-08-29
 
 **Изменено**

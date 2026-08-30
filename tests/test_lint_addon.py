@@ -476,5 +476,150 @@ class VerifiedMetaTests(unittest.TestCase):
             self.assertIn("переменная CI", out)
 
 
+class TimeEventLintTests(unittest.TestCase):
+    def _script(self, root: Path, name: str, source: str) -> Path:
+        addon = _minimal_addon(root, name)
+        script = addon / "gamedata" / "scripts" / f"{name}.script"
+        script.write_text(source, encoding="utf-8")
+        return addon
+
+    def test_named_functor_without_return_true_warns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "leak_event",
+                "local function retry_install()\n"
+                "    return false\n"
+                "end\n"
+                "function on_game_start()\n"
+                '    CreateTimeEvent("mod", "late", 1, retry_install)\n'
+                "end\n",
+            )
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)
+            hit = [f for f in findings if f.code == "LUA-006"]
+            self.assertEqual(len(hit), 1)
+            self.assertEqual(hit[0].severity, "warn")
+            self.assertIn("retry_install", hit[0].message)
+
+    def test_named_functor_with_return_true_is_silent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "ok_event",
+                "local function repair_tick()\n"
+                "    return true\n"
+                "end\n"
+                "function on_game_start()\n"
+                '    CreateTimeEvent("mod", "tick", 1, repair_tick)\n'
+                "end\n",
+            )
+            codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
+            self.assertNotIn("LUA-006", codes)
+            self.assertNotIn("LUA-007", codes)
+
+    def test_return_helper_that_returns_true_is_silent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "return_helper",
+                "local function finish_repair()\n"
+                "    return true\n"
+                "end\n"
+                "function repair_tick()\n"
+                "    return finish_repair()\n"
+                "end\n"
+                "function on_game_start()\n"
+                '    CreateTimeEvent("mod", "tick", 1, repair_tick)\n'
+                "end\n",
+            )
+            codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
+            self.assertNotIn("LUA-006", codes)
+
+    def test_self_create_then_return_true_warns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "dead_retry",
+                "local EVENT_ID = \"mod\"\n"
+                "local REPAIR_ACTION = \"tick\"\n"
+                "function repair_tick()\n"
+                "    CreateTimeEvent(EVENT_ID, REPAIR_ACTION, 1, repair_tick)\n"
+                "    return true\n"
+                "end\n"
+                "function on_game_start()\n"
+                "    CreateTimeEvent(EVENT_ID, REPAIR_ACTION, 1, repair_tick)\n"
+                "end\n",
+            )
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)
+            hit = [f for f in findings if f.code == "LUA-007"]
+            self.assertEqual(len(hit), 1)
+            self.assertIn("repair_tick", hit[0].message)
+
+    def test_reset_then_return_false_is_silent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "reset_retry",
+                "function repair_tick()\n"
+                "    if done then return true end\n"
+                '    ResetTimeEvent("mod", "tick", 1)\n'
+                "    return false\n"
+                "end\n"
+                "function on_game_start()\n"
+                '    CreateTimeEvent("mod", "tick", 1, repair_tick)\n'
+                "end\n",
+            )
+            codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
+            self.assertNotIn("LUA-006", codes)
+            self.assertNotIn("LUA-007", codes)
+
+    def test_create_other_event_then_return_true_is_silent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "other_event",
+                "local function late()\n"
+                "    return true\n"
+                "end\n"
+                "local function first()\n"
+                '    CreateTimeEvent("mod", "late", 1, late)\n'
+                "    return true\n"
+                "end\n"
+                "function on_game_start()\n"
+                '    CreateTimeEvent("mod", "first", 0, first)\n'
+                "end\n",
+            )
+            codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
+            self.assertNotIn("LUA-007", codes)
+
+    def test_alife_id_scan_warns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "id_scan",
+                "local MAX_ALIFE_ID = 65534\n"
+                "local function scan()\n"
+                "    for id = 1, MAX_ALIFE_ID do\n"
+                "        alife():object(id)\n"
+                "    end\n"
+                "end\n",
+            )
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)
+            hit = [f for f in findings if f.code == "LUA-008"]
+            self.assertEqual(len(hit), 1)
+            self.assertGreater(hit[0].line, 0)
+
+    def test_commented_alife_scan_is_silent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "id_scan_comment",
+                "-- ZIP scanned for id = 1, 65534 on every first_update\n"
+                "function on_game_start() end\n",
+            )
+            codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
+            self.assertNotIn("LUA-008", codes)
+
+
 if __name__ == "__main__":
     unittest.main()

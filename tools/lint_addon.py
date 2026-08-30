@@ -10,6 +10,9 @@ zzz-префиксы у .ltx, анонимные callback'и, дубли DLTX-с
     python3 tools/lint_addon.py --unverified    # только непроверенные в игре / устаревшие
     python3 tools/lint_addon.py --no-verify     # без VERIFY-001 (CI, clone)
     python3 tools/lint_addon.py my_fix --json
+
+Дополнительно предупреждает LUA-006/007 (контракт CreateTimeEvent в _g.script)
+и LUA-008 (полный проход id 1..65534).
 """
 
 from __future__ import annotations
@@ -53,6 +56,20 @@ UNREGISTER_RE = re.compile(r"\bUnregisterScriptCallback\s*\(\s*[\"']([\w_]+)[\"'
 MCM_LOAD_RE = re.compile(r"^\s*function\s+on_mcm_load\s*\(", re.M)
 SECTION_RE = re.compile(r"^\s*(!!|!|@)?\[([^\]\s]+)\]")
 DLTX_NAME_RE = re.compile(r"^mod_(.+)_([^_]+)$")
+# 4th arg is a named functor (not `function`). Extra params after it are allowed.
+CREATE_NAMED_RE = re.compile(
+    r"\b(?:CreateTimeEvent|(?:\w+\s*\.\s*)?create_time_event)\s*\(\s*"
+    r"[^,]+,\s*[^,]+,\s*[^,]+,\s*([A-Za-z_]\w*)\s*[,\)]",
+    re.S,
+)
+ALIFE_SCAN_RE = re.compile(r"for\s+\w+\s*=\s*1\s*,\s*(MAX_ALIFE_ID|65534|65535)\b")
+LUA_STRING_OR_COMMENT_RE = re.compile(
+    r"--\[\[[\s\S]*?\]\]|--[^\n]*|\[\[.*?\]\]|"
+    r"\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'",
+    re.S,
+)
+LUA_KW_RE = re.compile(r"\b(function|if|for|while|repeat|end|until)\b")
+RETURN_TRUE_RE = re.compile(r"\breturn\s+true\b")
 
 VAL_REQUIRED_TYPES = {"check", "track", "list", "radio_h", "radio_v", "input", "key_bind", "combo"}
 
@@ -348,6 +365,63 @@ def iter_innermost_tables(text: str):
                 yield start, inner
 
 
+def mask_lua_literals(text: str) -> str:
+    """Replace strings and comments with spaces so keyword scans ignore them.
+
+    Length and newlines stay, so match offsets still map to line numbers.
+    """
+
+    def repl(match: re.Match) -> str:
+        return re.sub(r"[^\n]", " ", match.group(0))
+
+    return LUA_STRING_OR_COMMENT_RE.sub(repl, text)
+
+
+def lua_named_function_span(masked: str, name: str) -> tuple[int, int] | None:
+    """Start/end offsets of `function name(...) ... end` in already-masked text."""
+    header = re.search(
+        rf"(?:^|\n)\s*(?:local\s+)?function\s+{re.escape(name)}\s*\(",
+        masked,
+    )
+    if not header:
+        return None
+    start = masked.rfind("function", 0, header.end())
+    if start < 0:
+        return None
+    depth = 0
+    for kw in LUA_KW_RE.finditer(masked, start):
+        word = kw.group(1)
+        if word in {"function", "if", "for", "while", "repeat"}:
+            depth += 1
+        else:
+            depth -= 1
+            if depth == 0:
+                return start, kw.end()
+    return None
+
+
+RETURN_CALL_RE = re.compile(r"\breturn\s+([A-Za-z_]\w*)\s*\(")
+
+
+def function_returns_true(masked: str, name: str, seen: set[str] | None = None) -> bool:
+    """True if the named function can return true, including `return other()`."""
+    if seen is None:
+        seen = set()
+    if name in seen:
+        return False
+    seen.add(name)
+    span = lua_named_function_span(masked, name)
+    if not span:
+        return False
+    body = masked[span[0] : span[1]]
+    if RETURN_TRUE_RE.search(body):
+        return True
+    for match in RETURN_CALL_RE.finditer(body):
+        if function_returns_true(masked, match.group(1), seen):
+            return True
+    return False
+
+
 class AddonLinter:
     def __init__(self, addon_dir: Path, reference: ReferenceView, *, verify: bool = True) -> None:
         self.dir = addon_dir
@@ -545,6 +619,9 @@ class AddonLinter:
                 path,
             )
 
+        self.check_time_events(path, text)
+        self.check_alife_id_scan(path, text)
+
         if MCM_LOAD_RE.search(text) and not path.stem.lower().endswith("mcm"):
             self.add(
                 "MCM-001",
@@ -563,6 +640,73 @@ class AddonLinter:
 
         if path.stem.lower().endswith("mcm"):
             self.check_mcm_options(path, text)
+
+    def check_time_events(self, path: Path, text: str) -> None:
+        """LUA-006 / LUA-007: контракт CreateTimeEvent из _g.script."""
+        masked = mask_lua_literals(text)
+        seen_never_true: set[str] = set()
+        for match in CREATE_NAMED_RE.finditer(masked):
+            name = match.group(1)
+            if name in seen_never_true:
+                continue
+            if function_returns_true(masked, name):
+                continue
+            if not lua_named_function_span(masked, name):
+                continue
+            seen_never_true.add(name)
+            self.add(
+                "LUA-006",
+                "warn",
+                f"{name} передана в CreateTimeEvent и нигде не возвращает true: "
+                "слот останется в очереди (_g.script ProcessEventQueue).",
+                path,
+                text[: match.start()].count("\n") + 1,
+            )
+
+        seen_self_retry: set[str] = set()
+        for match in CREATE_NAMED_RE.finditer(masked):
+            name = match.group(1)
+            if name in seen_self_retry:
+                continue
+            span = lua_named_function_span(masked, name)
+            if not span:
+                continue
+            start, end = span
+            body = masked[start:end]
+            self_create = None
+            for inner in CREATE_NAMED_RE.finditer(body):
+                if inner.group(1) == name:
+                    self_create = inner
+                    break
+            if not self_create:
+                continue
+            after = body[self_create.end() :]
+            if "RemoveTimeEvent" in after:
+                continue
+            if not RETURN_TRUE_RE.search(after):
+                continue
+            seen_self_retry.add(name)
+            self.add(
+                "LUA-007",
+                "warn",
+                f"{name} заново CreateTimeEvent с теми же id и возвращает true: "
+                "пока слот жив, Create — no-op, return true его снимает, retry не будет.",
+                path,
+                text[: start + self_create.start()].count("\n") + 1,
+            )
+
+    def check_alife_id_scan(self, path: Path, text: str) -> None:
+        """LUA-008: полный проход 1..65534 через alife():object."""
+        masked = mask_lua_literals(text)
+        for match in ALIFE_SCAN_RE.finditer(masked):
+            self.add(
+                "LUA-008",
+                "warn",
+                "Полный проход id 1..65534: каждый шаг — alife():object. "
+                "На загрузке/смене уровня это хитч. Нужен iterate_objects или чанк.",
+                path,
+                text[: match.start()].count("\n") + 1,
+            )
 
     def check_mcm_options(self, path: Path, text: str) -> None:
         for start, inner in iter_innermost_tables(text):
