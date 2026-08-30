@@ -29,7 +29,7 @@ tools/                  инструменты анализа и сборки
 
 ## Быстрый старт
 
-1. **Наполнить `reference/`.** Распакованные `gamedata` ванильной Anomaly 1.5.3, Anthology 2.1 и ключевых аддонов сборки. Подробно: [`docs/setup.md`](docs/setup.md).
+1. **Наполнить `reference/`.** `python3 tools/fill_reference.py <папка игры>`, затем аддоны из MO2 в `reference/addons/`. Подробно: [`docs/setup.md`](docs/setup.md).
 
 2. **Построить индекс** — он нужен правилу «не выдумывай API»:
 
@@ -62,6 +62,8 @@ python3 tools/build_addon.py my_fix_weapon_jam --zip
 | Команда | Зачем |
 | --- | --- |
 | `tools/xraylog.py <log>` | сжимает многомегабайтный лог игры в карточку вылета: класс ошибки, стек, warning'и перед падением |
+| `tools/xdb_unpack.py <archive> [--list\|--out]` | распаковка `.db`/`.dbN`/`.xdb`: TOC через LZHUF, файлы через LZO1X |
+| `tools/fill_reference.py <игра> [--dry-run]` | наполняет `reference/anomaly/` и `reference/anthology/` из `<игра>/db`: только `scripts/`, `configs/`, `text/` |
 | `tools/refindex.py build\|find\|section\|callback\|stats` | индекс по `reference/`: проверка, что функция/секция/callback реально существуют |
 | `tools/lint_addon.py [mod_id] [--cross]` | проверяет мод на правила: замена файлов сборки, дубли DLTX-секций, кодировка, анонимные callback'и. `ORDER-001` — ошибка на `zzz`/`aaa` у `.ltx`; `ORDER-002` — предупреждение у `.script`, снимается комментарием `-- load-order: после <что>` в первых 10 строках. `--cross` — предупреждения `CROSS-001`, если два мода патчат одну секцию в одном пути внутри gamedata. `vendor_fork=1` в `meta.ini` глушит `LUA-001`, `LTX-001` и `STRUCT-005` на форках чужих модов |
 | `tools/new_addon.py <mod_id>` | создаёт скелет мода из `templates/addon-skeleton` |

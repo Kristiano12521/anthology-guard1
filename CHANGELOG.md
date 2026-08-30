@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.10] — распаковка db и наполнение reference/
+
+`tools/xdb_unpack.py` перенесён из `.cache/`: LZHUF для TOC, LZO1X для payload, argparse, чтение TOC без загрузки всего архива. `tools/fill_reference.py` наполняет `reference/anomaly/` и `reference/anthology/` из `<игра>/db` (только `scripts/`, `configs/`, `text/`; `--dry-run`; аддоны не трогает). Раздел в `docs/setup.md`, строки в таблице README.
+
 ## [0.1.9] — CHANGELOG только после факта; --cross в процессе аддона
 
 Правило в `anomaly-core.mdc` и `AGENTS.md`: запись в CHANGELOG после применения правки и тестов, только выполненное. README: lint — `ORDER-001`/`ORDER-002`, `--cross`, `vendor_fork=1`; добавлен `_pack_kristiano_aio.py`. В `workflow-addon`, `docs/plans/addon.md` и `docs/mo2.md` `--cross` перед установкой в MO2.
