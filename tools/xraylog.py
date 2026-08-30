@@ -78,6 +78,14 @@ WARNING_PREFIXES = ("!", "~")
 MAX_NONFATAL_GROUPS = 5
 MAX_NONFATAL_FRAMES = 40
 
+# Обёртки движка в Lua-стеке: abort() всегда оставляет _g.script сверху,
+# axr_main.script бывает следующим диспетчером. Дополнять по мере нужды.
+INFRA_SCRIPTS = (
+    "_g.script",
+    "axr_main.script",
+)
+C_FRAME_RE = re.compile(r"\[C\]:\s*in function", re.I)
+
 # Нормализация путей и чисел, чтобы одинаковые по смыслу warning'и группировались.
 NORMALIZE_RES = [
     (re.compile(r"[A-Za-z]:\\[^\s'\"]+\\"), ""),
@@ -109,12 +117,40 @@ def strip_line_numbers(frame: str) -> str:
     return re.sub(r"\s+", " ", out).strip()
 
 
+def _frame_script(frame: str) -> str:
+    match = SCRIPT_NAME_RE.search(frame)
+    return match.group(1) if match else ""
+
+
 def culprit_script(frames: list[str]) -> str:
+    """Заголовок группы: первый кадр не из инфраструктуры.
+
+    Строки ``[C]: in function`` пропускаются. ``abort()`` кладёт сверху
+    ``_g.script`` — это обёртка, не виновник; следующие кадры из
+    INFRA_SCRIPTS тоже. Если первый Lua-кадр уже место отказа
+    (``axr_main.script`` / ``callback_set``), он остаётся заголовком.
+    Если после фильтра ничего не осталось — верхний скриптовый кадр.
+    """
+    infra = {name.lower() for name in INFRA_SCRIPTS}
+    first_script = ""
+    skip_infra = False
     for frame in frames:
-        match = SCRIPT_NAME_RE.search(frame)
-        if match:
-            return match.group(1)
-    return ""
+        if C_FRAME_RE.search(frame):
+            continue
+        name = _frame_script(frame)
+        if not name:
+            continue
+        key = name.lower()
+        if not first_script:
+            first_script = name
+            if key == "_g.script":
+                skip_infra = True
+                continue
+            return name
+        if skip_infra and key in infra:
+            continue
+        return name
+    return first_script
 
 
 def traceback_trigger(recent: deque[str]) -> str:

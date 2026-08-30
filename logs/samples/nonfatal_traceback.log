@@ -38,6 +38,11 @@ Starting engine...
 	... sound_theme.script (line: 644) in function <... sound_theme.script:614>
 	[C]: in function 'object_sound'
 	... sound_theme.script (line: 877) in function <... sound_theme.script:868>
+	[C]: in function 'section_for_each'
+	... sound_theme.script (line: 885) in function 'load_sound'
+	... bind_stalker.script (line: 107) in function <... bind_stalker.script:100>
+	[C]: in function 'actor_binder'
+	... bind_stalker.script (line: 6) in function <... bind_stalker.script:5>
 ~ ------------------------------------------------------------------------
 There are no sound collection with path: semitone\anomalies\generators
 * Quitting...

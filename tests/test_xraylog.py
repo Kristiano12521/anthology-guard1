@@ -105,7 +105,7 @@ class NonfatalTracebackTests(unittest.TestCase):
             any("mas_scope_detach.script (line: 106)" in frame for frame in groups[0].frames)
         )
         self.assertEqual(groups[1].count, 1)
-        self.assertEqual(groups[1].culprit, "_g.script")
+        self.assertEqual(groups[1].culprit, "sound_theme.script")
         self.assertEqual(groups[1].trigger, "")
         self.assertTrue(any("sound_theme.script" in frame for frame in groups[1].frames))
 
@@ -124,8 +124,51 @@ class NonfatalTracebackTests(unittest.TestCase):
         warnings_at = card.index("## Предупреждения")
         self.assertLess(errors_at, warnings_at)
         self.assertIn("`axr_main.script` ×2", card)
+        self.assertIn("`sound_theme.script` ×1", card)
         self.assertIn("Триггер:", card)
         self.assertIn("dxml_core.script", card)
+
+
+class CulpritScriptTests(unittest.TestCase):
+    def test_skips_abort_wrapper_and_c_frames(self):
+        frames = [
+            "... _g.script (line: 672) in function 'abort'",
+            "... sound_theme.script (line: 644) in function <... sound_theme.script:614>",
+            "[C]: in function 'object_sound'",
+            "... sound_theme.script (line: 877) in function <... sound_theme.script:868>",
+            "[C]: in function 'section_for_each'",
+            "... sound_theme.script (line: 885) in function 'load_sound'",
+            "... bind_stalker.script (line: 107) in function <... bind_stalker.script:100>",
+        ]
+        self.assertEqual(xraylog.culprit_script(frames), "sound_theme.script")
+
+    def test_callback_set_keeps_axr_main(self):
+        frames = [
+            "... axr_main.script (line: 253) in function 'callback_set'",
+            "... _g.script (line: 104) in function 'RSC'",
+            "... dxml_core.script (line: 27) in function 'RegisterScriptCallback'",
+            "... mas_scope_detach.script (line: 106) in function 'on_game_start'",
+            "... axr_main.script (line: 359) in function 'on_game_start'",
+            "... _g.script (line: 82) in function <... _g.script:73>",
+        ]
+        self.assertEqual(xraylog.culprit_script(frames), "axr_main.script")
+
+    def test_skips_axr_main_dispatcher_after_abort(self):
+        frames = [
+            "... _g.script (line: 672) in function 'abort'",
+            "... axr_main.script (line: 100) in function 'dispatch'",
+            "... my_mod.script (line: 10) in function 'foo'",
+        ]
+        self.assertEqual(xraylog.culprit_script(frames), "my_mod.script")
+
+    def test_all_infra_falls_back_to_top_frame(self):
+        frames = [
+            "... _g.script (line: 672) in function 'abort'",
+            "[C]: in function 'lua_error'",
+            "... axr_main.script (line: 359) in function 'on_game_start'",
+            "... _g.script (line: 82) in function <... _g.script:73>",
+        ]
+        self.assertEqual(xraylog.culprit_script(frames), "_g.script")
 
 
 class FatalSampleRegressionTests(unittest.TestCase):
