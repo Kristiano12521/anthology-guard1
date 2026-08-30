@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "tools"))
@@ -416,6 +417,63 @@ class VerifiedMetaTests(unittest.TestCase):
             self.assertIsNotNone(missing)
             self.assertIsNotNone(fresh)
             self.assertIsNotNone(stale)
+
+    def _cli(self, root: Path, extra: list[str], env: dict[str, str]) -> tuple[int, str]:
+        buf = io.StringIO()
+        with patch.dict(os.environ, env, clear=False):
+            with contextlib.redirect_stdout(buf):
+                code = lint_addon.main(
+                    extra
+                    + [
+                        "--addon-root",
+                        str(root),
+                        "--reference",
+                        str(root / "none"),
+                    ]
+                )
+        return code, buf.getvalue()
+
+    def test_no_verify_flag_skips_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._addon_with_script(root, "never_played")
+            code, out = self._cli(
+                root,
+                ["never_played", "--no-verify"],
+                {"CI": "", "GITHUB_ACTIONS": ""},
+            )
+            self.assertEqual(code, 0)
+            self.assertNotIn("VERIFY-001", out)
+            self.assertNotIn("в игре не проверялся", out)
+            self.assertIn("Проверка в игре пропущена: --no-verify", out)
+
+    def test_ci_env_skips_verify(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._addon_with_script(root, "never_played")
+            code, out = self._cli(
+                root,
+                ["never_played"],
+                {"CI": "true", "GITHUB_ACTIONS": ""},
+            )
+            self.assertEqual(code, 0)
+            self.assertNotIn("VERIFY-001", out)
+            self.assertNotIn("в игре не проверялся", out)
+            self.assertIn("Проверка в игре пропущена: переменная CI", out)
+
+    def test_unverified_runs_when_mtime_untrusted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._addon_with_script(root, "aaa_missing")
+            code, out = self._cli(
+                root,
+                ["--unverified"],
+                {"CI": "true", "GITHUB_ACTIONS": ""},
+            )
+            self.assertEqual(code, 0)
+            self.assertIn("aaa_missing: в игре не проверялся", out)
+            self.assertIn("mtime в этом окружении недостоверен", out)
+            self.assertIn("переменная CI", out)
 
 
 if __name__ == "__main__":

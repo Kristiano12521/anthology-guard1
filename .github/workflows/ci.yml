@@ -27,7 +27,7 @@ jobs:
         run: python -m unittest discover tests
 
       - name: Lint addons
-        run: python tools/lint_addon.py --cross
+        run: python tools/lint_addon.py --cross --no-verify
 
       - name: CHANGELOG vs tools/
         env:

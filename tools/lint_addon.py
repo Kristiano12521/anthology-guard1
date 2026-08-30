@@ -8,6 +8,7 @@ zzz-префиксы у .ltx, анонимные callback'и, дубли DLTX-с
     python3 tools/lint_addon.py my_fix_weapon_jam
     python3 tools/lint_addon.py --cross         # плюс конфликты секций между модами
     python3 tools/lint_addon.py --unverified    # только непроверенные в игре / устаревшие
+    python3 tools/lint_addon.py --no-verify     # без VERIFY-001 (CI, clone)
     python3 tools/lint_addon.py my_fix --json
 """
 
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -187,6 +189,15 @@ def verify_finding(addon_dir: Path) -> Finding | None:
     return None
 
 
+def mtime_untrusted_reason() -> str | None:
+    """Почему mtime нельзя доверять (CI/clone), или None."""
+    if os.environ.get("GITHUB_ACTIONS"):
+        return "переменная GITHUB_ACTIONS — mtime после clone недостоверен"
+    if os.environ.get("CI"):
+        return "переменная CI — mtime после clone недостоверен"
+    return None
+
+
 def has_load_order_justification(text: str) -> bool:
     """Комментарий `-- load-order: после <что>` в первых 10 строках снимает ORDER-002."""
     for line in text.splitlines()[:10]:
@@ -338,10 +349,11 @@ def iter_innermost_tables(text: str):
 
 
 class AddonLinter:
-    def __init__(self, addon_dir: Path, reference: ReferenceView) -> None:
+    def __init__(self, addon_dir: Path, reference: ReferenceView, *, verify: bool = True) -> None:
         self.dir = addon_dir
         self.reference = reference
         self.vendor_fork = is_vendor_fork(addon_dir)
+        self.verify = verify
         self.findings: list[Finding] = []
 
     def add(self, code: str, severity: str, message: str, path: Path | None = None, line: int = 0) -> None:
@@ -582,14 +594,15 @@ class AddonLinter:
 
     def run(self) -> list[Finding]:
         self.check_structure()
-        self.check_verified()
+        if self.verify:
+            self.check_verified()
         for path in iter_files(self.dir):
             self.check_file(path)
         return self.findings
 
 
-def lint(addon_dir: Path, reference: ReferenceView) -> list[Finding]:
-    return AddonLinter(addon_dir, reference).run()
+def lint(addon_dir: Path, reference: ReferenceView, *, verify: bool = True) -> list[Finding]:
+    return AddonLinter(addon_dir, reference, verify=verify).run()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -609,6 +622,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="только моды без проверки в игре или изменённые после verified_date",
     )
+    parser.add_argument(
+        "--no-verify",
+        action="store_true",
+        help="не проверять verified_* (mtime после git clone недостоверен)",
+    )
     args = parser.parse_args(argv)
 
     if args.mod_id:
@@ -627,6 +645,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2 if missing else 0
 
     if args.unverified:
+        untrusted = mtime_untrusted_reason()
+        if untrusted:
+            print(f"mtime в этом окружении недостоверен ({untrusted}). --unverified всё равно выполняется.")
         listed = 0
         for target in targets:
             finding = verify_finding(target)
@@ -637,11 +658,18 @@ def main(argv: list[str] | None = None) -> int:
             print("Все выбранные моды проверены в игре.")
         return 0
 
+    skip_verify = bool(args.no_verify or mtime_untrusted_reason())
+    skip_reason = None
+    if args.no_verify:
+        skip_reason = "--no-verify"
+    elif skip_verify:
+        skip_reason = mtime_untrusted_reason()
+
     reference = ReferenceView.load(args.reference)
     results: dict[str, list[Finding]] = {}
     fork_profile: dict[str, bool] = {}
     for target in targets:
-        results[target.name] = lint(target, reference)
+        results[target.name] = lint(target, reference, verify=not skip_verify)
         fork_profile[target.name] = is_vendor_fork(target)
 
     cross_findings: list[Finding] = []
@@ -664,6 +692,9 @@ def main(argv: list[str] | None = None) -> int:
                 "reference/ пуст — проверки на замену файлов сборки и существование секций пропущены.\n"
                 "См. docs/setup.md.\n"
             )
+        if skip_reason:
+            print(f"Проверка в игре пропущена: {skip_reason}.")
+            print()
         for name, findings in results.items():
             errors = [f for f in findings if f.severity == "error"]
             warns = [f for f in findings if f.severity == "warn"]

@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.18] — VERIFY-001 не в CI: --no-verify и автоотключение
+
+`lint_addon.py --no-verify` отключает проверку в игре. То же само, если выставлена `CI` или `GITHUB_ACTIONS`: после clone mtime у всех файлов равен чекауту и сверка с `verified_date` бесполезна. В сводке одна строка, почему пропущено. `--unverified` в таком окружении всё равно печатает список и предупреждает, что mtime недостоверен. Шаг Lint addons в CI — явно `--cross --no-verify`. Ограничение в `docs/mo2.md`.
+
 ## [0.1.17] — verified_* в meta.ini; VERIFY-001 и --unverified
 
 Необязательные ключи `verified_date` / `verified_build` / `verified_note`: человек ставит после проверки в игре, агент не проставляет (`anomaly-core.mdc`). Линтер: предупреждение `VERIFY-001`, если ключей нет или файлы в `gamedata/` новее даты; `vendor_fork=1` не глушит. `python3 tools/lint_addon.py --unverified` — список на сессию. Формат в `docs/mo2.md` и закомментированных строках скелета. Строка в этапах проверки `workflow-fix`, `workflow-addon` и плейбуках.

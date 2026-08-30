@@ -107,4 +107,4 @@ D:\STALKER_DEV\Anthology\build\  результат сборки
 python3 -m unittest discover tests
 ```
 
-На `push` и `pull_request` то же гоняет GitHub Actions (Python 3.9 и 3.12), плюс `python tools/lint_addon.py --cross` (предупреждения не валят сборку) и `python tools/check_changelog_tools.py`.
+На `push` и `pull_request` то же гоняет GitHub Actions (Python 3.9 и 3.12), плюс `python tools/lint_addon.py --cross --no-verify` (предупреждения не валят сборку; `VERIFY-001` в CI пропускается — mtime после clone недостоверен) и `python tools/check_changelog_tools.py`.
