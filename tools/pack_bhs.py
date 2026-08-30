@@ -12,7 +12,6 @@ from datetime import datetime
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-OVERLAY = REPO / "addon" / "anthology_busyhands_stability_fix"
 VERSION = "0.6.4"
 OUT_NAME = "Anthology_BusyHands_Stability_Fix_v0_6_4"
 
@@ -23,16 +22,16 @@ OVERLAY_MAP = {
 }
 
 
-def bhs_source() -> Path:
-    root = REPO / "reference" / "addons"
+def bhs_source(repo: Path) -> Path:
+    root = repo / "reference" / "addons"
     for path in root.iterdir():
         if path.is_dir() and "BusyHands" in path.name:
             return path
     raise SystemExit("reference/addons/*BusyHands* not found")
 
 
-def mag_seqload_source() -> Path:
-    hits = list((REPO / "reference").rglob("sequential_load_magazine.script"))
+def mag_seqload_source(repo: Path) -> Path:
+    hits = list((repo / "reference").rglob("sequential_load_magazine.script"))
     if len(hits) != 1:
         raise SystemExit(f"expected 1 sequential_load_magazine.script, got {len(hits)}")
     return hits[0]
@@ -164,16 +163,18 @@ end"""
     return text.replace("\n", "\r\n")
 
 
-def main() -> None:
-    src = bhs_source()
-    scripts = OVERLAY / "gamedata" / "scripts"
+def pack(repo: Path | None = None) -> Path:
+    repo = repo or REPO
+    overlay = repo / "addon" / "anthology_busyhands_stability_fix"
+    src = bhs_source(repo)
+    scripts = overlay / "gamedata" / "scripts"
     for name in OVERLAY_MAP:
         if not (scripts / name).is_file():
             raise SystemExit(f"missing overlay {name}")
 
-    seq_src = mag_seqload_source()
+    seq_src = mag_seqload_source(repo)
 
-    out_dir = REPO / "build" / OUT_NAME
+    out_dir = repo / "build" / OUT_NAME
     if out_dir.exists():
         shutil.rmtree(out_dir)
     gamedata = out_dir / "gamedata"
@@ -199,8 +200,8 @@ def main() -> None:
     if loot.exists():
         loot.unlink()
 
-    shutil.copy2(OVERLAY / "CHANGELOG.md", out_dir / "CHANGELOG.md")
-    shutil.copy2(OVERLAY / "meta.ini", out_dir / "meta.ini")
+    shutil.copy2(overlay / "CHANGELOG.md", out_dir / "CHANGELOG.md")
+    shutil.copy2(overlay / "meta.ini", out_dir / "meta.ini")
     (out_dir / "BUILD_INFO.txt").write_text(
         "\n".join(
             [
@@ -216,7 +217,7 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    archive = REPO / "build" / f"{OUT_NAME}.zip"
+    archive = repo / "build" / f"{OUT_NAME}.zip"
     if archive.exists():
         archive.unlink()
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -238,6 +239,11 @@ def main() -> None:
     print(f"zip: {archive} ({archive.stat().st_size} bytes)")
     for name in names:
         print(f"  {name}")
+    return archive
+
+
+def main() -> None:
+    pack()
 
 
 if __name__ == "__main__":

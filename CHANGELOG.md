@@ -6,6 +6,14 @@
 
 `docs/pitfalls.md`: `-dbg` и debug HUD (оверлей зон как зеркало `db.actor_inside_zones`; три мода со `space_restrictor`); синтаксическая ошибка `.script` без попапа; коллизия глобалов. `docs/api-verification.md`: `run_string` — первый способ проверки в сессии, диагностический скрипт — для повторяющихся. Этап 6 в `docs/plans/fix.md` и `workflow-fix.mdc`: повтор фичи, бой/меню/торговля, оборонительный `load_state`. Ссылки на разделы гайда в `docs/references.md`. Сверка с xray-monolith: `-dbg`, `run_string` и `flush` есть; подписи оверлеев в русской сборке не подтверждены.
 
+## [0.1.12] — CI, сверка CHANGELOG с tools/, тесты пакеров
+
+`.github/workflows/ci.yml`: Python 3.9 и 3.12 на push/pull_request — `unittest discover tests`, `lint_addon.py --cross` (предупреждения не валят сборку), `check_changelog_tools.py`. Guard падает, если в добавленных строках CHANGELOG есть путь `tools/`, а файлы под `tools/` в диапазоне не менялись. Тесты `pack_bhs` и `_pack_kristiano_aio` на фикстурах: состав zip, `gamedata/` на верхнем уровне, SKIP/SEPARATE, имя с версией.
+
+## [0.1.11] — нефатальные ошибки в crash-плейбуке; правило XML
+
+`workflow-crash.mdc` и `docs/plans/crash.md`: этап 0 знает секцию «Нефатальные ошибки» и `--errors-only`; в таблице классификации — повторяющийся STACK TRACEBACK без FATAL и `![axr_main callback_set] callback X doesn't exist` / `to nil function`. Новое auto-attached правило `anomaly-xml.mdc` (строковые таблицы, Windows-1251, пара eng/rus, `modxml_*` по двум скриптам в `addon/`). Строки в README и `docs/rules.md`.
+
 ## [0.1.10] — распаковка db и наполнение reference/
 
 `tools/xdb_unpack.py` перенесён из `.cache/`: LZHUF для TOC, LZO1X для payload, argparse, чтение TOC без загрузки всего архива. `tools/fill_reference.py` наполняет `reference/anomaly/` и `reference/anthology/` из `<игра>/db` (только `scripts/`, `configs/`, `text/`; `--dry-run`; аддоны не трогает). Раздел в `docs/setup.md`, строки в таблице README.

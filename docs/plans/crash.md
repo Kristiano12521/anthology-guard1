@@ -1,6 +1,6 @@
 # План: разбор вылета
 
-Для CTD, `FATAL ERROR` и Lua error. Правило: [`.cursor/rules/workflow-crash.mdc`](../../.cursor/rules/workflow-crash.mdc).
+Для CTD, `FATAL ERROR`, Lua error и нефатальных `STACK TRACEBACK`. Правило: [`.cursor/rules/workflow-crash.mdc`](../../.cursor/rules/workflow-crash.mdc).
 
 Ключевая идея: лог Anomaly — это мегабайты, из которых полезны сотни байт. Если вывалить его целиком в чат, агент утонет в шуме и начнёт угадывать. Поэтому нулевой этап — механическое сжатие лога, а не работа модели.
 
@@ -8,9 +8,10 @@
 
 ```bash
 python3 tools/xraylog.py logs/xray_ivan.log --out logs/card.md
+python3 tools/xraylog.py logs/xray_ivan.log --errors-only
 ```
 
-Карточка содержит: класс ошибки, блок `FATAL ERROR` целиком, Lua-кадры, последние осмысленные строки перед падением и сгруппированные warning'и. Дальше работаем по карточке.
+Карточка: класс, блок `FATAL ERROR` если он есть, иначе секция «Нефатальные ошибки». FATAL может отсутствовать — для этой сборки основной класс проблем как раз повторяющиеся traceback'и. `--errors-only` показывает только эту секцию, без вылета и warning'ов. Дальше работаем по карточке.
 
 ## Этап 1. Классификация
 
@@ -27,6 +28,8 @@ python3 tools/xraylog.py logs/xray_ivan.log --out logs/card.md
 | Сигнатура в логе | Класс | Первый вопрос |
 | --- | --- | --- |
 | `CScriptEngine::lua_error`, `...script:NN:` | Lua | какая строка и что там nil |
+| повторяющийся `STACK TRACEBACK` без `FATAL` | нефатальная ошибка | заголовок группы (первый кадр не из `_g.script` / `axr_main.script`) |
+| `![axr_main callback_set] callback X doesn't exist` или `... to nil function` | Lua / callback | опечатка в имени callback либо нет функции-обработчика в вызывающем скрипте |
 | `CInifile::r_section`, `Can't open section 'X'` | конфиг | кто ждёт секцию `X` и кто должен был её объявить |
 | `Can't find variable X in section Y` | конфиг | какой мод удалил или недоопределил поле |
 | `Can't find included file` | конфиг | битый `#include` после установки/удаления мода |

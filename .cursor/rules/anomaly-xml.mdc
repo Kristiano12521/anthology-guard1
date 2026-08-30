@@ -1,0 +1,30 @@
+---
+description: Правила правки XML Anomaly: строковые таблицы, UI, textures_descr
+globs: addon/**/*.xml, templates/**/*.xml
+alwaysApply: false
+---
+
+# XML
+
+## Строковые таблицы
+
+Путь: `gamedata/configs/text/eng/` и `.../rus/`, два файла с одним именем.
+
+```
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="ключ">
+		<text>Текст</text>
+	</string>
+</string_table>
+```
+
+`game.translate_string` при отсутствии ключа возвращает сам ключ: ошибки нет, в логе тоже, в игре виден идентификатор. Ключ сверяй с объявленным `id` и с вызовом в скрипте.
+
+## Кодировка
+
+Windows-1251. Декларация `encoding="windows-1251"` в шапке обязательна. UI (`configs/ui/`) и `textures_descr` — та же кодировка и декларация.
+
+## Динамическая правка XML
+
+Файл `modxml_*.script` собирает `dxml_core` и один раз вызывает `on_xml_read()`, где регистрируется `RegisterScriptCallback("on_xml_read", handler)`. Снимать нельзя: диспатч идёт из `COnXmlRead` на жизнь процесса; повторная регистрация после `on_game_end` пропускает первый разбор или сдвигает порядок относительно других `modxml_*`. Обработчик получает имя XML и `xml_obj`. В `addon/` два: `modxml_fix_gonta_duplicate_dialog` на `gameplay\character_desc_cop_zaton.xml` через `query` / `iterateChildren` / `removeElement` вырезает узлы; `modxml_fix_tutorial_hooks` грузится раньше `modxml_tutorial_hooks` и на `ui\game_tutorials.xml` оборачивает `getText`, возвращая nil у узла без текстового ребёнка.

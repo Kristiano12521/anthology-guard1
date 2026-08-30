@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import re
 import shutil
 import sys
@@ -109,10 +110,29 @@ def write_meta(dest: Path, *, version: str, comments: str, install_name: str) ->
     )
 
 
-def pack_separate(mod_id: str, mo2_name: str) -> Path:
-    addon_dir = ADDON_ROOT / mod_id
+def aio_addons(addon_root: Path) -> list[Path]:
+    return sorted(
+        p
+        for p in addon_root.iterdir()
+        if p.is_dir()
+        and (p / "gamedata").is_dir()
+        and p.name not in SEPARATE
+        and p.name not in SKIP
+    )
+
+
+def pack_separate(
+    mod_id: str,
+    mo2_name: str,
+    *,
+    addon_root: Path | None = None,
+    out_dir: Path | None = None,
+) -> Path:
+    addon_root = addon_root or ADDON_ROOT
+    out_dir = out_dir or OUT_DIR
+    addon_dir = addon_root / mod_id
     version = detect_version(addon_dir)
-    staging = OUT_DIR / "_staging" / mo2_name
+    staging = out_dir / "_staging" / mo2_name
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir(parents=True)
@@ -129,14 +149,15 @@ def pack_separate(mod_id: str, mo2_name: str) -> Path:
             flags=re.M,
         )
         (staging / "meta.ini").write_text(text, encoding="utf-8")
-    archive = OUT_DIR / f"{mo2_name}.zip"
+    archive = out_dir / f"{mo2_name}.zip"
     write_zip(staging, archive)
     print(f"{mo2_name}: {files} files, v{version} -> {archive.name}")
     return archive
 
 
-def pack_aio(addons: list[Path]) -> Path:
-    staging = OUT_DIR / "_staging" / AIO_NAME
+def pack_aio(addons: list[Path], *, out_dir: Path | None = None) -> Path:
+    out_dir = out_dir or OUT_DIR
+    staging = out_dir / "_staging" / AIO_NAME
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir(parents=True)
@@ -210,26 +231,26 @@ def pack_aio(addons: list[Path]) -> Path:
         ),
         install_name=AIO_NAME,
     )
-    archive = OUT_DIR / f"{AIO_NAME}.zip"
+    archive = out_dir / f"{AIO_NAME}.zip"
     write_zip(staging, archive)
     print(f"{AIO_NAME}: {total} files from {len(addons)} addons -> {archive.name}")
     return archive
 
 
-def main() -> int:
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    addons = sorted(
-        p
-        for p in ADDON_ROOT.iterdir()
-        if p.is_dir()
-        and (p / "gamedata").is_dir()
-        and p.name not in SEPARATE
-        and p.name not in SKIP
-    )
-    pack_aio(addons)
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Pack Kristiano AIO + separate mods")
+    parser.add_argument("--addon-root", type=Path, default=ADDON_ROOT)
+    parser.add_argument("--out", type=Path, default=OUT_DIR)
+    args = parser.parse_args(argv)
+
+    addon_root = args.addon_root
+    out_dir = args.out
+    out_dir.mkdir(parents=True, exist_ok=True)
+    addons = aio_addons(addon_root)
+    pack_aio(addons, out_dir=out_dir)
     for mod_id, mo2_name in SEPARATE.items():
-        pack_separate(mod_id, mo2_name)
-    staging = OUT_DIR / "_staging"
+        pack_separate(mod_id, mo2_name, addon_root=addon_root, out_dir=out_dir)
+    staging = out_dir / "_staging"
     if staging.exists():
         shutil.rmtree(staging)
     return 0
