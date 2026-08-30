@@ -1,0 +1,26 @@
+# Сырые логи игры и карточка xraylog — не исходники, часто с локальными путями.
+logs/*.log
+logs/card.md
+
+# Кэш инструментов (индекс reference/ и прочее).
+.cache/
+
+# Собранные моды для MO2, руками не правятся.
+build/
+
+# reference/ в .gitignore, но агенту он нужен как эталон — не исключаем целиком.
+!reference/
+!reference/**
+
+# Бинарники в addon/ и reference/: текстуры, звуки, спавн, секвенции.
+# Тексты (.script, .ltx, .xml) остаются в индексе.
+addon/**/*.dds
+addon/**/*.png
+addon/**/*.ogg
+addon/**/*.bin
+addon/**/*.seq
+reference/**/*.dds
+reference/**/*.png
+reference/**/*.ogg
+reference/**/*.bin
+reference/**/*.seq
