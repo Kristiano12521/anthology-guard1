@@ -2,6 +2,14 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.15] — MIT + NOTICE; --cross в workflow-fix
+
+Корневой `LICENSE` — MIT только на оригинальное (tools, docs, правила, собственные фиксы). Форки в `addon/` и `reference/` вынесены в `NOTICE`; указатель в README. Этап 6 в `workflow-fix.mdc` и `docs/plans/fix.md`: `lint_addon.py --cross`.
+
+## [0.1.14] — промпты fill_reference / --errors-only / --cross; reference/README
+
+`docs/prompts.md`: секция «Развёртывание на новой машине» с `fill_reference.py` как первым шагом; в разборе вылета — `--errors-only` и промпт, когда FATAL нет, а ошибки есть; в новом аддоне — `lint_addon.py --cross`. `reference/README.md`: `docs/` наполняется руками; `anomaly/` и `anthology/` — `fill_reference.py` (только `scripts/`/`configs/`/`text/`); `addons/` скрипт не трогает.
+
 ## [0.1.13] — отладка из гайда Anomaly: `-dbg`, `run_string`, тихие провалы скриптов
 
 `docs/pitfalls.md`: `-dbg` и debug HUD (оверлей зон как зеркало `db.actor_inside_zones`; три мода со `space_restrictor`); синтаксическая ошибка `.script` без попапа; коллизия глобалов. `docs/api-verification.md`: `run_string` — первый способ проверки в сессии, диагностический скрипт — для повторяющихся. Этап 6 в `docs/plans/fix.md` и `workflow-fix.mdc`: повтор фичи, бой/меню/торговля, оборонительный `load_state`. Ссылки на разделы гайда в `docs/references.md`. Сверка с xray-monolith: `-dbg`, `run_string` и `flush` есть; подписи оверлеев в русской сборке не подтверждены.

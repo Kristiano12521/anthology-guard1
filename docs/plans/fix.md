@@ -61,7 +61,10 @@
 
 ```bash
 python3 tools/lint_addon.py <mod_id>
+python3 tools/lint_addon.py --cross
 ```
+
+`--cross` без `mod_id` смотрит все моды в `addon/`: фикс может патчить ту же секцию в том же пути, что уже существующий (`CROSS-001`). Один `mod_id` для перекрёстной проверки недостаточен.
 
 ```
 Этап 6. Проверь:

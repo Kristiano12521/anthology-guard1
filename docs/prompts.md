@@ -2,11 +2,26 @@
 
 Копируются как есть. Общий принцип: в первом сообщении явно называем workflow и явно ограничиваем этап. Правила `workflow-*` подключаются агентом по описанию, но явное упоминание надёжнее автодетекта.
 
+## Развёртывание на новой машине
+
+Первый шаг — наполнить `reference/anomaly/` и `reference/anthology/` из `db/` игры. `reference/addons/` кладутся из MO2 отдельно; `reference/docs/` — руками.
+
+```bash
+python3 tools/fill_reference.py "<папка игры>" --dry-run
+python3 tools/fill_reference.py "<папка игры>"
+python3 tools/refindex.py build
+```
+
+Подробности: [`setup.md`](setup.md).
+
 ## Разбор вылета
 
 ```bash
 python3 tools/xraylog.py logs/xray_<user>.log --out logs/card.md
+python3 tools/xraylog.py logs/xray_<user>.log --errors-only
 ```
+
+`--errors-only` — когда `FATAL ERROR` в логе нет, а Lua-ошибки / `STACK TRACEBACK` есть: только секция «Нефатальные ошибки», без вылета и warning'ов.
 
 ```
 Это разбор вылета, веди по workflow-crash. Этапы 1-3, ничего не исправляй.
@@ -19,6 +34,16 @@ python3 tools/xraylog.py logs/xray_<user>.log --out logs/card.md
 
 Дай: класс ошибки, первопричину с путём и строкой в reference/,
 и чей это файл — ванилла, Anthology, сторонний аддон или мой мод.
+```
+
+Если `FATAL ERROR` в логе нет, а ошибки есть:
+
+```
+FATAL ERROR в логе нет, есть STACK TRACEBACK / Lua-ошибки.
+Карточку собери через --errors-only. Это разбор вылета,
+веди по workflow-crash. Этапы 1-3, ничего не исправляй.
+
+@logs/card.md
 ```
 
 Продолжение, когда причина названа:
@@ -88,6 +113,13 @@ API не меняем, функцию целиком не переписывае
 ```
 План принят с изменениями: <...>. Этап 4, реализуй.
 ```
+
+```bash
+python3 tools/lint_addon.py <mod_id>
+python3 tools/lint_addon.py --cross
+```
+
+`--cross` без `mod_id` смотрит все моды в `addon/`: новый мод может патчить ту же секцию в том же пути (`CROSS-001`, исход решает порядок в MO2).
 
 ## Проверка API
 

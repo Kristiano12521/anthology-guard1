@@ -1,0 +1,34 @@
+Third-party works in this repository. They are not licensed under LICENSE.
+
+`reference/` (Anomaly / Anthology / addons of the pack) is not stored in git
+and is not redistributed by this project.
+
+addon/context_menu_overhaul_anthology
+    Unofficial local fix on top of Context Menu Overhaul 1.4.2 adapted for
+    Anthology 2.1 (v1.2.1 BETA). The adapter's license is not stated in the
+    tree; local changes are in CHANGELOG.txt. Enjoy Cigarettes (Tosox,
+    CC BY-NC-SA 4.0) is referenced only as a menu entry that this fork
+    hides — that addon is not vendored here.
+
+addon/seamless_inventory_sort_anthology
+    Self-contained replacement of Seamless Inventory Sort for Anthology 2.1.
+    Credits (full text in CREDITS.txt):
+      TheMrDemonized — Inventory Antifreeze (license not stated in the tree)
+      Flueno — Tooltip Control 1.1.2, CC BY-NC-SA 3.0 (header kept in source)
+      Razfarg — Scroll Fix v3 (license not stated in the tree)
+    CC BY-NC-SA 3.0 on Tooltip Control is not replaced by the root MIT license.
+
+addon/burnshit_inventory_destroy
+    Inventory destroy actions built as an extension of [GAM] Burn Shit.
+    Does not replace burnshit.script. Original license is not stated in the tree.
+
+addon/anthology_busyhands_stability_fix
+    Stability overlay on vendor Busy Hands / MAG Redux. Vendor files are
+    packed from reference/addons at zip time and are not stored in git.
+    Original license is not stated in the tree.
+
+addon/quickqk_task_complete
+    Rework of [GFX] QuickQK Task Status Tool Anthology from the pack.
+    Original license is not stated in the tree.
+
+Own bugfixes under addon/fix_* are original work covered by LICENSE.
