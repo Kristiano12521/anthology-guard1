@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.13] — отладка из гайда Anomaly: `-dbg`, `run_string`, тихие провалы скриптов
+
+`docs/pitfalls.md`: `-dbg` и debug HUD (оверлей зон как зеркало `db.actor_inside_zones`; три мода со `space_restrictor`); синтаксическая ошибка `.script` без попапа; коллизия глобалов. `docs/api-verification.md`: `run_string` — первый способ проверки в сессии, диагностический скрипт — для повторяющихся. Этап 6 в `docs/plans/fix.md` и `workflow-fix.mdc`: повтор фичи, бой/меню/торговля, оборонительный `load_state`. Ссылки на разделы гайда в `docs/references.md`. Сверка с xray-monolith: `-dbg`, `run_string` и `flush` есть; подписи оверлеев в русской сборке не подтверждены.
+
 ## [0.1.10] — распаковка db и наполнение reference/
 
 `tools/xdb_unpack.py` перенесён из `.cache/`: LZHUF для TOC, LZO1X для payload, argparse, чтение TOC без загрузки всего архива. `tools/fill_reference.py` наполняет `reference/anomaly/` и `reference/anthology/` из `<игра>/db` (только `scripts/`, `configs/`, `text/`; `--dry-run`; аддоны не трогает). Раздел в `docs/setup.md`, строки в таблице README.

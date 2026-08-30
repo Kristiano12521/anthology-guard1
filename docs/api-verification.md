@@ -55,13 +55,16 @@ local ok = some_module.maybe_exists and some_module.maybe_exists(obj)
 
 ## Быстрая проверка в игре
 
-Если grep не дал ответа, дешевле всего проверить одним запуском:
+Если grep не дал ответа, первый шаг — `run_string` в уже запущенной сессии, без правки файлов. Команда есть в Modded Exes (`CCC_ScriptCommand` в `console_commands.cpp`) и регистрируется только с `-dbg`. Без ключа консоль ответит unknown command.
 
-```lua
-printf("[mymod] some_module.maybe_exists = %s", tostring(some_module.maybe_exists))
+```
+run_string printf("[mymod] some_module.maybe_exists = %s", tostring(some_module.maybe_exists))
+flush
 ```
 
-Появилось `nil` — функции нет. Такой однострочник в диагностическом скрипте стоит дешевле, чем полчаса спора с моделью.
+Появилось `nil` — функции нет. `printf` без `-dbg` в release тоже молчит (`vscript_log` в `script_storage.cpp`). `flush` (`CCC_FlushLog`) от `-dbg` не зависит; без него строка часто видна только в `.bkp` следующей сессии.
+
+Диагностический скрипт (`<mod_id>_diag.script`, только `printf` с тегом) — для повторяющихся проверок: один и тот же снимок на каждом тике, на загрузке сейва, в бою. Одноразовый вопрос «есть ли эта функция» им решать дороже, чем `run_string`.
 
 ## Сигнатуры
 

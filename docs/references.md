@@ -12,7 +12,11 @@
 
 ## Anomaly: скрипты и конфиги
 
-- [S.T.A.L.K.E.R. Anomaly Modding Guide](https://robe127.github.io/stalker-anomaly-modding-guide/) — система callback'ов, жизненный цикл скриптов, область видимости, MCM, DLTX. Наиболее аккуратный современный справочник.
+- [S.T.A.L.K.E.R. Anomaly Modding Guide](https://robe127.github.io/stalker-anomaly-modding-guide/) — система callback'ов, жизненный цикл скриптов, область видимости, MCM, DLTX. Наиболее аккуратный современный справочник. Написан под ванильную Anomaly 1.5.3; сборка идёт на Modded Exes MT — каждое утверждение сверять с `reference/` и README xray-monolith. Полезные разделы, которых не было в наших docs:
+  - [Debugging & Logging](https://robe127.github.io/stalker-anomaly-modding-guide/scripting/debugging/) — `-dbg`, debug HUD, `run_string`, синтаксическая ошибка загрузки `.script`, коллизия глобалов.
+  - [Console Commands](https://robe127.github.io/stalker-anomaly-modding-guide/reference/console-commands/) — `run_string` / `run_script` только с `-dbg`, `flush`.
+  - [Lua Scope & Globals](https://robe127.github.io/stalker-anomaly-modding-guide/scripting/lua-scope/) — per-script env, когда глобал реально перетирается.
+  - [level — db.actor_inside_zones](https://robe127.github.io/stalker-anomaly-modding-guide/api-reference/level/) и [Space Restrictors](https://robe127.github.io/stalker-anomaly-modding-guide/systems/space-restrictors/) — таблица зон актора и оверлей Actor Inside Zone Info.
 - [anomaly-modding-book](https://github.com/TheParaziT/anomaly-modding-book) — туториалы по DLTX, MCM, monkey-patching.
 - [DLTX — Differential LTX Loading](https://aqxaromods.com/stalker/anomaly/2190-dltx-differential-ltx-loading-updated-25th-september-2021.html) — исходное описание механизма от автора.
 - [RAX-Anomaly/Anomaly-Mod-Configuration-Menu](https://github.com/RAX-Anomaly/Anomaly-Mod-Configuration-Menu) — исходники MCM и описание дерева опций.

@@ -63,9 +63,50 @@ RegisterScriptCallback("actor_on_update", function() ... end)
 
 Код для Call of Chernobyl, Call of Misery, OGSR, IX-Ray и чистого CoP похож, но не совместим. Совпадение имени функции ничего не доказывает — проверяем по `reference/`.
 
+## 13. Отладочный режим `-dbg` и debug HUD
+
+Запуск с `-dbg` в аргументах MO2. В Modded Exes (`script_storage.cpp` xray-monolith) без этого ключа `printf` в release-сборке молчит: `vscript_log` сразу выходит. Тот же ключ в `console_commands.cpp` регистрирует `run_string`, `run_script`, `g_god` и соседние команды внутри блока `MASTER_GOLD + strstr(Core.Params, "-dbg")` — без `-dbg` консоль ответит unknown command.
+
+Команда `flush` (`CCC_FlushLog` в том же файле) от `-dbg` не зависит. После `printf` из консоли её стоит вызвать сразу: иначе строка часто видна только в `.bkp` следующей сессии.
+
+Гайд по ванильной Anomaly 1.5.3 описывает вкладку Others с оверлеями Debug HUD, Debug map spots, Debug error notifications и Actor Inside Zone Info. Последний — список имён `space_restrictor`, внутри которых сейчас актор. Точные подписи пунктов в русской Anthology по локальному `reference/configs/text` не сверены (`reference/` не наполнен). Проверка: запуск с `-dbg` и осмотр вкладки опций.
+
+Независимо от подписей меню ту же информацию даёт таблица `db.actor_inside_zones` (ключ — имя зоны, значение — `game_object`). Она есть в `db.script` Anomaly 1.5.2 (определения Aoldri). Кто её заполняет, гайд указывает `bind_restrictor.script` — локально не сверено. Проверка в сессии:
+
+```
+run_string for name,_ in pairs(db.actor_inside_zones or {}) do printf("inside_zone=%s", name) end
+```
+
+У нас со `space_restrictor` работают `fix_gigant_space_restriction`, `fix_soc_nimble_flash`, `fix_x2_gravity_room`.
+
+## 14. Синтаксическая ошибка в `.script`: файл не грузится, попапа нет
+
+Ошибка разбора не даёт загрузиться всему файлу. Игра идёт дальше без него: `on_game_start` не вызывается, callback'и не регистрируются, функциональность просто отсутствует. Попапа нет.
+
+В логе при старте строка вида:
+
+```
+[error][     LUA] ...scripts/my_mod.script:42: unexpected symbol near '='
+```
+
+Класс: «мод не работает, а лог выглядит чистым». `tools/xraylog.py` собирает FATAL и `STACK TRACEBACK`; ошибка загрузки чанка часто не попадает в карточку. Ищи в сыром логе имя `.script` и `LUA` сразу после старта, не после вылета.
+
+Путь в движке подтверждён: `CScriptStorage::do_file` / `load_buffer` в xray-monolith при `luaL_loadbuffer`/`lua_pcall` ≠ 0 печатает ошибку и возвращает false — скрипт в окружение не попадает. Точный префикс `[error][     LUA]` — форма из гайда по ванильной 1.5.3; сверять по факту в логе этой сборки.
+
+## 15. Коллизия глобальных имён
+
+Каждый `.script` — своё окружение с `__index = _G`. `function foo()` без `local` в двух разных файлах — это `a.foo` и `b.foo`, они не сталкиваются. Реальная коллизия — когда оба пишут в одно и то же место, видимое всем:
+
+- два файла с одним именем: второй модуль в `_G` молча подменяет первый;
+- два monkey-patch одной функции на общей таблице модуля (`some_module.fn = ...`): второй побеждает;
+- явная запись в `_G` (`rawset(_G, "name", ...)`). В `addon/` так делает `fix_replace_quest_corpse`.
+
+Симптом — неверное значение переменной или подменившаяся функция, без ошибки в логе. Диагностика: `printf("%s", type(имя))` в начале своего callback. В `addon/` десятки `.script`, риск реальный. Новые хелперы — `local`.
+
 ## Открытые вопросы
 
 Сюда пишем то, что пока не проверено на этой сборке, чтобы не выдавать за факт:
 
 - Насколько полно Anthology 2.1 поддерживает XML-override для UI-файлов и в каком виде — проверить по README Modded Exes конкретной версии.
 - Какие именно MT-тумблеры включены в дефолтном конфиге сборки.
+- Точные строковые id и русские подписи debug-оверлеев (Actor Inside Zone Info и соседние) в `configs/text` этой сборки.
