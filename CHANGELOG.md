@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.36] — тесты совместимы с Python 3.9
+
+`from __future__ import annotations` первой строкой во всех двенадцати `tests/*.py` с аннотациями: `str | None` больше не вычисляется при импорте (CI на 3.9). Runtime-конструкций `X | Y` (isinstance, cast, TypeVar, алиасы на уровне модуля) в тестах и скриптах нет — переписывать нечего. Матрица CI по-прежнему 3.9 и 3.12.
+
 ## [0.1.35] — verified_build с номером; версия упаковки из мода
 
 `verified_build` у пяти проверенных модов — `Anthology 2.1 / Modded Exes MT 10063` (номер из карточек `logs/cards/`, `xrCore build 10063`). Формат в `docs/mo2.md`: номер обязателен, берётся из лога или карточки. `tools/pack_bhs.py` читает версию overlay из CHANGELOG/meta.ini (`_common.detect_version`); вендорская папка в `reference/addons/` — отдельная `VENDOR_SOURCE_VERSION` (0.6.4, исходник BusyHands, не версия фикса). Тот же `detect_version` в `_pack_kristiano_aio.py` и `build_addon.py`. Тесты на чтение версии из мода.
