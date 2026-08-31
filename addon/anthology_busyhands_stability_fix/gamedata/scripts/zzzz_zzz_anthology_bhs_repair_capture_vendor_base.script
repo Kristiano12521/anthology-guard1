@@ -41,9 +41,45 @@
 -- только СОХРАНЯЕТ V под безопасным именем, пока она ещё не потеряна -
 -- больше нигде и никогда её взять будет неоткуда.
 
-if type(RepairOnItemSelect) == "function" then
-	ANTHOLOGY_BHS_REPAIR_VENDOR_BASE_ON_ITEM_SELECT = RepairOnItemSelect
-	printf("[BusyHandsFix v0.5.3] Captured true vendor OnItemSelect before outfit_repair overwrites the shared RepairOnItemSelect global")
+-- Env of zzzz_arti_jamming_repairs is visible as _G[filename] (axr_main).
+-- RepairOnItemSelect is a non-local assign in that file, so it SHOULD be
+-- module.RepairOnItemSelect. run_string 31.08.2026: that field is nil, and
+-- the bare global is nil too. Cannot read V from jamming. File name / slot
+-- zzzz_zzz_ is not changed (loads after jamming, before outfit).
+-- Fallback: current UIRepair.OnItemSelect at this slot (vendor, or keep_crafting
+-- wrap, if jamming never wrote the method).
+local function resolve_ui_repair_class()
+	if UIRepair ~= nil then
+		return UIRepair, "bare UIRepair"
+	end
+	if type(_G) == "table" and _G.UIRepair ~= nil then
+		return _G.UIRepair, "_G.UIRepair"
+	end
+	if type(item_repair) == "table" and item_repair.UIRepair ~= nil then
+		return item_repair.UIRepair, "item_repair.UIRepair"
+	end
+	return nil, nil
+end
+
+local function resolve_vendor_base_on_item_select()
+	local module = zzzz_arti_jamming_repairs
+	if type(module) == "table" and type(module.RepairOnItemSelect) == "function" then
+		return module.RepairOnItemSelect, "zzzz_arti_jamming_repairs.RepairOnItemSelect"
+	end
+	if type(RepairOnItemSelect) == "function" then
+		return RepairOnItemSelect, "bare RepairOnItemSelect"
+	end
+	local cls, cls_via = resolve_ui_repair_class()
+	if cls ~= nil and type(cls.OnItemSelect) == "function" then
+		return cls.OnItemSelect, cls_via .. ".OnItemSelect"
+	end
+	return nil, nil
+end
+
+local vendor_base, resolved_via = resolve_vendor_base_on_item_select()
+if vendor_base then
+	ANTHOLOGY_BHS_REPAIR_VENDOR_BASE_ON_ITEM_SELECT = vendor_base
+	printf("[BusyHandsFix v0.6.5] Captured OnItemSelect via %s before outfit_repair overwrites the shared RepairOnItemSelect global", resolved_via)
 else
-	printf("[BusyHandsFix v0.5.3] RepairOnItemSelect was not found at expected load position - repair chain fix will NOT be able to install correctly")
+	printf("[BusyHandsFix v0.6.5] RepairOnItemSelect was not found via jamming module / bare global / UIRepair.OnItemSelect - repair chain capture NOT installed (patch not functional in this build if jamming never exported the original)")
 end

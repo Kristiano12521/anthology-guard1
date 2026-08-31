@@ -1,5 +1,42 @@
 # Anthology Busy Hands Stability Fix
 
+## [0.6.5] — 2026-08-31
+
+**Изменено**
+
+- Четыре патча ищут цель другим путём. Поведение гардов то же.
+- `zzzzzz_anthology_bhs_crow_spawner_patch.script` — `sr_crow_spawner.crowkiller` это userdata (`class "crowkiller"`), не table. Условие как у рабочего `zzzz_anthology_crow_spawner_fix`: `_G.crowkiller`, затем модуль; принимаются table и userdata.
+- `zzzzzz_anthology_bhs_item_repair_patch.script` и `zzzzzz_anthology_bhs_sortingplus_patch.script` — `class "X" (CUIScriptWnd)` кладёт класс в `_G`, на таблице модуля его нет. Ищутся оба пути, как у `find_close_cover`: голый `UIRepair`/`UIInventory`, `_G.*`, `item_repair.UIRepair` / `ui_inventory.UIInventory`.
+- `zzzz_zzz_anthology_bhs_repair_capture_vendor_base.script` — env `zzzz_arti_jamming_repairs` снаружи есть (`_G[filename]`), поле `RepairOnItemSelect` на нём nil. Имя файла не трогали. Если модуля/глобала нет, захватывается текущий `UIRepair.OnItemSelect`.
+- `zzzzzz_anthology_bhs_repair_recursion_fix.script` — тот же dual-path к `UIRepair`, иначе цепочка не встанет после смены поиска.
+
+**Причина**
+
+`run_string` 31.08.2026, Anthology 2.1 / Modded Exes MT: `sr_crow_spawner.crowkiller` = userdata; `item_repair.UIRepair` / `ui_inventory.UIInventory` / `zzzz_arti_jamming_repairs.RepairOnItemSelect` = nil. Проверка `type(...) == "table"` и поиск только на модуле цель не находили.
+
+**Как исправлено**
+
+Разный резолв под каждый замер. Каждый патч пишет в лог, каким путём нашёл цель.
+
+**Не затронуто**
+
+- Логика гардов (pcall вокруг vertex, rebind ремкомплекта, LMode_Init, реконструкция OnItemSelect).
+- Имена файлов и слот `zzzz_zzz_`.
+- FDDA / mon_sleep / sequential_load / traders / DotMarks.
+- Сохраняемое состояние.
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+- В MO2 заменить предыдущий overlay BHS 0.6.4.
+
+**Проверено**
+
+- lint overlay и `--cross`: см. прогон после правки
+- В игре: не прогонялось. В логе у crow/UIRepair/UIInventory/capture должна быть строка `via ...`, не `was not found`.
+
+
 ## [0.6.4] — 2026-08-31
 
 **Изменено**

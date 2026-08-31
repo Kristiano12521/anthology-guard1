@@ -15,7 +15,7 @@
 -- snd_open (local snd_open = sound_object([[interface\inv_open]])) -
 -- воспроизводим её здесь же, это тривиальный конструктор ресурса, не логика.
 
-local VERSION = "0.5.0"
+local VERSION = "0.6.5"
 ANTHOLOGY_BHS_SORTINGPLUS_PATCH_VERSION = VERSION
 
 local snd_open = sound_object([[interface\inv_open]])
@@ -63,11 +63,46 @@ local function patched_lmode_init(self, obj)
 	self:PlaySND(snd_open)
 end
 
-if type(ui_inventory) == "table"
-and type(ui_inventory.UIInventory) == "table"
-and type(ui_inventory.UIInventory.LMode_Init) == "function" then
-	ui_inventory.UIInventory.LMode_Init = patched_lmode_init
-	printf("[BusyHandsFix v%s] ui_inventory.UIInventory.LMode_Init patched (method-level, zzz_rax_sortingplus_mcm.script untouched)", VERSION)
-else
-	printf("[BusyHandsFix v%s] ui_inventory.UIInventory.LMode_Init was not found - guard NOT installed", VERSION)
+-- class "UIInventory" (CUIScriptWnd) lives in _G, not on the module table
+-- (run_string 31.08.2026: ui_inventory.UIInventory = nil). Console env may
+-- differ from a script env, so both paths are patched like find_close_cover.
+local function add_ui_inventory_target(list, seen, obj, via)
+	if obj == nil then
+		return
+	end
+	if seen[obj] then
+		for i = 1, #list do
+			if list[i].obj == obj then
+				list[i].via = list[i].via .. " + " .. via
+				return
+			end
+		end
+		return
+	end
+	seen[obj] = true
+	list[#list + 1] = { obj = obj, via = via }
+end
+
+local ui_inventory_targets = {}
+local ui_inventory_seen = {}
+add_ui_inventory_target(ui_inventory_targets, ui_inventory_seen, UIInventory, "bare UIInventory")
+if type(_G) == "table" then
+	add_ui_inventory_target(ui_inventory_targets, ui_inventory_seen, _G.UIInventory, "_G.UIInventory")
+end
+if type(ui_inventory) == "table" then
+	add_ui_inventory_target(ui_inventory_targets, ui_inventory_seen, ui_inventory.UIInventory, "ui_inventory.UIInventory")
+end
+
+local ui_inventory_installed = false
+for ui_i = 1, #ui_inventory_targets do
+	local cls = ui_inventory_targets[ui_i].obj
+	local via = ui_inventory_targets[ui_i].via
+	if cls and type(cls.LMode_Init) == "function" then
+		cls.LMode_Init = patched_lmode_init
+		ui_inventory_installed = true
+		printf("[BusyHandsFix v%s] UIInventory.LMode_Init patched via %s (method-level, zzz_rax_sortingplus_mcm.script untouched)", VERSION, via)
+	end
+end
+if not ui_inventory_installed then
+	printf("[BusyHandsFix v%s] UIInventory.LMode_Init was not found via bare UIInventory / _G.UIInventory / ui_inventory.UIInventory - guard NOT installed", VERSION)
 end

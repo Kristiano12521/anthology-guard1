@@ -30,7 +30,7 @@
 -- ресурса по фиксированному пути, не логика - воспроизведена как есть.
 -- outfit_repair.script вообще не имеет ни одного top-level local (проверено).
 
-local VERSION = "0.5.3"
+local VERSION = "0.6.5"
 ANTHOLOGY_BHS_REPAIR_CHAIN_PATCH_VERSION = VERSION
 
 local ini_custom_repair = ini_file("repair\\importer.ltx")
@@ -133,21 +133,53 @@ local function outfit_on_item_select(self, n, next_fn)
 	self.btn_repair:Enable(true)
 end
 
+local function add_ui_repair_target(list, seen, obj, via)
+	if obj == nil then
+		return
+	end
+	if seen[obj] then
+		for i = 1, #list do
+			if list[i].obj == obj then
+				list[i].via = list[i].via .. " + " .. via
+				return
+			end
+		end
+		return
+	end
+	seen[obj] = true
+	list[#list + 1] = { obj = obj, via = via }
+end
+
 local function install()
 	local vendor_base = ANTHOLOGY_BHS_REPAIR_VENDOR_BASE_ON_ITEM_SELECT
 	if type(vendor_base) ~= "function" then
 		printf("[BusyHandsFix v%s] vendor base OnItemSelect was not captured (load-order marker missing) - repair chain fix NOT installed, recursion bug remains", VERSION)
 		return false
 	end
-	if type(item_repair) ~= "table" or type(item_repair.UIRepair) ~= "table" then
-		printf("[BusyHandsFix v%s] item_repair.UIRepair was not found - repair chain fix NOT installed", VERSION)
+
+	local targets = {}
+	local seen = {}
+	add_ui_repair_target(targets, seen, UIRepair, "bare UIRepair")
+	if type(_G) == "table" then
+		add_ui_repair_target(targets, seen, _G.UIRepair, "_G.UIRepair")
+	end
+	if type(item_repair) == "table" then
+		add_ui_repair_target(targets, seen, item_repair.UIRepair, "item_repair.UIRepair")
+	end
+	if #targets == 0 then
+		printf("[BusyHandsFix v%s] UIRepair was not found via bare UIRepair / _G.UIRepair / item_repair.UIRepair - repair chain fix NOT installed", VERSION)
 		return false
 	end
 
-	item_repair.UIRepair.OnItemSelect = function(self, n)
+	local chain = function(self, n)
 		outfit_on_item_select(self, n, function(self2, n2)
 			jamming_on_item_select(self2, n2, vendor_base)
 		end)
+	end
+
+	for i = 1, #targets do
+		targets[i].obj.OnItemSelect = chain
+		printf("[BusyHandsFix v%s] repair chain UIRepair.OnItemSelect set via %s", VERSION, targets[i].via)
 	end
 
 	return true

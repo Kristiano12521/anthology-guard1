@@ -19,7 +19,7 @@
 -- файла - local degrade_factor = item_repair.degrade_factor or 0.2,
 -- тривиальная константа, воспроизведённая ниже.
 
-local VERSION = "0.5.0"
+local VERSION = "0.6.5"
 ANTHOLOGY_BHS_ITEM_REPAIR_PATCH_VERSION = VERSION
 
 local degrade_factor = item_repair.degrade_factor or 0.2
@@ -99,13 +99,27 @@ end
 -- вендорского файла), а не подменяет с нуля.
 -- --------------------------------------------------------------------------
 
-local function install()
-	if type(item_repair) ~= "table" or type(item_repair.UIRepair) ~= "table" then
-		printf("[BusyHandsFix v%s] item_repair.UIRepair was not found - guard NOT installed", VERSION)
-		return false
+-- class "UIRepair" (CUIScriptWnd) lives in _G, not on the module table
+-- (run_string 31.08.2026: item_repair.UIRepair = nil). Console env may
+-- differ from a script env, so both paths are patched like find_close_cover.
+local function add_ui_repair_target(list, seen, obj, via)
+	if obj == nil then
+		return
 	end
+	if seen[obj] then
+		for i = 1, #list do
+			if list[i].obj == obj then
+				list[i].via = list[i].via .. " + " .. via
+				return
+			end
+		end
+		return
+	end
+	seen[obj] = true
+	list[#list + 1] = { obj = obj, via = via }
+end
 
-	local UIRepair = item_repair.UIRepair
+local function install(UIRepair)
 
 	local InitControlsSuper = UIRepair.InitControls
 	if InitControlsSuper then
@@ -370,6 +384,23 @@ local function install()
 	return true
 end
 
-if install() then
-	printf("[BusyHandsFix v%s] item_repair.UIRepair patched: InitControls/Reset/CollectValidItems/UpdateUi/OnRepair/OnCancel (method-level, zz_item_repair_keep_crafting_window_open.script untouched)", VERSION)
+local ui_repair_targets = {}
+local ui_repair_seen = {}
+add_ui_repair_target(ui_repair_targets, ui_repair_seen, UIRepair, "bare UIRepair")
+if type(_G) == "table" then
+	add_ui_repair_target(ui_repair_targets, ui_repair_seen, _G.UIRepair, "_G.UIRepair")
+end
+if type(item_repair) == "table" then
+	add_ui_repair_target(ui_repair_targets, ui_repair_seen, item_repair.UIRepair, "item_repair.UIRepair")
+end
+
+local ui_repair_installed = false
+for ui_r = 1, #ui_repair_targets do
+	if install(ui_repair_targets[ui_r].obj) then
+		ui_repair_installed = true
+		printf("[BusyHandsFix v%s] UIRepair patched via %s: InitControls/Reset/CollectValidItems/UpdateUi/OnRepair/OnCancel (method-level, zz_item_repair_keep_crafting_window_open.script untouched)", VERSION, ui_repair_targets[ui_r].via)
+	end
+end
+if not ui_repair_installed then
+	printf("[BusyHandsFix v%s] UIRepair was not found via bare UIRepair / _G.UIRepair / item_repair.UIRepair - guard NOT installed", VERSION)
 end

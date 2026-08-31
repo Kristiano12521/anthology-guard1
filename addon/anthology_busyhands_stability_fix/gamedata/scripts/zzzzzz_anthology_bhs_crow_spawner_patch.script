@@ -20,7 +20,7 @@
 -- Фикс - pcall строго вокруг ЭТОЙ ОДНОЙ пары вызовов, больше НИЧЕГО в
 -- алгоритме не меняется:
 
-local VERSION = "0.6.0"
+local VERSION = "0.6.5"
 ANTHOLOGY_BHS_CROW_PATCH_VERSION = VERSION
 
 local function patched_check_for_spawn_new_crow(self)
@@ -51,11 +51,33 @@ local function patched_check_for_spawn_new_crow(self)
 	return false
 end
 
-local crowkiller_module = sr_crow_spawner
-if type(crowkiller_module) == "table" and type(crowkiller_module.crowkiller) == "table" then
-	crowkiller_module.crowkiller.check_for_spawn_new_crow = patched_check_for_spawn_new_crow
-	printf("[BusyHandsFix v%s] crowkiller:check_for_spawn_new_crow patched (method-level, minimal pcall-only diff, sr_crow_spawner.script untouched)", VERSION)
+-- class "crowkiller" is userdata on the module (run_string 31.08.2026).
+-- type(...) == "table" can never pass. Same lookup as
+-- zzzz_anthology_crow_spawner_fix: _G.crowkiller, then sr_crow_spawner.crowkiller.
+local function is_class_obj(obj)
+	local t = type(obj)
+	return t == "table" or t == "userdata"
+end
+
+local function resolve_crowkiller_class()
+	if is_class_obj(_G.crowkiller) then
+		return _G.crowkiller, "_G.crowkiller"
+	end
+	if is_class_obj(crowkiller) then
+		return crowkiller, "bare crowkiller"
+	end
+	local module = sr_crow_spawner
+	if type(module) == "table" and is_class_obj(module.crowkiller) then
+		return module.crowkiller, "sr_crow_spawner.crowkiller"
+	end
+	return nil, nil
+end
+
+local crowkiller_class, resolved_via = resolve_crowkiller_class()
+if crowkiller_class and crowkiller_class.check_for_spawn_new_crow then
+	crowkiller_class.check_for_spawn_new_crow = patched_check_for_spawn_new_crow
+	printf("[BusyHandsFix v%s] crowkiller:check_for_spawn_new_crow patched via %s (method-level, minimal pcall-only diff, sr_crow_spawner.script untouched)", VERSION, resolved_via)
 else
-	printf("[BusyHandsFix v%s] sr_crow_spawner.crowkiller class was not found - guard NOT installed", VERSION)
+	printf("[BusyHandsFix v%s] crowkiller class was not found via _G.crowkiller / bare crowkiller / sr_crow_spawner.crowkiller - guard NOT installed", VERSION)
 end
 
