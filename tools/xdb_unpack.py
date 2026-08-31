@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import struct
 import sys
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -256,8 +257,33 @@ class LzHufDecoder:
         return bytes(out)
 
 
+def skip_kind(message: str) -> str:
+    """Класс ошибки для сводки: без пофайловых чисел и имён."""
+    if message.startswith("lzo bad distance"):
+        return "lzo bad distance"
+    if message.startswith("короткое чтение"):
+        return "короткое чтение"
+    return message
+
+
+def format_skip_summary(kinds: list[str]) -> str | None:
+    """Одна строка «пропущено N: причина (k), …» или None, если пропусков нет."""
+    if not kinds:
+        return None
+    counts = Counter(kinds)
+    parts = [f"{kind} ({n})" for kind, n in counts.most_common()]
+    return f"пропущено {len(kinds)}: {', '.join(parts)}"
+
+
 def lzo1x_decompress(src: bytes, dst_len: int) -> bytes:
-    """LZO1X as used by X-Ray rtc_decompress (no framing)."""
+    """Сырой LZO1X без фрейма, как minilzo ``lzo1x_decompress`` / X-Ray ``rtc_decompress``.
+
+    Кодирование сверено с:
+    - Linux ``Documentation/lzo.txt`` (stream format as understood by the kernel);
+    - ``lib/lzo/lzo1x_decompress_safe.c`` (в т.ч. ``m_pos -= 0x4000`` у M4);
+    - minilzo Oberhumer (``first_literal_run``, ``match_next``, copy_match побайтно);
+    - lzokay (тот же текст Documentation/lzo.txt, читаемый state-machine).
+    """
     ip = 0
     n = len(src)
     dst = bytearray()
@@ -272,157 +298,101 @@ def lzo1x_decompress(src: bytes, dst_len: int) -> bytes:
 
     def copy_literal(cnt: int) -> None:
         nonlocal ip
+        if cnt < 0 or ip + cnt > n:
+            raise ValueError("lzo truncated")
         dst.extend(src[ip : ip + cnt])
         ip += cnt
 
-    first = u8()
-    if first > 17:
-        copy_literal(first - 17)
-        first = 0  # fall into match loop via instruction
-        instruction = None
-    else:
-        instruction = first
-        first = None
+    def extra_when_zero(add: int) -> int:
+        extra = 0
+        while True:
+            b = u8()
+            if b:
+                return extra + b + add
+            extra += 255
 
-    state = 0
-    if first is None:
-        # already copied literals; read next instruction
-        pass
-    else:
-        # first byte 0..17 handled below as instruction
-        instruction = first
-
-    # Restart into main loop
-    ip_start_handled = True
-    while True:
-        if instruction is None:
-            instruction = u8()
-        inst = instruction
-        instruction = None
-
-        if inst < 16:
-            if state == 0:
-                length = inst
-                if length == 0:
-                    extra = 0
-                    while True:
-                        b = u8()
-                        if b:
-                            length = extra + b + 15 + 3
-                            break
-                        extra += 255
-                else:
-                    length += 3
-                copy_literal(length)
-                state = 4 if length >= 4 else length
-                continue
-            # match, 2 or 3 bytes, distance 1..1k / 2k..3k
-            if state >= 4:
-                # copy 3 bytes from 2..3kB
-                d = (inst >> 2) & 3  # wait: 0000 DDSS
-                ss = inst & 3
-                h = u8()
-                distance = (h << 2) + d + 1 + 2048
-                length = 3
-                state = ss
-            else:
-                d = (inst >> 2) & 3
-                ss = inst & 3
-                h = u8()
-                distance = (h << 2) + d + 1
-                length = 2
-                state = ss
-        elif inst < 32:
-            # 16..31: copy within 16..48kB
-            length = inst & 7
-            if length == 0:
-                extra = 0
-                while True:
-                    b = u8()
-                    if b:
-                        length = extra + b + 7 + 2
-                        break
-                    extra += 255
-            else:
-                length += 2
-            le16 = u8() | (u8() << 8)
-            ss = le16 & 3
-            d = le16 >> 2
-            h = (inst & 8) >> 3  # bit 3 of instruction is H in some variants
-            # Linux: distance = 16384 + (H << 14) + D; H is inst&8
-            distance = 16384 + ((inst & 8) << 11) + d
-            if distance == 16384:
-                break  # EOS
-            state = ss
-        elif inst < 64:
-            # 32..63: copy small block within 16kB
-            length = inst & 31
-            if length == 0:
-                extra = 0
-                while True:
-                    b = u8()
-                    if b:
-                        length = extra + b + 31 + 2
-                        break
-                    extra += 255
-            else:
-                length += 2
-            le16 = u8() | (u8() << 8)
-            ss = le16 & 3
-            distance = (le16 >> 2) + 1
-            state = ss
-        else:
-            # 64..255: copy 3-4 bytes from 0..2kB or 3-byte from 0..16kB depending
-            if inst >= 64:
-                # 01L LLLDD  / M2
-                length = ((inst >> 5) & 1) + 3  # 64-127: 3, 128-191: 4? 
-                # Actually: (inst >> 5) - 1 => 64..95: 1+2? Let's use kernel:
-                # instruction 64..127: length = 3 + ((inst >> 5) & 1)  => 3 or 4
-                # distance from  (H << 3) + D + 1, H next byte, D = inst & 7? 
-                # Kernel 0x40..0x7f:
-                #   length = 3 + ((instruction >> 5) & 1)
-                #   Always followed by one byte H
-                #   distance = (H << 3) + (instruction & 7) + 1  -- wait DD from low bits
-                # Standard lzo1x:
-                #   length = 3 + ((inst >> 5) & 1)  for 64-127? No:
-                # 01 L LLL D D  where LLL is 3 bits...
-                # From kernel:
-                # 0100 00DD .. 0111 11DD : 3-4 bytes from 0..2kB
-                length = 3 + ((inst >> 5) & 1)
-                h = u8()
-                distance = (h << 3) + (inst & 7) + 1
-                state = (inst >> 2) & 3  # SS sometimes in other bits
-                # Kernel: state = instruction & 3 for 0x40-0xff after using D from low 3? 
-                # 0x40-0x7f: D is bits 0-2, S is not in this byte for M2 of lzo1x...
-                # Correct lzo1x M2: inst = 01xddsss? I'll use a known-good impl below.
-                ss = inst & 3
-                # For 0x40-0xff, SS is bits 0-1, D is bits 2-4 for 0x80+
-                if inst >= 128:
-                    # 1LLLLDSS : copy 5-8 bytes from 0..2kB
-                    length = ((inst >> 5) & 3) + 5
-                    h = u8()
-                    distance = (h << 3) + ((inst >> 2) & 7) + 1
-                    state = inst & 3
-                else:
-                    length = 3 + ((inst >> 5) & 1)
-                    h = u8()
-                    distance = (h << 3) + ((inst >> 2) & 7) + 1
-                    state = inst & 3
-
-        # copy from dictionary
+    def copy_match(distance: int, length: int) -> None:
+        # Перекрытие (dist < length) — только побайтно, не срезом: каждый
+        # новый байт может ссылаться на только что записанный.
         if distance <= 0 or distance > len(dst):
-            raise ValueError(f"lzo bad distance {distance} dst={len(dst)} inst={inst}")
+            raise ValueError(f"lzo bad distance {distance} dst={len(dst)}")
         for _ in range(length):
             dst.append(dst[-distance])
+
+    if n < 3:
+        raise ValueError("lzo truncated")
+
+    state = 0
+    first = src[0]
+    if first > 17:
+        ip = 1
+        taken = first - 17
+        copy_literal(taken)
+        state = 4 if taken >= 4 else taken
+
+    while True:
+        inst = u8()
+        if inst >= 64:
+            # M2: 01L DDDSS (64..127) длина 3–4; 1LL DDDSS (128..255) длина 5–8.
+            # Один байт H, не два: прежний декодер читал H дважды и срывал поток.
+            length = (inst >> 5) + 1
+            h = u8()
+            distance = (h << 3) + ((inst >> 2) & 7) + 1
+            state = inst & 3
+            copy_match(distance, length)
+        elif inst >= 32:
+            # M3: 001LLLLL, длина 2+(L ?: 31 + 255*нулей + байт), dist = D+1.
+            length = (inst & 31) + 2
+            if length == 2:
+                length += extra_when_zero(31)
+            le16 = u8() | (u8() << 8)
+            state = le16 & 3
+            copy_match((le16 >> 2) + 1, length)
+        elif inst >= 16:
+            # M4: 0001HLLL. Компрессор пишет m_off -= 0x4000; декодер возвращает
+            # bias: distance = 16384 + (H<<14) + D. EOS, если (H<<14)+D == 0.
+            length = (inst & 7) + 2
+            if length == 2:
+                length += extra_when_zero(7)
+            le16 = u8() | (u8() << 8)
+            state = le16 & 3
+            d = le16 >> 2
+            high = (inst & 8) << 11
+            if high + d == 0:
+                if length != 3:
+                    raise ValueError("lzo bad eos")
+                break
+            copy_match(16384 + high + d, length)
+        elif state == 0:
+            length = inst + 3
+            if length == 3:
+                length += extra_when_zero(15)
+            copy_literal(length)
+            state = 4
+            if len(dst) > dst_len:
+                raise ValueError("lzo overflow")
+            continue
+        elif state != 4:
+            # M1, после 1–3 литералов: 2 байта с дистанции 1..1k.
+            h = u8()
+            distance = (h << 2) + (inst >> 2) + 1
+            state = inst & 3
+            copy_match(distance, 2)
+        else:
+            # M1 после 4+ литералов (first_literal_run): 3 байта с 2049..3072.
+            h = u8()
+            distance = (h << 2) + (inst >> 2) + 2049
+            state = inst & 3
+            copy_match(distance, 3)
+
         if state:
             copy_literal(state)
-
-        if len(dst) > dst_len * 2:
+        if len(dst) > dst_len:
             raise ValueError("lzo overflow")
-        if len(dst) >= dst_len and ip >= n - 1:
-            break
 
-    return bytes(dst[:dst_len])
+    if len(dst) != dst_len:
+        raise ValueError(f"lzo size {len(dst)} != {dst_len}")
+    return bytes(dst)
 
 
 @dataclass(frozen=True)
@@ -577,17 +547,22 @@ def unpack_archive(
 
     dest.mkdir(parents=True, exist_ok=True)
     written = 0
+    skips: list[str] = []
     for entry in chosen:
         try:
             raw = read_entry(archive, entry)
         except (ValueError, OSError) as exc:
             print(f"пропуск {entry.posix_name}: {exc}", file=sys.stderr)
+            skips.append(skip_kind(str(exc)))
             continue
         out = dest / entry.posix_name
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(raw)
         written += 1
-    print(f"записано {written} → {rel(dest)}")
+    print(f"записано {written} -> {rel(dest)}")
+    summary = format_skip_summary(skips)
+    if summary:
+        print(summary)
     return written
 
 

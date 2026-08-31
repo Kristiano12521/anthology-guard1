@@ -9,7 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 import fill_reference  # noqa: E402
-from test_xdb_unpack import build_uncompressed_archive  # noqa: E402
+from test_xdb_unpack import build_archive, build_uncompressed_archive  # noqa: E402
 
 
 def run_fill(game: Path, reference: Path, *extra: str) -> tuple[int, str]:
@@ -39,6 +39,14 @@ class PathFilterTests(unittest.TestCase):
             fill_reference.dest_relative("configs/text/eng/ui.xml"),
             "configs/text/eng/ui.xml",
         )
+        self.assertEqual(
+            fill_reference.dest_relative("materials\\materials.ltx"),
+            "materials/materials.ltx",
+        )
+        self.assertEqual(
+            fill_reference.dest_relative("gamedata/materials/material_pairs.ltx"),
+            "materials/material_pairs.ltx",
+        )
 
     def test_configs_scripts_keeps_configs_prefix(self):
         self.assertEqual(
@@ -54,11 +62,13 @@ class PathFilterTests(unittest.TestCase):
         self.assertIsNone(fill_reference.dest_relative("levels\\l01_escape\\level"))
         self.assertIsNone(fill_reference.dest_relative("scripts\\"))
         self.assertIsNone(fill_reference.dest_relative("configs/"))
+        self.assertIsNone(fill_reference.dest_relative("materials/"))
         self.assertIsNone(fill_reference.dest_relative(""))
 
     def test_should_keep_rejects_zero_size(self):
         self.assertFalse(fill_reference.should_keep("scripts\\foo.script", size_real=0))
         self.assertTrue(fill_reference.should_keep("scripts\\foo.script", size_real=10))
+        self.assertTrue(fill_reference.should_keep("materials\\materials.ltx", size_real=10))
         self.assertFalse(fill_reference.should_keep("textures\\a.dds", size_real=99))
 
 
@@ -168,6 +178,45 @@ class FillPipelineTests(unittest.TestCase):
             [p.relative_to(self.reference / "addons").as_posix() for p in (self.reference / "addons").rglob("*") if p.is_file()],
             ["keep_me/marker.txt"],
         )
+
+    def test_extracts_materials(self):
+        self._put_archive(
+            "mods.db0",
+            {
+                "materials\\materials.ltx": b"[default]\n",
+                "gamedata\\materials\\material_pairs.ltx": b"[pair]\n",
+                "textures\\skip.dds": b"DDS",
+            },
+        )
+        code, out = run_fill(self.game, self.reference)
+        self.assertEqual(code, 0, msg=out)
+        anomaly = self.reference / "anomaly"
+        self.assertEqual((anomaly / "materials" / "materials.ltx").read_bytes(), b"[default]\n")
+        self.assertEqual(
+            (anomaly / "materials" / "material_pairs.ltx").read_bytes(), b"[pair]\n"
+        )
+        self.assertFalse((anomaly / "textures").exists())
+        self.assertNotIn("пропущено", out)
+
+    def test_skip_summary_at_end(self):
+        garbage = bytes([18]) + b"x"
+        path = self.db / "broken.db0"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(
+            build_archive(
+                {
+                    "scripts\\bad.script": (garbage, 40),
+                    "scripts\\ok.script": b"-- ok",
+                }
+            )
+        )
+        code, out = run_fill(self.game, self.reference)
+        self.assertEqual(code, 0, msg=out)
+        self.assertEqual(
+            (self.reference / "anomaly" / "scripts" / "ok.script").read_bytes(), b"-- ok"
+        )
+        self.assertFalse((self.reference / "anomaly" / "scripts" / "bad.script").exists())
+        self.assertIn("пропущено 1: lzo truncated (1)", out)
 
     def test_missing_db_dir(self):
         empty_game = self.root / "empty"

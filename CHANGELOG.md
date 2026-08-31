@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.25] — LZO1X, materials в reference, сводка пропусков
+
+`tools/xdb_unpack.py`: декодер LZO1X сверен с Linux `Documentation/lzo.txt`, `lzo1x_decompress_safe.c`, minilzo и lzokay. Чинится рассинхрон на M2 (лишний байт H) и `first_literal_run`/`state`; совпадения с перекрытием копируются побайтно. На `00_modded_exes_gamedata.db0` все 157 файлов распаковываются, CRC совпадает. `tools/fill_reference.py` кладёт ещё `materials/` (линтер больше не даёт ложный LTX-002 на `fix_st2_footstep`). Оба скрипта в конце печатают сводку пропусков по классу ошибки, если пропуски были.
+
 ## [0.1.24] — скелет: двухслойный repair; pitfalls ORDER-002
 
 В `templates/addon-skeleton`: закомментированная заготовка DLTX + `CreateTimeEvent`/`ResetTimeEvent` по коду `fix_rogue_hostility` / `fix_soc_nimble_flash` / `fix_noosphere_voice_x18` (частичные: `fix_quest_story_id`, `fix_wtf_assault_instacomplete`). В [`docs/pitfalls.md`](docs/pitfalls.md) §9 — оговорка, что старые CHANGELOG модов про запрет `zzz` не отменяют ORDER-002 для `.script`.

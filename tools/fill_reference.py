@@ -2,9 +2,9 @@
 """Наполняет reference/anomaly/ и reference/anthology/ из db-архивов игры.
 
 Ищет .db / .dbN / .xdb в <игра>/db (включая вложенные), читает TOC через
-xdb_unpack, пишет только scripts/, configs/, text/. Текстуры, модели, звуки,
-шейдеры и уровни пропускаются. reference/addons/ не трогает — аддоны ставятся
-из MO2 отдельно.
+xdb_unpack, пишет только scripts/, configs/, text/, materials/. Текстуры,
+модели, звуки, шейдеры и уровни пропускаются. reference/addons/ не трогает —
+аддоны ставятся из MO2 отдельно.
 
 Куда класть архив: если в относительном пути от db/ есть «anthology» —
 в reference/anthology/, иначе в reference/anomaly/. Это имя файла/папки,
@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import xdb_unpack  # noqa: E402
 from _common import REPO_ROOT  # noqa: E402
 
-KEEP_DIRS = ("scripts", "configs", "text")
+KEEP_DIRS = ("scripts", "configs", "text", "materials")
 ADDONS_DIR_NAME = "addons"
 DEFAULT_REFERENCE = REPO_ROOT / "reference"
 
@@ -47,8 +47,9 @@ def classify_archive(archive: Path, db_root: Path) -> str:
 def dest_relative(entry_name: str) -> str | None:
     """Путь внутри anomaly/ или anthology/, либо None — файл не для reference/.
 
-    Берётся первый каталог scripts|configs|text в пути. Префикс gamedata/
-    отбрасывается вместе со всем, что левее. Каталоги (хвост \\ или /) — None.
+    Берётся первый каталог scripts|configs|text|materials в пути. Префикс
+    gamedata/ отбрасывается вместе со всем, что левее. Каталоги (хвост \\
+    или /) — None.
     """
     if entry_name.endswith(("\\", "/")):
         return None
@@ -90,32 +91,35 @@ def process_archive(
     reference_root: Path,
     *,
     dry_run: bool,
-) -> tuple[str, list[str], int, int]:
-    """Возвращает (bucket, dest_rel paths kept, written, unchanged)."""
+) -> tuple[str, list[str], int, int, list[str]]:
+    """Возвращает (bucket, dest_rel paths kept, written, unchanged, skip kinds)."""
     bucket = classify_archive(archive, db_root)
     dest_root = reference_root / bucket
     entries = xdb_unpack.read_toc(archive)
     kept: list[str] = []
+    skips: list[str] = []
     written = 0
     unchanged = 0
     for entry in entries:
         relative = dest_relative(entry.name)
         if relative is None or entry.is_dir or entry.size_real <= 0:
             continue
-        kept.append(relative)
         if dry_run:
+            kept.append(relative)
             continue
         try:
             data = xdb_unpack.read_entry(archive, entry)
         except (ValueError, OSError) as exc:
             print(f"  пропуск {relative}: {exc}", file=sys.stderr)
+            skips.append(xdb_unpack.skip_kind(str(exc)))
             continue
+        kept.append(relative)
         status = write_if_changed(dest_root.joinpath(*relative.split("/")), data)
         if status == "written":
             written += 1
         else:
             unchanged += 1
-    return bucket, kept, written, unchanged
+    return bucket, kept, written, unchanged, skips
 
 
 def fill_reference(
@@ -123,20 +127,21 @@ def fill_reference(
     reference_root: Path,
     *,
     dry_run: bool = False,
-) -> dict[str, int]:
+) -> tuple[dict[str, int], list[str]]:
     db_root = resolve_db_dir(game)
     archives = xdb_unpack.find_archives(db_root)
     counts = {"anomaly": 0, "anthology": 0, "written": 0, "unchanged": 0, "archives": 0}
+    skips: list[str] = []
 
     if not archives:
         print(f"в {db_root} архивов .db/.xdb не найдено")
-        return counts
+        return counts, skips
 
     addons_root = (reference_root / ADDONS_DIR_NAME).resolve()
 
     for archive in archives:
         try:
-            bucket, kept, written, unchanged = process_archive(
+            bucket, kept, written, unchanged, archive_skips = process_archive(
                 archive, db_root, reference_root, dry_run=dry_run
             )
         except ValueError as exc:
@@ -152,6 +157,7 @@ def fill_reference(
         counts[bucket] += len(kept)
         counts["written"] += written
         counts["unchanged"] += unchanged
+        skips.extend(archive_skips)
 
         try:
             shown = archive.resolve().relative_to(db_root.resolve()).as_posix()
@@ -159,17 +165,19 @@ def fill_reference(
             shown = archive.name
         action = "будет" if dry_run else "взято"
         print(
-            f"{shown}  →  reference/{bucket}/  "
+            f"{shown}  ->  reference/{bucket}/  "
             f"({action} {len(kept)} файлов из {'/'.join(KEEP_DIRS)})"
         )
         if dry_run:
             for relative in kept:
                 print(f"  {relative}")
 
-    return counts
+    return counts, skips
 
 
-def print_summary(counts: dict[str, int], *, dry_run: bool) -> None:
+def print_summary(
+    counts: dict[str, int], skips: list[str], *, dry_run: bool
+) -> None:
     total = counts["anomaly"] + counts["anthology"]
     verb = "попало бы" if dry_run else "легло"
     print()
@@ -184,6 +192,9 @@ def print_summary(counts: dict[str, int], *, dry_run: bool) -> None:
             f"записано новых/изменённых: {counts['written']}, "
             f"без изменений: {counts['unchanged']}."
         )
+    summary = xdb_unpack.format_skip_summary(skips)
+    if summary:
+        print(summary)
     print("Аддоны в reference/addons/ этот скрипт не трогает — их кладут из MO2 отдельно.")
     print("Дальше: python3 tools/refindex.py build")
 
@@ -211,11 +222,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"нет папки игры: {game}", file=sys.stderr)
         return 2
     try:
-        counts = fill_reference(game, args.reference, dry_run=args.dry_run)
+        counts, skips = fill_reference(game, args.reference, dry_run=args.dry_run)
     except FileNotFoundError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    print_summary(counts, dry_run=args.dry_run)
+    print_summary(counts, skips, dry_run=args.dry_run)
     return 0
 
 

@@ -8,7 +8,7 @@
 
 ```
 reference/
-├─ anomaly/     scripts/, configs/, text/ ванильной Anomaly 1.5.3
+├─ anomaly/     scripts/, configs/, text/, materials/ ванильной Anomaly 1.5.3
 ├─ anthology/   то же для Anthology 2.1
 ├─ addons/      gamedata ключевых аддонов сборки, по папке на аддон
 └─ docs/        README Modded Exes, заметки, распечатки вики — руками
@@ -16,7 +16,7 @@ reference/
 
 Как наполняется:
 
-- `anomaly/` и `anthology/` — `python3 tools/fill_reference.py <папка игры>`. Скрипт ищет `.db` / `.dbN` / `.xdb` в `<игра>/db` (включая вложенные), пишет только пути с каталогом `scripts/`, `configs/` или `text/`. Архив, в чьём относительном пути от `db/` есть `anthology`, идёт в `anthology/`, остальные — в `anomaly/`. `--dry-run` ничего не пишет. Повторный запуск не дублирует совпавшие файлы и не удаляет лишние уже лежащие.
+- `anomaly/` и `anthology/` — `python3 tools/fill_reference.py <папка игры>`. Скрипт ищет `.db` / `.dbN` / `.xdb` в `<игра>/db` (включая вложенные), пишет только пути с каталогом `scripts/`, `configs/`, `text/` или `materials/`. Архив, в чьём относительном пути от `db/` есть `anthology`, идёт в `anthology/`, остальные — в `anomaly/`. `--dry-run` ничего не пишет. Повторный запуск не дублирует совпавшие файлы и не удаляет лишние уже лежащие.
 - `addons/` скрипт **не** трогает — ключевые аддоны сборки кладут из MO2 отдельно, по папке на аддон.
 - `docs/` скрипт **не** создаёт и создавать не должен: это ручной каталог справочников, в отличие от `anomaly/` и `anthology/`.
 
