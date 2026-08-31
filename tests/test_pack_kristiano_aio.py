@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import sys
 import tempfile
 import unittest
@@ -70,7 +72,8 @@ class PackKristianoTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def pack(self) -> None:
-        code = packer.main(["--addon-root", str(self.addon_root), "--out", str(self.out_dir)])
+        with contextlib.redirect_stdout(io.StringIO()):
+            code = packer.main(["--addon-root", str(self.addon_root), "--out", str(self.out_dir)])
         self.assertEqual(code, 0)
 
     def test_aio_excludes_skip_and_separate(self):

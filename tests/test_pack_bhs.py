@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import sys
 import tempfile
 import unittest
@@ -76,6 +78,11 @@ def overlay_zip_name(name: str) -> str:
     return name
 
 
+def pack_quiet(repo: Path) -> Path:
+    with contextlib.redirect_stdout(io.StringIO()):
+        return pack_bhs.pack(repo)
+
+
 class PackBhsTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
@@ -104,7 +111,7 @@ class PackBhsTests(unittest.TestCase):
         self.assertEqual(version, "0.9.9")
         self.assertNotEqual(version, pack_bhs.VENDOR_SOURCE_VERSION)
         expected = f"{pack_bhs.packed_name(version)}.zip"
-        archive = pack_bhs.pack(self.repo)
+        archive = pack_quiet(self.repo)
         self.assertEqual(archive.name, expected)
         info = (self.repo / "build" / pack_bhs.packed_name(version) / "BUILD_INFO.txt").read_text(
             encoding="utf-8"
@@ -112,7 +119,7 @@ class PackBhsTests(unittest.TestCase):
         self.assertIn("version: 0.9.9", info)
 
     def test_mo2_layout_and_contents(self):
-        archive = pack_bhs.pack(self.repo)
+        archive = pack_quiet(self.repo)
         with zipfile.ZipFile(archive) as zf:
             names = zf.namelist()
         self.assertIn("gamedata/scripts/vendor_bhs.script", names)
@@ -135,7 +142,7 @@ class PackBhsTests(unittest.TestCase):
         )
         preferred.mkdir(parents=True)
         write(preferred / "scripts" / "from_vendor_version.script")
-        archive = pack_bhs.pack(self.repo)
+        archive = pack_quiet(self.repo)
         with zipfile.ZipFile(archive) as zf:
             names = zf.namelist()
         self.assertIn("gamedata/scripts/from_vendor_version.script", names)
@@ -156,7 +163,7 @@ class PackBhsTests(unittest.TestCase):
             "mod_id: Anthology_BusyHands_Stability_Fix\nversion: 0.6.4\n",
         )
         with self.assertRaises(SystemExit) as ctx:
-            pack_bhs.pack(self.repo)
+            pack_quiet(self.repo)
         self.assertIn("BUILD_INFO.txt", str(ctx.exception))
         self.assertIn("own pack", str(ctx.exception).lower())
 
