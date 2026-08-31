@@ -837,5 +837,80 @@ class Lua003LintTests(unittest.TestCase):
         self.assertIn("game_object_on_net_destroy", hit[0].message)
 
 
+class LogPresenceTests(unittest.TestCase):
+    def test_top_level_printf_detected(self):
+        source = (
+            'local LOG_TAG = "[demo_mod]"\n'
+            'local VERSION = "1.0.0"\n'
+            'printf("%s loaded v%s", LOG_TAG, VERSION)\n'
+            "function on_game_start() end\n"
+        )
+        self.assertTrue(lint_addon.has_presence_log_marker(source))
+
+    def test_on_game_start_early_log_detected(self):
+        source = (
+            'local LOG_TAG = "[demo_mod]"\n'
+            "function on_game_start()\n"
+            '    printf("%s loaded", LOG_TAG)\n'
+            "    if false then end\n"
+            "end\n"
+        )
+        self.assertTrue(lint_addon.has_presence_log_marker(source))
+
+    def test_install_only_log_is_not_presence(self):
+        source = (
+            'local LOG_TAG = "[demo_mod]"\n'
+            "local function log(fmt, ...)\n"
+            '    printf(LOG_TAG .. " " .. fmt, ...)\n'
+            "end\n"
+            "local function install()\n"
+            '    log("wrapped")\n'
+            "end\n"
+            "install()\n"
+            "function on_game_start()\n"
+            "    install()\n"
+            "end\n"
+        )
+        self.assertFalse(lint_addon.has_presence_log_marker(source))
+
+    def test_mcm_script_excluded_from_mod_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = _minimal_addon(Path(tmp), "presence_mcm")
+            (addon / "gamedata" / "scripts" / "presence_mcm_mcm.script").write_text(
+                'function on_mcm_load() return {} end\n', encoding="utf-8"
+            )
+            self.assertEqual(lint_addon.mod_presence_script_paths(addon), [])
+
+    def test_log001_disabled_in_linter(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = _minimal_addon(Path(tmp), "presence_silent")
+            (addon / "gamedata" / "scripts" / "presence_silent.script").write_text(
+                "function on_game_start()\n"
+                "    if true then end\n"
+                "end\n",
+                encoding="utf-8",
+            )
+            codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
+            self.assertNotIn("LOG-001", codes)
+
+    def test_log001_fires_when_enabled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = _minimal_addon(Path(tmp), "presence_missing")
+            (addon / "gamedata" / "scripts" / "presence_missing.script").write_text(
+                "function on_game_start()\n"
+                "    if true then end\n"
+                "end\n",
+                encoding="utf-8",
+            )
+            with patch.object(lint_addon, "LOG_PRESENCE_CHECK_ENABLED", True):
+                codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
+            self.assertIn("LOG-001", codes)
+
+    def test_current_addon_failures_above_threshold(self):
+        count, _failed = lint_addon.count_presence_log_failures(REPO_ROOT / "addon")
+        self.assertGreater(count, 10)
+        self.assertFalse(lint_addon.LOG_PRESENCE_CHECK_ENABLED)
+
+
 if __name__ == "__main__":
     unittest.main()

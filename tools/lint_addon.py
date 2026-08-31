@@ -13,7 +13,8 @@ zzz-префиксы у .ltx, анонимные callback'и, дубли DLTX-с
 
 Дополнительно предупреждает LUA-006/007 (контракт CreateTimeEvent в _g.script),
 LUA-008 (полный проход id 1..65534) и FORK-001 (у форка нет файлов оригинала
-из reference/addons/<vendor_source>/).
+из reference/addons/<vendor_source>/). LOG-001 (presence-строка для xraylog)
+реализован, но отключён: 25 из 37 модов со скриптами не проходят порог >10.
 """
 
 from __future__ import annotations
@@ -75,6 +76,16 @@ LUA_STRING_OR_COMMENT_RE = re.compile(
 )
 LUA_KW_RE = re.compile(r"\b(function|if|for|while|repeat|end|until)\b")
 RETURN_TRUE_RE = re.compile(r"\breturn\s+true\b")
+LOG_CALL_RE = re.compile(r"\b(printf|log)\s*\(")
+FUNCTION_HEADER_RE = re.compile(
+    r"(?:^|\n)\s*(?:local\s+)?function\s+[A-Za-z_]\w+\s*\("
+)
+LUA_BLOCK_KW_RE = re.compile(r"\b(function|if|for|while|repeat|do|end|until)\b")
+LUA_BLOCK_OPEN = frozenset({"function", "if", "for", "while", "repeat", "do"})
+LUA_BLOCK_CLOSE = frozenset({"end", "until"})
+PRESENCE_SCRIPT_SUFFIXES = ("_diag", "_mcm")
+# LOG-001 disabled until existing addons migrate (25/37 scripted mods fail, threshold >10).
+LOG_PRESENCE_CHECK_ENABLED = False
 
 VAL_REQUIRED_TYPES = {"check", "track", "list", "radio_h", "radio_v", "input", "key_bind", "combo"}
 
@@ -458,6 +469,123 @@ def lua_named_function_span(masked: str, name: str) -> tuple[int, int] | None:
 RETURN_CALL_RE = re.compile(r"\breturn\s+([A-Za-z_]\w*)\s*\(")
 
 
+def function_span_from(masked: str, start: int) -> tuple[int, int] | None:
+    """Start/end offsets of a function block opened at or after start."""
+    header = re.search(r"\bfunction\b", masked[start : start + 120])
+    if not header:
+        return None
+    pos = start + header.start()
+    depth = 0
+    for match in LUA_BLOCK_KW_RE.finditer(masked, pos):
+        word = match.group(1)
+        if word in LUA_BLOCK_OPEN:
+            depth += 1
+        elif word in LUA_BLOCK_CLOSE:
+            depth -= 1
+            if depth == 0:
+                return pos, match.end()
+    return None
+
+
+def all_function_spans(masked: str) -> list[tuple[int, int]]:
+    spans: list[tuple[int, int]] = []
+    for header in FUNCTION_HEADER_RE.finditer(masked):
+        span = function_span_from(masked, header.start())
+        if span:
+            spans.append(span)
+    return spans
+
+
+def _in_any_span(pos: int, spans: list[tuple[int, int]]) -> bool:
+    return any(start <= pos < end for start, end in spans)
+
+
+def has_top_level_log_call(masked: str) -> bool:
+    """True if printf/log appears outside any function body."""
+    spans = all_function_spans(masked)
+    for match in LOG_CALL_RE.finditer(masked):
+        if not _in_any_span(match.start(), spans):
+            return True
+    return False
+
+
+def function_inner_body(masked: str, name: str) -> str | None:
+    header = re.search(
+        rf"(?:^|\n)\s*(?:local\s+)?function\s+{re.escape(name)}\s*\(",
+        masked,
+    )
+    if not header:
+        return None
+    span = function_span_from(masked, header.start())
+    if not span:
+        return None
+    chunk = masked[span[0] : span[1]]
+    paren = chunk.find("(")
+    close = chunk.find(")", paren + 1) if paren >= 0 else -1
+    if close < 0:
+        return None
+    end = chunk.rfind("end")
+    if end < 0:
+        return None
+    return chunk[close + 1 : end]
+
+
+def has_on_game_start_early_log(masked: str) -> bool:
+    """True if on_game_start logs before its first top-level if."""
+    body = function_inner_body(masked, "on_game_start")
+    if not body:
+        return False
+    depth = 0
+    first_if = len(body)
+    for match in LUA_BLOCK_KW_RE.finditer(body):
+        word = match.group(1)
+        if word in LUA_BLOCK_OPEN:
+            if word == "if" and depth == 0:
+                first_if = match.start()
+                break
+            depth += 1
+        elif word in LUA_BLOCK_CLOSE:
+            depth -= 1
+    return bool(LOG_CALL_RE.search(body[:first_if]))
+
+
+def has_presence_log_marker(text: str) -> bool:
+    """Presence line: top-level printf/log or on_game_start before first if."""
+    masked = mask_lua_literals(text)
+    return has_top_level_log_call(masked) or has_on_game_start_early_log(masked)
+
+
+def is_presence_checked_script(path: Path) -> bool:
+    stem = path.stem.lower()
+    return not any(stem.endswith(suffix) for suffix in PRESENCE_SCRIPT_SUFFIXES)
+
+
+def mod_presence_script_paths(addon_dir: Path) -> list[Path]:
+    scripts: list[Path] = []
+    for path in iter_files(addon_dir):
+        if path.suffix.lower() not in {".script", ".lua"}:
+            continue
+        if not is_presence_checked_script(path):
+            continue
+        scripts.append(path)
+    return scripts
+
+
+def count_presence_log_failures(addon_root: Path = ADDON_ROOT) -> tuple[int, list[str]]:
+    """How many mods with scripts lack a presence marker in any checked script."""
+    failed: list[str] = []
+    for mod_dir in sorted(addon_root.iterdir()):
+        if not mod_dir.is_dir():
+            continue
+        scripts = mod_presence_script_paths(mod_dir)
+        if not scripts:
+            continue
+        if any(has_presence_log_marker(decode_bytes(path.read_bytes())) for path in scripts):
+            continue
+        failed.append(mod_dir.name)
+    return len(failed), failed
+
+
 def function_returns_true(masked: str, name: str, seen: set[str] | None = None) -> bool:
     """True if the named function can return true, including `return other()`."""
     if seen is None:
@@ -569,6 +697,27 @@ class AddonLinter:
                 f"нет {relpath} — есть в оригинале ({source_name})",
                 self.dir / "gamedata" / Path(*relpath.split("/")),
             )
+
+    def check_presence_log(self) -> None:
+        """LOG-001: mod must log unconditionally for xraylog «Мои моды»."""
+        if not LOG_PRESENCE_CHECK_ENABLED:
+            return
+        scripts = mod_presence_script_paths(self.dir)
+        if not scripts:
+            return
+        for path in scripts:
+            try:
+                text = decode_bytes(path.read_bytes())
+            except OSError:
+                continue
+            if has_presence_log_marker(text):
+                return
+        self.add(
+            "LOG-001",
+            "warn",
+            "Нет presence-строки: безусловный printf/log на верхнем уровне "
+            "или в on_game_start до первого if. См. .cursor/rules/anomaly-lua.mdc.",
+        )
 
     # -- проверки уровня файла ----------------------------------------
 
@@ -850,6 +999,7 @@ class AddonLinter:
     def run(self) -> list[Finding]:
         self.check_structure()
         self.check_vendor_fork()
+        self.check_presence_log()
         if self.verify:
             self.check_verified()
         for path in iter_files(self.dir):

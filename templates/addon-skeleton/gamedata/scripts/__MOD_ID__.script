@@ -3,6 +3,10 @@
 -- Logic only. MCM options live in __MOD_ID___mcm.script
 
 local LOG_TAG = "[__MOD_ID__]"
+local VERSION = "1.0.0"
+
+-- Presence line for xraylog «Мои моды» — unconditional, before any guards.
+printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local function opt(path, default)
 	return ui_mcm and ui_mcm.get(path) or default
@@ -147,6 +151,8 @@ end
 
 function on_game_start()
 	reset_state()
+	-- install() guard example:
+	-- if not target then printf("%s target not found - guard NOT installed", LOG_TAG); return end
 	RegisterScriptCallback("on_game_load", on_game_load)
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	RegisterScriptCallback("actor_on_update", actor_on_update)

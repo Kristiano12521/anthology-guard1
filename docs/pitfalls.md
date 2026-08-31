@@ -127,6 +127,14 @@ run_string for name,_ in pairs(db.actor_inside_zones or {}) do printf("inside_zo
 
 - **Пишет ли движок `STACK TRACEBACK` при пойманной `pcall`-ошибке.** На решение это не влияет — форма всё равно `pcall(function() return obj:id() end)`. Замер в игре не удался трижды, 31.08.2026, Anthology 2.1 / Modded Exes MT, ключ `-dbg`. Мешало одно и то же: ссылка на объект не доживала до второго ввода. Попытка 1: две команды в одном вводе → синтаксическая ошибка `console_command:2: '=' expected near 'local'`. Попытка 2: глобальная `_tmp` через `run_string` → после смены уровня `attempt to index global '_tmp' (a nil value)`. Попытка 3: `_G.db.__tmp_ref` → `saved=true`, после смены уровня `ref=false`, таблица `db` пересоздаётся. Способ, который может сработать: объект, исчезающий в пределах одного уровня, без смены уровня.
 
+## 17. Молчаливый guard неотличим от отсутствия мода
+
+Секция **«Мои моды»** в `tools/xraylog.py` ищет строки с `LOG_TAG` / именем мода. Если скрипт загрузился, но `install()` вышел без `printf`, мод попадает в **«Не появились в логе»** — как будто его нет в MO2 или пакете.
+
+Пример: `fix_aim_fatigue_visibility` — guard на строках 95–96 возвращает `false`, когда нет `aim_stamina.on_option_change` / `load_state`, без записи в лог. Подтверждено в игре 31.08.2026: `[HARD] Aim Fatigue` отключён в профиле MO2 (`modlist.txt`, строка с минусом), скрипт из `[DBG] Kristiano Fixes ALL IN ONE NEW` на месте, в карточке — ноль строк.
+
+Контракт (`.cursor/rules/anomaly-lua.mdc`): безусловная presence-строка при загрузке файла; каждый ранний `return` из `install()` — `printf` с причиной. Образец: `aaa_fix_trader_restock_callback` (top-level), `fix_charon_red_forest_travel` (`guard NOT installed`).
+
 ## Открытые вопросы
 
 Сюда пишем то, что пока не проверено на этой сборке, чтобы не выдавать за факт:
