@@ -244,6 +244,92 @@ class VendorForkTests(unittest.TestCase):
             self.assertIn("профиле форка", buf.getvalue())
 
 
+class Fork001Tests(unittest.TestCase):
+    ORIGIN = "Vendor_Original_v1"
+
+    def _write(self, path: Path, name: str) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"-- {name}\n", encoding="utf-8")
+
+    def _pair(
+        self,
+        root: Path,
+        *,
+        origin_files: list[str],
+        our_files: list[str],
+        vendor_source: str | None,
+    ) -> tuple[Path, Path]:
+        origin = root / "reference" / "addons" / self.ORIGIN
+        for relpath in origin_files:
+            self._write(origin.joinpath(*relpath.split("/")), relpath)
+        extra = "vendor_fork=1\n"
+        if vendor_source is not None:
+            extra += f"vendor_source={vendor_source}\n"
+        addon = _minimal_addon(root, "fork_mod", meta_extra=extra)
+        for relpath in our_files:
+            self._write(addon / "gamedata" / Path(*relpath.split("/")), relpath)
+        return addon, root / "reference"
+
+    def _fork001(self, addon: Path, reference_root: Path) -> list:
+        return [
+            f
+            for f in lint_addon.lint(
+                addon, lint_addon.ReferenceView(), verify=False, reference_root=reference_root
+            )
+            if f.code == "FORK-001"
+        ]
+
+    def test_missing_original_file_warns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon, ref = self._pair(
+                Path(tmp),
+                origin_files=["scripts/core.script", "scripts/gone.script"],
+                our_files=["scripts/core.script"],
+                vendor_source=self.ORIGIN,
+            )
+            hit = self._fork001(addon, ref)
+            self.assertEqual(len(hit), 1)
+            self.assertEqual(hit[0].severity, "warn")
+            self.assertIn("gone.script", hit[0].message)
+            self.assertNotIn("core.script", hit[0].message)
+
+    def test_prefixed_rename_is_not_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon, ref = self._pair(
+                Path(tmp),
+                origin_files=["scripts/keep_me.script", "scripts/also_keep.script"],
+                our_files=["scripts/zzzzzz_keep_me.script", "scripts/aaa_also_keep.script"],
+                vendor_source=self.ORIGIN,
+            )
+            hit = self._fork001(addon, ref)
+            self.assertEqual(hit, [], msg=[f.format() for f in hit])
+
+    def test_our_addition_is_not_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon, ref = self._pair(
+                Path(tmp),
+                origin_files=["scripts/core.script"],
+                our_files=["scripts/core.script", "scripts/our_extra.script"],
+                vendor_source=self.ORIGIN,
+            )
+            hit = self._fork001(addon, ref)
+            self.assertEqual(hit, [], msg=[f.format() for f in hit])
+
+    def test_without_vendor_source_is_silent_except_notice(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon, ref = self._pair(
+                Path(tmp),
+                origin_files=["scripts/core.script", "scripts/gone.script"],
+                our_files=["scripts/core.script"],
+                vendor_source=None,
+            )
+            hit = self._fork001(addon, ref)
+            self.assertEqual(len(hit), 1)
+            self.assertEqual(hit[0].severity, "warn")
+            self.assertIn("vendor_source", hit[0].message)
+            self.assertNotIn("gone.script", hit[0].message)
+
+
 class CrossModTests(unittest.TestCase):
     _CMO_DIR = Path("gamedata") / "configs" / "plugins" / "context_menu_overhaul"
     _BASE = "[functor_icons]\na=1\n[label_icons]\na=1\n[groups]\na=1\n[colors]\na=1\n"

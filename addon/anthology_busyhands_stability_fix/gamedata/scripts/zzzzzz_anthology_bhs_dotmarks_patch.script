@@ -1,0 +1,38 @@
+-- Anthology Busy Hands Stability Fix v0.5.0 - DotMarks ui_inventory.start guard
+-- load-order: ����� z_ui_inventory_dotmarks
+--
+-- ПРАВИЛО 2/3: z_ui_inventory_dotmarks.script (58 строк, вендорский DotMarks
+-- addon) остаётся оригинальным - НЕ подменяется. Вместо этого мы оборачиваем
+-- ui_inventory.start ЕЩЁ ОДНИМ слоем поверх - той же цепочкой monkey-patch,
+-- которой сам DotMarks уже оборачивает исходный ui_inventory.start.
+--
+-- Наша обёртка работает СНАРУЖИ DotMarks: если объект невалиден, мы
+-- останавливаемся ДО входа в DotMarks-версию и вообще не даём ей вызвать
+-- obj:section()/obj:name() на потенциально уничтоженной userdata. Поэтому
+-- нам не нужно знать/дублировать внутреннюю логику DotMarks (idm, dm,
+-- whitelist и т.д.) - в отличие от mon_sleep, здесь чистая обёртка входа.
+
+local VERSION = "0.5.0"
+ANTHOLOGY_BHS_DOTMARKS_PATCH_VERSION = VERSION
+
+local function busyhands_object_valid(obj)
+	if not obj then
+		return false
+	end
+	local ok = pcall(function() return obj:section() end)
+	return ok
+end
+
+if type(ui_inventory) == "table" and type(ui_inventory.start) == "function" then
+	local original_start = ui_inventory.start
+	ui_inventory.start = function(mode, obj)
+		if mode == "loot" and not busyhands_object_valid(obj) then
+			printf("[BusyHandsFix v%s] ui_inventory.start blocked loot mode for nil or destroyed object", VERSION)
+			return
+		end
+		return original_start(mode, obj)
+	end
+	printf("[BusyHandsFix v%s] ui_inventory.start entry guard installed (z_ui_inventory_dotmarks.script untouched)", VERSION)
+else
+	printf("[BusyHandsFix v%s] ui_inventory.start was not found - guard NOT installed", VERSION)
+end

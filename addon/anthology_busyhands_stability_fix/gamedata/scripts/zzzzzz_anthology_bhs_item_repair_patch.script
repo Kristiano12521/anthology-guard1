@@ -1,0 +1,375 @@
+-- Anthology Busy Hands Stability Fix v0.5.0 - item_repair.UIRepair patch
+-- load-order: ����� zz_item_repair_keep_crafting_window_open
+--
+-- ПРАВИЛО 2/3: zz_item_repair_keep_crafting_window_open.script (вендорский
+-- monkey-patch addon поверх item_repair.script) остаётся оригинальным - НЕ
+-- подменяется. Патчим ТОЛЬКО 6 методов класса item_repair.UIRepair, которые
+-- сам вендорский файл и так патчит цепочкой (InitControlsSuper/ResetSuper) -
+-- мы добавляем ещё один слой этой же цепочки, не трогая файл.
+--
+-- Причина бага: несколько методов держат self.obj как прямую ссылку на
+-- userdata израсходованного/уничтоженного ремкомплекта (utils_item.discharge
+-- освобождает объект) и продолжают вызывать на нём нативные методы
+-- (obj:condition() и т.д.) в отложенных колбэках (CreateTimeEvent) - к
+-- моменту срабатывания объект уже может быть невалиден.
+--
+-- Все 6 методов используют только self:*/self.* и публичные глобальные
+-- функции (db.actor, utils_item, utils_xml, ui_item, game_statistics,
+-- utils_obj.play_sound) - единственная приватная зависимость вендорского
+-- файла - local degrade_factor = item_repair.degrade_factor or 0.2,
+-- тривиальная константа, воспроизведённая ниже.
+
+local VERSION = "0.5.0"
+ANTHOLOGY_BHS_ITEM_REPAIR_PATCH_VERSION = VERSION
+
+local degrade_factor = item_repair.degrade_factor or 0.2
+
+-- --------------------------------------------------------------------------
+-- Общие защитные хелперы (аналог того, что уже было в loose-копии v0.4.4)
+-- --------------------------------------------------------------------------
+
+local function find_actor_item(section, preferred_id)
+	if not section or not db or not db.actor then return nil end
+
+	local preferred = nil
+	local fallback = nil
+
+	db.actor:iterate_inventory(function(_, item)
+		if preferred then return end
+
+		if item:section() == section then
+			local id = item:id()
+			if preferred_id and id == preferred_id then
+				preferred = item
+			elseif not fallback then
+				fallback = item
+			end
+		end
+	end, nil)
+
+	return preferred or fallback
+end
+
+local function rebind_repair_object(self)
+	if not self then return nil end
+
+	local section = self.section or self.repair_section
+	if not section then
+		self.obj = nil
+		self.repair_obj_id = nil
+		return nil
+	end
+
+	local previous_id = self.repair_obj_id
+	local found = find_actor_item(section, previous_id)
+
+	self.obj = found
+	if found then
+		local found_id = found:id()
+		self.repair_obj_id = found_id
+		self.repair_section = section
+
+		if previous_id and found_id ~= previous_id then
+			printf("[BusyHandsFix v%s] Repair UI switched consumed kit %s -> %s", VERSION, tostring(previous_id), tostring(found_id))
+		end
+	else
+		self.repair_obj_id = nil
+		if previous_id then
+			printf("[BusyHandsFix v%s] Repair UI closed: repair kit %s no longer exists", VERSION, tostring(previous_id))
+		end
+	end
+
+	return found
+end
+
+local function delayed_collect_valid_items(self, section)
+	if not self then return true end
+
+	if not self:CollectValidItems(nil, section) then
+		if self.OnCancel then
+			self:OnCancel()
+		end
+	end
+
+	return true
+end
+
+-- --------------------------------------------------------------------------
+-- Патчи методов - каждый оборачивает текущую версию (цепочка, как у самого
+-- вендорского файла), а не подменяет с нуля.
+-- --------------------------------------------------------------------------
+
+local function install()
+	if type(item_repair) ~= "table" or type(item_repair.UIRepair) ~= "table" then
+		printf("[BusyHandsFix v%s] item_repair.UIRepair was not found - guard NOT installed", VERSION)
+		return false
+	end
+
+	local UIRepair = item_repair.UIRepair
+
+	local InitControlsSuper = UIRepair.InitControls
+	if InitControlsSuper then
+		UIRepair.InitControls = function(self)
+			InitControlsSuper(self)
+			self.repair_obj_id = nil
+			self.repair_section = nil
+		end
+	end
+
+	local ResetSuper = UIRepair.Reset
+	if ResetSuper then
+		UIRepair.Reset = function(self, obj, section)
+			ResetSuper(self, obj, section)
+
+			self.repair_section = section
+			self.repair_obj_id = nil
+
+			-- Привязываемся только через свежий обход инвентаря актёра.
+			-- Отложенный колбэк ниже не получает userdata ремкомплекта, поэтому
+			-- израсходованный объект не может пережить его в очереди событий.
+			local live_obj = find_actor_item(section, nil)
+			if live_obj then
+				self.obj = live_obj
+				self.repair_obj_id = live_obj:id()
+			end
+
+			CreateTimeEvent("totally_not_random_event" .. random_number(1, 1000000), "update_ui_delay" .. random_number(1, 1000000), 0.1, delayed_collect_valid_items, self, section)
+			return true
+		end
+	end
+
+	-- CollectValidItems подменяется целиком (не оборачивается вокруг
+	-- оригинала) - оригинал безусловно вызывает obj:condition() на
+	-- self.obj, а нам нужно сначала ревалидировать self.obj и, если это
+	-- невозможно, вернуть false ДО этого вызова, не после.
+	UIRepair.CollectValidItems = function(self, obj, section)
+		section = section or self.section or self.repair_section
+		if not section then return false end
+
+		self.section = section
+		self.repair_section = section
+
+		local repair_obj = rebind_repair_object(self)
+		if not repair_obj then
+			return false
+		end
+
+		empty_table(self.multiUseItemsObj)
+		local parts_id = {}
+		local function search(temp, item)
+			if (item:section() == section) and (not parts_id[item:id()]) then
+				local cnt = IsItem("multiuse", section, nil) and item:get_remaining_uses() or 1
+				local id = item:id()
+				parts_id[id] = cnt
+				self.multiUseItemsObj[#self.multiUseItemsObj + 1] = {
+					[id] = cnt
+				}
+			end
+		end
+		db.actor:iterate_inventory(search, nil)
+
+		self.multiUseItemsUses = 0
+		for _, cnt in pairs(parts_id) do
+			self.multiUseItemsUses = self.multiUseItemsUses + cnt
+		end
+
+		local uses
+		local color = ""
+		if (IsItem("multiuse", section, nil)) then
+			self.condition = 1
+			self.isMultiUse = true
+			if self.multiUseItemsUses > 3 then
+				color = utils_xml.get_color("d_green")
+			elseif self.multiUseItemsUses > 2 then
+				color = utils_xml.get_color("pda_yellow")
+			elseif self.multiUseItemsUses > 1 then
+				color = utils_xml.get_color("d_orange")
+			else
+				color = utils_xml.get_color("d_red")
+			end
+			uses = self.multiUseItemsUses
+		else
+			self.isMultiUse = false
+			self.condition = repair_obj:condition()
+			if self.condition > degrade_factor * 2 then
+				color = utils_xml.get_color("d_green")
+			elseif self.condition > degrade_factor then
+				color = utils_xml.get_color("pda_yellow")
+			else
+				color = utils_xml.get_color("d_red")
+			end
+			uses = string.format("%s%%", math.ceil(self.condition * 100))
+		end
+
+		local str = color .. ui_item.get_sec_name(section) .. " (" .. uses .. ")"
+		self.cap_menu:SetText(str)
+
+		return true
+	end
+
+	UIRepair.UpdateUi = function(self)
+		-- Ремонтные/вспомогательные предметы могут быть освобождены
+		-- асинхронно - ревалидируем self.obj перед тем, как остальной код
+		-- метода к нему обратится.
+		if not rebind_repair_object(self) then
+			self:OnCancel()
+			return true
+		end
+
+		if ((self.isMultiUse and (self.multiUseItemsUses == 1 or (self.multiUseItemsUses == 2 and self.section == self.partSection))) or (not self.isMultiUse and self.condition <= degrade_factor)) then
+			self:OnCancel()
+			return true
+		end
+
+		self:InitInventory(1)
+		self:CollectValidItems(nil, self.section)
+
+		if (not self.CC[1]:GetObj(self.cont_1_last_idx)) then
+			self.cont_1_last_idx = self.cont_1_last_idx - 1
+		end
+		if (self.cont_1_last_idx <= 0) then
+			self:OnCancel()
+			return true
+		end
+		self.CC[1]:On_Select(self.cont_1_last_idx)
+
+		local cont_2_last_idx = nil
+		if (self.cont_2_last_idx) then
+			cont_2_last_idx = self.cont_2_last_idx
+		end
+
+		self:On_CC_Mouse1(1, self.cont_1_last_idx)
+
+		self.cont_2_last_idx = cont_2_last_idx
+		if (self.cont_2_last_idx) then
+			if (not self.CC[2]:GetObj(self.cont_2_last_idx)) then
+				self.cont_2_last_idx = self.cont_2_last_idx - 1
+			end
+			if (self.cont_2_last_idx > 0 and self.CC[2]:GetObj(self.cont_2_last_idx)) then
+				self.CC[2]:On_Select(self.cont_2_last_idx)
+				self:On_CC_Mouse1(2, self.cont_2_last_idx, true)
+			end
+		end
+		return true
+	end
+
+	UIRepair.OnRepair = function(self)
+		local obj_1 = self.CC[1]:GetCell_Selected(true)
+		local obj_2 = self.CC[2]:GetCell_Selected(true)
+
+		if not (obj_1 and self.con_val[4]) then return end
+
+		obj_1:set_condition(self.con_val[4] / 100)
+		if obj_2 then
+			utils_item.discharge(obj_2)
+		end
+
+		if not self:CollectValidItems(nil, self.section) then
+			self:OnCancel()
+			return
+		end
+
+		if self.isMultiUse then
+			local item_id = nil
+			local item_uses = nil
+
+			-- Предпочитаем уже привязанный к окну ремкомплект. Если он исчез -
+			-- берём первый живой того же раздела.
+			for _, group in ipairs(self.multiUseItemsObj) do
+				for id, amount in pairs(group) do
+					if not item_id then
+						item_id = id
+						item_uses = amount
+					end
+					if self.repair_obj_id and id == self.repair_obj_id then
+						item_id = id
+						item_uses = amount
+						break
+					end
+				end
+				if self.repair_obj_id and item_id == self.repair_obj_id then
+					break
+				end
+			end
+
+			local next_id = item_id
+			if item_uses == 1 then
+				next_id = nil
+				for _, group in ipairs(self.multiUseItemsObj) do
+					for id, _ in pairs(group) do
+						if id ~= item_id then
+							next_id = id
+							break
+						end
+					end
+					if next_id then break end
+				end
+			end
+
+			local item = find_actor_item(self.section, item_id)
+			if item then
+				-- Не держим и не переиспользуем объект в тот же кадр, что и
+				-- discharge - движок может освободить его userdata немедленно.
+				utils_item.discharge(item)
+				self.obj = nil
+				self.repair_obj_id = next_id
+			else
+				self.obj = nil
+				self.repair_obj_id = nil
+			end
+		else
+			local repair_obj = rebind_repair_object(self)
+			if not repair_obj then
+				self:OnCancel()
+				return
+			end
+
+			local repair_id = self.repair_obj_id
+			utils_item.degrade(repair_obj, degrade_factor)
+			self.obj = nil
+			self.repair_obj_id = repair_id
+		end
+
+		self.hasCraftedItem = true
+		game_statistics.increment_statistic("self_repairs")
+		utils_obj.play_sound("interface\\inv_properties_2")
+
+		if (self.last_cont and self.last_idx) then
+			self.btn_repair:Enable(false)
+			CreateTimeEvent("totally_not_random_event" .. random_number(1, 1000000), "update_ui_delay" .. random_number(1, 1000000), 0.1, self.UpdateUi, self)
+		end
+	end
+
+	-- OnCancel заменяется целиком, а не оборачивается вокруг оригинала - в
+	-- патче сброс repair_obj_id/repair_section/obj идёт МЕЖДУ partSection и
+	-- HideDialog(), как в оригинале, а не после всего метода.
+	UIRepair.OnCancel = function(self)
+		if (self.hasCraftedItem and self.use_actor_effects and actor_effects) then
+			actor_effects.play_item_fx(self.section .. "_dummy")
+		end
+
+		utils_obj.play_sound("interface\\inv_close")
+
+		self.hasCraftedItem = false
+		self.last_cont = nil
+		self.last_idx = nil
+		self.cont_1_last_idx = 0
+		self.cont_2_last_idx = nil
+		self.multiUseItemsObj = {}
+		self.multiUseItemsUses = 0
+		self.partSection = nil
+		self.repair_obj_id = nil
+		self.repair_section = nil
+		self.obj = nil
+
+		self:HideDialog()
+
+		Unregister_UI("UIRepair")
+	end
+
+	return true
+end
+
+if install() then
+	printf("[BusyHandsFix v%s] item_repair.UIRepair patched: InitControls/Reset/CollectValidItems/UpdateUi/OnRepair/OnCancel (method-level, zz_item_repair_keep_crafting_window_open.script untouched)", VERSION)
+end

@@ -1,0 +1,49 @@
+-- Anthology Busy Hands Stability Fix v0.5.3 - repair chain vendor-base capture
+-- load-order: ����� zzzz_arti_jamming_repairs
+--
+-- ЭТОТ ФАЙЛ ДОЛЖЕН ЗАГРУЗИТЬСЯ РОВНО МЕЖДУ zzzz_arti_jamming_repairs.script
+-- И zzzzz_arti_outfit_repair.script. Имя файла подобрано так, чтобы попасть
+-- именно в эту позицию по алфавиту ("zzzz_" - 4 буквы z, как у jamming, но
+-- "zzz" после подчёркивания сортируется после "arti"; при этом 4 буквы z
+-- всегда идут раньше 5 букв z у outfit_repair). ЕСЛИ вы переименуете любой
+-- из трёх файлов - эта логика сломается молча. Не переименовывайте
+-- zzzz_arti_jamming_repairs.script / zzzzz_arti_outfit_repair.script /
+-- этот файл относительно друг друга без пересмотра load-order.
+--
+-- ЗАЧЕМ ЭТО НУЖНО (независимый от BusyHandsFix баг в самом Anthology 2.1):
+--
+-- Оба вендорских файла - zzzz_arti_jamming_repairs.script и
+-- zzzzz_arti_outfit_repair.script - патчат item_repair.UIRepair.OnItemSelect
+-- цепочкой через ОДНО и то же имя ГЛОБАЛЬНОЙ переменной без local:
+--   RepairOnItemSelect = item_repair.UIRepair.OnItemSelect
+--   function item_repair.UIRepair:OnItemSelect(n) ... RepairOnItemSelect(self,n) end
+--
+-- jamming_repairs (4z, грузится первым) захватывает исходную (vendor base,
+-- назовём V) версию в RepairOnItemSelect, затем ставит СВОЮ версию (J).
+-- outfit_repair (5z, грузится вторым) читает ТЕКУЩЕЕ значение
+-- item_repair.UIRepair.OnItemSelect (это уже J, не V!) в ТУ ЖЕ переменную
+-- RepairOnItemSelect - тем самым стирая V без возможности восстановления -
+-- и ставит свою версию (O).
+--
+-- Итог: на рантайме O вызывает RepairOnItemSelect(self,n) и корректно
+-- попадает в J (т.к. глобал на тот момент = J). Но J САМ внутри себя тоже
+-- вызывает RepairOnItemSelect(self,n), ожидая попасть в V - а глобал к
+-- этому моменту уже был перезаписан на J. J вызывает сам себя -
+-- БЕСКОНЕЧНАЯ РЕКУРСИЯ -> stack overflow -> вылет.
+--
+-- Триггерится КАЖДЫЙ раз, когда has_parts(obj_1) == false в O - то есть
+-- практически при любом обычном ремонте брони/одежды через этот аддон
+-- (has_parts относится к оружейным деталям, не к броне) - вероятно, самый
+-- частый краш во всём этом наборе аддонов.
+--
+-- Настоящий фикс - в zzzzzz_anthology_bhs_repair_recursion_fix.script
+-- (грузится последним, после обоих вендорских файлов). Этот файл здесь
+-- только СОХРАНЯЕТ V под безопасным именем, пока она ещё не потеряна -
+-- больше нигде и никогда её взять будет неоткуда.
+
+if type(RepairOnItemSelect) == "function" then
+	ANTHOLOGY_BHS_REPAIR_VENDOR_BASE_ON_ITEM_SELECT = RepairOnItemSelect
+	printf("[BusyHandsFix v0.5.3] Captured true vendor OnItemSelect before outfit_repair overwrites the shared RepairOnItemSelect global")
+else
+	printf("[BusyHandsFix v0.5.3] RepairOnItemSelect was not found at expected load position - repair chain fix will NOT be able to install correctly")
+end

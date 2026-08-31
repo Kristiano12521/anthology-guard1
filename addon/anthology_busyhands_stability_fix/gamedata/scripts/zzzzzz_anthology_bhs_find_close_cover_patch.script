@@ -1,0 +1,106 @@
+-- Anthology Busy Hands Stability Fix v0.5.0 - find_close_cover runtime patch
+-- load-order: ����� utils_obj
+--
+-- ПРАВИЛО 2/3: настоящий monkey-patch ОДНОЙ глобальной функции.
+-- utils_obj.script (965 строк) остаётся оригинальным вендорским файлом -
+-- НЕ подменяется. Все остальные ~40 функций этого файла (lmove,
+-- send_to_nearest_accessible_vertex, find_random_cover, find_cover_in_rand_
+-- direction и т.д.) не тронуты и будут получать апдейты Anthology.
+--
+-- Причина бага: оригинал вызывает npc:best_cover(...) без защиты. Если npc
+-- мёртв/не в онлайне (типичный случай - компаньон погиб в долгом бою между
+-- кадрами), нативный вызов кидает исключение -> [BusyHandsDebug] Runtime
+-- Error -> tempsave + Disconnect. Стек из баг-репорта:
+--   utils_obj.script(551): find_close_cover
+--   axr_fight_from_cover.script(139): try_go_cover
+--
+-- ВАЖНО: это НЕ безобидный спам в лог - в логах пользователя после этой
+-- ошибки так же идёт "Saving spawns... tempsave.scop saved - Disconnect",
+-- то есть игру аварийно кидает в меню, как и при mon_sleep.
+
+local VERSION = "0.5.0"
+ANTHOLOGY_BHS_FIND_COVER_PATCH_VERSION = VERSION
+
+-- Мини-копия приватного validate(npc,vid) из utils_obj.script (5 строк,
+-- самодостаточная логика без обращения к другим локальным функциям файла -
+-- использует только публичный глобальный db.used_level_vertex_ids).
+-- Публичный valid_vertex(npc,vid) из utils_obj.script используется как есть,
+-- без копирования - он объявлен без local и доступен глобально.
+local function validate_cover_vertex(npc, vid)
+	if vid and vid < 4294967295 and npc:accessible(vid) and vid ~= npc:level_vertex_id() then
+		return db.used_level_vertex_ids[vid] == nil or db.used_level_vertex_ids[vid] == npc:id()
+	end
+	return false
+end
+
+local function patched_find_close_cover(npc, base_position, pos, cover_dist, mn, mx)
+	if not (npc and base_position and pos) then
+		return nil
+	end
+
+	local ok_alive, alive = pcall(function() return npc:alive() end)
+	if not ok_alive or not alive then
+		return nil
+	end
+
+	local cover
+	cover_dist = not cover_dist and 5 or cover_dist
+	while not cover and cover_dist < 30 do
+		local ok_cover, result = pcall(function()
+			return npc:best_cover(base_position, pos, cover_dist, mn or 1, mx or 60)
+		end)
+		if not ok_cover then
+			printf("[BusyHandsFix v%s] find_close_cover: best_cover rejected invalid state", VERSION)
+			return nil
+		end
+		cover = result
+
+		if cover then
+			local ok_vid, vid = pcall(function() return cover:level_vertex_id() end)
+			local ok_valid, is_valid = false, false
+			if ok_vid and vid then
+				ok_valid, is_valid = pcall(validate_cover_vertex, npc, vid)
+			end
+			if not (ok_vid and ok_valid and is_valid) then
+				cover = nil
+			end
+		end
+		cover_dist = cover_dist + 1
+	end
+
+	if not cover then
+		return nil
+	end
+
+	local ok_vid, vid = pcall(function() return cover:level_vertex_id() end)
+	if not ok_vid or not vid then
+		return nil
+	end
+
+	-- valid_vertex - публичная функция из utils_obj.script, не копируется.
+	local ok_result, result = pcall(valid_vertex, npc, vid)
+	return ok_result and result or nil
+end
+
+-- Патч на верхнем уровне (не в on_game_start), по той же причине и с тем же
+-- зазором загрузки, что и в crow_spawner_patch: этот файл идёт после
+-- utils_obj.script по алфавиту загрузки скриптов.
+--
+-- ВАЖНО: реальные вызывающие (axr_fight_from_cover.script:138) обращаются
+-- через utils_obj.find_close_cover(...), а не через голый find_close_cover(...).
+-- Патчим ОБА пути - неизвестно, является ли utils_obj живым прокси к _G
+-- (тогда патч глобала автоматически виден и через utils_obj.*) или отдельной
+-- снапшот-таблицей, собранной один раз при загрузке файла (тогда патчить
+-- нужно её отдельно, иначе реальный вызывающий код продолжит звать старую
+-- версию). Дублирование безвредно в любом случае.
+if type(find_close_cover) == "function" then
+	find_close_cover = patched_find_close_cover
+	printf("[BusyHandsFix v%s] find_close_cover patched (function-level, utils_obj.script untouched)", VERSION)
+else
+	printf("[BusyHandsFix v%s] global find_close_cover was not found - guard NOT installed", VERSION)
+end
+
+if type(utils_obj) == "table" and type(utils_obj.find_close_cover) == "function" then
+	utils_obj.find_close_cover = patched_find_close_cover
+	printf("[BusyHandsFix v%s] utils_obj.find_close_cover patched (module-table path)", VERSION)
+end

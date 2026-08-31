@@ -1,5 +1,38 @@
 # Anthology Busy Hands Stability Fix
 
+## [0.6.4] — 2026-08-31
+
+**Изменено**
+
+- В overlay возвращены восемь патчей 0.6.4 и `zzzz_zzz_anthology_bhs_repair_capture_vendor_base.script`. Без них главный скрипт писал `marker was not found` и `guards installed: 0`.
+- FDDA-патч снова `zzzzzz_anthology_bhs_fdda_patch.script`. С префиксом `install()` на загрузке файла выполняется после `liz_fdda_redone_body_search`, а не до. В логе сначала `patched (module-table`, потом `Anthology Busy Hands Stability Fix 0.6.4 loaded`; строки `were not found - guard NOT installed` перед `patched` быть не должно.
+- У всех `zzzzzz_` / `zzzz_zzz_` скриптов в шапке `-- load-order: после <вендор>`.
+
+**Причина**
+
+`build_addon.py` пакует только `addon/`. Там лежали главный скрипт и FDDA; остальные восемь модулей, которые сводка ищет по имени `zzzzzz_anthology_bhs_*`, в overlay не входили.
+
+**Как исправлено**
+
+Файлы скопированы из эталона `Anthology_BusyHands_Stability_Fix_v0_6_4`. Префиксы как в оригинале: DotMarks / SortingPlus / item_repair / repair chain должны грузиться после вендорских `z_`/`zz_`/`zzz_`/`zzzzz_` скриптов. Capture встаёт между `zzzz_arti_jamming_repairs` и `zzzzz_arti_outfit_repair`.
+
+**Не затронуто**
+
+- Логика FDDA 0.6.4 и текст главного скрипта.
+- `mon_sleep` / `guaranteed_loot` / `sequential_load_magazine` / `aes_crow_spawner.ltx`.
+- Сохраняемое состояние.
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+- В MO2 заменить предыдущий overlay BHS 0.6.4.
+
+**Проверено**
+
+- lint overlay и `--cross`: см. прогон после правки
+- В игре: не прогонялось. В логе не должно остаться `marker was not found`; `guards installed` у девяти патчей ненулевые.
+
 ## [0.6.4] — 2026-08-28
 
 **Изменено**

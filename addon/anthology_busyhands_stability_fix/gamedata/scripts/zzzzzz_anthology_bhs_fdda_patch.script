@@ -1,4 +1,5 @@
 -- Anthology Busy Hands Stability Fix v0.6.4 - FDDA body search patch
+-- load-order: после liz_fdda_redone_body_search
 --
 -- liz_fdda_redone_body_search.script stays vendor. We patch start_body_search
 -- and get_template_action_looting_idle on the MODULE TABLE (same pattern as

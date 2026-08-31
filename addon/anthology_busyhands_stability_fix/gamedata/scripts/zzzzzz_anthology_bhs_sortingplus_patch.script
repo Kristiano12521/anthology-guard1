@@ -1,0 +1,73 @@
+-- Anthology Busy Hands Stability Fix v0.5.0 - SortingPlus LMode_Init patch
+-- load-order: ����� zzz_rax_sortingplus_mcm
+--
+-- ПРАВИЛО 2/3: zzz_rax_sortingplus_mcm.script (674 строки, вендорский
+-- SortingPlus addon) остаётся оригинальным - НЕ подменяется. Патчим ТОЛЬКО
+-- один метод класса - ui_inventory.UIInventory.LMode_Init - через
+-- monkey-patch поверх публичной таблицы класса.
+--
+-- Причина бага: оригинал безусловно вызывает obj:name() и передаёт obj
+-- дальше в self:Reset(obj)/self:LMode_TransferInfo(obj). Если obj - труп,
+-- освобождённый движком между кадрами (после долгого боя), нативный вызов
+-- кидает исключение -> BusyHandsDebug.
+--
+-- Метод не использует ничего приватного из файла, кроме локальной переменной
+-- snd_open (local snd_open = sound_object([[interface\inv_open]])) -
+-- воспроизводим её здесь же, это тривиальный конструктор ресурса, не логика.
+
+local VERSION = "0.5.0"
+ANTHOLOGY_BHS_SORTINGPLUS_PATCH_VERSION = VERSION
+
+local snd_open = sound_object([[interface\inv_open]])
+
+local function busyhands_safe_obj_name(obj)
+	if not obj then return nil end
+	local ok, value = pcall(function() return obj:name() end)
+	return ok and value or nil
+end
+
+local function patched_lmode_init(self, obj)
+	local obj_name = busyhands_safe_obj_name(obj)
+	if not obj_name then
+		printf("[BusyHandsFix v%s] SortingPlus LMode_Init cancelled: loot object is nil or destroyed", VERSION)
+		return
+	end
+
+	self:Print(nil, "LMode_Init | obj: %s", obj_name)
+	self.mode = "loot"
+
+	-- Reset() тоже дёргает нативные методы obj - защищаем как финальный барьер
+	-- на случай гонки состояния между проверкой выше и этим вызовом.
+	local ok_reset, reset_err = pcall(function() self:Reset(obj) end)
+	if not ok_reset then
+		printf("[BusyHandsFix v%s] SortingPlus LMode_Init cancelled in Reset: %s", VERSION, tostring(reset_err))
+		return
+	end
+
+	if (not self.box_init_update.state) then
+		self.box_init_update.tg = time_global()
+		self.box_init_update.state = true
+		self:LMode_ResetInventories(true)
+		return
+	end
+	self.box_init_update.state = false
+
+	self:LMode_ResetInventories()
+	self:UpdateInfo(true)
+
+	local ok_info, info_err = pcall(function() self:LMode_TransferInfo(obj) end)
+	if not ok_info then
+		printf("[BusyHandsFix v%s] SortingPlus skipped corpse info transfer: %s", VERSION, tostring(info_err))
+	end
+
+	self:PlaySND(snd_open)
+end
+
+if type(ui_inventory) == "table"
+and type(ui_inventory.UIInventory) == "table"
+and type(ui_inventory.UIInventory.LMode_Init) == "function" then
+	ui_inventory.UIInventory.LMode_Init = patched_lmode_init
+	printf("[BusyHandsFix v%s] ui_inventory.UIInventory.LMode_Init patched (method-level, zzz_rax_sortingplus_mcm.script untouched)", VERSION)
+else
+	printf("[BusyHandsFix v%s] ui_inventory.UIInventory.LMode_Init was not found - guard NOT installed", VERSION)
+end

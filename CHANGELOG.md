@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.31] — lint: FORK-001 сверка состава форка с оригиналом
+
+`tools/lint_addon.py`: у `vendor_fork=1` предупреждение `FORK-001`, если в `reference/addons/<vendor_source>/` есть файл, которого нет в моде. Сопоставление по имени без префиксов `zzz`/`aaa`. Наши добавления не ловятся. Без `vendor_source` проверка пропускается с одной строкой. Ключ проставлен у `anthology_busyhands_stability_fix`, `context_menu_overhaul_anthology`, `seamless_inventory_sort_anthology` и `burnshit_inventory_destroy`. Строка в README и `docs/mo2.md`. Тесты в `tests/test_lint_addon.py`.
+
 ## [0.1.30] — pitfalls: pcall Lua-порядок подтверждён, STACK TRACEBACK не замерили
 
 В [`docs/pitfalls.md`](docs/pitfalls.md) §16: `pcall(obj:id())` не защищает (аргумент вычисляется до вызова) — в основном разделе, образец BHS v0_6_5. В «требует перепроверки» осталось: пишет ли движок `STACK TRACEBACK` при пойманной `pcall`-ошибке. Три неудачных замера 31.08.2026 (две команды в одном вводе; `_tmp` не переживает смену уровня; `db` пересоздаётся).

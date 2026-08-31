@@ -11,8 +11,9 @@ zzz-префиксы у .ltx, анонимные callback'и, дубли DLTX-с
     python3 tools/lint_addon.py --no-verify     # без VERIFY-001 (CI, clone)
     python3 tools/lint_addon.py my_fix --json
 
-Дополнительно предупреждает LUA-006/007 (контракт CreateTimeEvent в _g.script)
-и LUA-008 (полный проход id 1..65534).
+Дополнительно предупреждает LUA-006/007 (контракт CreateTimeEvent в _g.script),
+LUA-008 (полный проход id 1..65534) и FORK-001 (у форка нет файлов оригинала
+из reference/addons/<vendor_source>/).
 """
 
 from __future__ import annotations
@@ -45,6 +46,7 @@ ALLOWED_TOP_LEVEL = {"meta.ini", "changelog.md", "readme.md", ".gitignore"}
 LOAD_ORDER_HACK_RE = re.compile(r"^(z{3,}|a{3,})", re.I)
 LOAD_ORDER_JUSTIFICATION_RE = re.compile(r"--\s*load-order:\s*после\s+\S+", re.I)
 VENDOR_FORK_RE = re.compile(r"^vendor_fork\s*=\s*1$", re.I)
+VENDOR_SOURCE_RE = re.compile(r"^vendor_source\s*=\s*(.+)$", re.I)
 VERIFIED_DATE_RE = re.compile(r"^verified_date\s*=\s*(\S+)$", re.I)
 VERIFY_SKIP_NAMES = frozenset({"meta.ini", "changelog.md", "readme.md"})
 FORK_SILENCED_CODES = frozenset({"LUA-001", "LTX-001", "STRUCT-005"})
@@ -160,6 +162,48 @@ def _meta_active_lines(addon_dir: Path) -> list[str]:
 def is_vendor_fork(addon_dir: Path) -> bool:
     """True, если в meta.ini стоит необязательный ключ vendor_fork=1."""
     return any(VENDOR_FORK_RE.match(line) for line in _meta_active_lines(addon_dir))
+
+
+def read_vendor_source(addon_dir: Path) -> str | None:
+    """Имя папки оригинала в reference/addons/ из vendor_source, или None."""
+    for line in _meta_active_lines(addon_dir):
+        match = VENDOR_SOURCE_RE.match(line)
+        if not match:
+            continue
+        value = match.group(1).strip().strip("\"'")
+        return value or None
+    return None
+
+
+def strip_load_order_prefixes(name: str) -> str:
+    """Имя файла без ведущих z{3,}/a{3,} и следующего подчёркивания."""
+    while True:
+        match = LOAD_ORDER_HACK_RE.match(name)
+        if not match:
+            return name
+        rest = name[match.end() :]
+        if rest.startswith("_"):
+            rest = rest[1:]
+        if rest == name:
+            return name
+        name = rest
+
+
+def fork_match_key(relpath: str) -> str:
+    """Путь внутри gamedata для сверки форка: имя без load-order префикса."""
+    posix = relpath.replace("\\", "/").lower()
+    parent, _, name = posix.rpartition("/")
+    key_name = strip_load_order_prefixes(name)
+    if parent:
+        return f"{parent}/{key_name}"
+    return key_name
+
+
+def vendor_source_folder(addons_root: Path, name: str) -> Path | None:
+    """Папка оригинала, или None если имя не однокомпонентное."""
+    if not name or Path(name).name != name:
+        return None
+    return addons_root / name
 
 
 def read_verified_date(addon_dir: Path) -> date | None:
@@ -434,9 +478,17 @@ def function_returns_true(masked: str, name: str, seen: set[str] | None = None) 
 
 
 class AddonLinter:
-    def __init__(self, addon_dir: Path, reference: ReferenceView, *, verify: bool = True) -> None:
+    def __init__(
+        self,
+        addon_dir: Path,
+        reference: ReferenceView,
+        *,
+        verify: bool = True,
+        reference_root: Path | None = None,
+    ) -> None:
         self.dir = addon_dir
         self.reference = reference
+        self.reference_root = reference_root if reference_root is not None else DEFAULT_ROOT
         self.vendor_fork = is_vendor_fork(addon_dir)
         self.verify = verify
         self.findings: list[Finding] = []
@@ -472,6 +524,51 @@ class AddonLinter:
         finding = verify_finding(self.dir)
         if finding:
             self.findings.append(finding)
+
+    def check_vendor_fork(self) -> None:
+        """FORK-001: у форка нет файлов, которые есть в оригинале reference/addons/."""
+        if not self.vendor_fork:
+            return
+        meta = self.dir / "meta.ini"
+        meta_path = meta if meta.is_file() else None
+        source_name = read_vendor_source(self.dir)
+        if not source_name:
+            self.add(
+                "FORK-001",
+                "warn",
+                "vendor_fork=1 без vendor_source: сверка с оригиналом пропущена",
+                meta_path,
+            )
+            return
+        addons_root = self.reference_root / "addons"
+        if not addons_root.is_dir():
+            return
+        source_dir = vendor_source_folder(addons_root, source_name)
+        if source_dir is None or not source_dir.is_dir():
+            self.add(
+                "FORK-001",
+                "warn",
+                f"vendor_source={source_name}: нет папки reference/addons/{source_name}",
+                meta_path,
+            )
+            return
+        origin_relpaths = [
+            path.relative_to(source_dir).as_posix() for path in iter_files(source_dir)
+        ]
+        gamedata = self.dir / "gamedata"
+        our_keys: set[str] = set()
+        if gamedata.is_dir():
+            for path in iter_files(gamedata):
+                our_keys.add(fork_match_key(gamedata_relpath(path)))
+        for relpath in origin_relpaths:
+            if fork_match_key(relpath) in our_keys:
+                continue
+            self.add(
+                "FORK-001",
+                "warn",
+                f"нет {relpath} — есть в оригинале ({source_name})",
+                self.dir / "gamedata" / Path(*relpath.split("/")),
+            )
 
     # -- проверки уровня файла ----------------------------------------
 
@@ -752,6 +849,7 @@ class AddonLinter:
 
     def run(self) -> list[Finding]:
         self.check_structure()
+        self.check_vendor_fork()
         if self.verify:
             self.check_verified()
         for path in iter_files(self.dir):
@@ -759,8 +857,16 @@ class AddonLinter:
         return self.findings
 
 
-def lint(addon_dir: Path, reference: ReferenceView, *, verify: bool = True) -> list[Finding]:
-    return AddonLinter(addon_dir, reference, verify=verify).run()
+def lint(
+    addon_dir: Path,
+    reference: ReferenceView,
+    *,
+    verify: bool = True,
+    reference_root: Path | None = None,
+) -> list[Finding]:
+    return AddonLinter(
+        addon_dir, reference, verify=verify, reference_root=reference_root
+    ).run()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -827,7 +933,9 @@ def main(argv: list[str] | None = None) -> int:
     results: dict[str, list[Finding]] = {}
     fork_profile: dict[str, bool] = {}
     for target in targets:
-        results[target.name] = lint(target, reference, verify=not skip_verify)
+        results[target.name] = lint(
+            target, reference, verify=not skip_verify, reference_root=args.reference
+        )
         fork_profile[target.name] = is_vendor_fork(target)
 
     cross_findings: list[Finding] = []

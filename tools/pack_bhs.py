@@ -15,9 +15,10 @@ REPO = Path(__file__).resolve().parents[1]
 VERSION = "0.6.4"
 OUT_NAME = "Anthology_BusyHands_Stability_Fix_v0_6_4"
 
-# Overlay files cannot use zzz prefixes (lint). Zip keeps vendor load order.
+# Addon FDDA keeps the vendor zzzzzz_ name (src == zip name).
+# Main overlay stays unprefixed in addon/; zip restores vendor load order.
 OVERLAY_MAP = {
-    "anthology_bhs_fdda_patch.script": "zzzzzz_anthology_bhs_fdda_patch.script",
+    "zzzzzz_anthology_bhs_fdda_patch.script": "zzzzzz_anthology_bhs_fdda_patch.script",
     "anthology_busyhands_stability_fix.script": "zzzzzz_anthology_busyhands_stability_fix.script",
 }
 

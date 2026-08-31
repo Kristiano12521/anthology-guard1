@@ -1,0 +1,58 @@
+-- Anthology Busy Hands Stability Fix - trader furniture distance check
+-- load-order: ����� zzzzzz_anthology_bhs_trader_autoinject_patch
+-- (ОПЦИОНАЛЬНО, НЕ фикс краша)
+--
+-- Это НЕ часть стабилизации - это изменение игрового поведения, которое
+-- было в самом первом черновике (v0.4.2) под комментарием "sid/forester
+-- fix", но отсутствует в настоящем вендорском файле (в т.ч. в версии из
+-- Campfires Anthology Compat v2). Не найдено подтверждения, было ли оно
+-- намеренным. Добавлено отдельным файлом по вашей просьбе "на всякий
+-- случай" - чтобы не смешивать с фиксами крашей в
+-- zzzzzz_anthology_bhs_trader_autoinject_patch.script.
+--
+-- Что делает: trade_manager.update пропускает обновление ассортимента для
+-- "мебельных" NPC (esc_m_trader - Сидорович, red_m_lesnik - Лесник), если
+-- актёр дальше 20 метров от них. Без этого файла такие трейдеры могут
+-- обновлять товар, даже когда игрок далеко/не рядом с торговой точкой.
+--
+-- КАК ОТКЛЮЧИТЬ: поставьте ENABLED = false ниже - оставит файл в паке,
+-- но отключит эффект.
+-- КАК УДАЛИТЬ ПОЛНОСТЬЮ: просто сотрите этот файл из gamedata/scripts -
+-- он самодостаточен, ни один другой файл на него не ссылается.
+
+local ENABLED = true
+
+local VERSION = "0.6.1"
+
+if not ENABLED then
+	printf("[BusyHandsFix v%s] trader furniture distance check is present but disabled (ENABLED = false)", VERSION)
+	return
+end
+
+local furniture = {
+	["esc_m_trader"] = true,
+	["red_m_lesnik"] = true
+}
+
+if type(trade_manager) == "table" and type(trade_manager.update) == "function" then
+	-- Локальная переменная, НЕ глобальная (как "TraderUpdate" у вендора) -
+	-- чтобы не повторить баг с коллизией общего имени, как в OnItemSelect
+	-- (см. zzzzzz_anthology_bhs_repair_recursion_fix.script).
+	local original_trade_manager_update = trade_manager.update
+	trade_manager.update = function(npc, force_refresh)
+		local ok_name, npc_name = pcall(function() return npc:name() end)
+		if ok_name and furniture[npc_name] then
+			local ok_dist, too_far = pcall(function()
+				return npc:position():distance_to(db.actor:position()) > 20
+			end)
+			if ok_dist and too_far then
+				return
+			end
+		end
+		return original_trade_manager_update(npc, force_refresh)
+	end
+	ANTHOLOGY_BHS_TRADER_FURNITURE_DISTANCE_PATCH_VERSION = VERSION
+	printf("[BusyHandsFix v%s] trader furniture distance check installed (gameplay behavior, not a crash fix - see file header)", VERSION)
+else
+	printf("[BusyHandsFix v%s] trade_manager.update was not found - furniture distance check NOT installed", VERSION)
+end
