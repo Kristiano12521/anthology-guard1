@@ -52,6 +52,28 @@ def write(path: Path, text: str = "x\n") -> None:
     path.write_text(text, encoding="utf-8")
 
 
+# Имена как в addon/anthology_busyhands_stability_fix/gamedata/scripts/.
+OVERLAY_SCRIPTS = [
+    "anthology_busyhands_stability_fix.script",
+    "zzzz_zzz_anthology_bhs_repair_capture_vendor_base.script",
+    "zzzzzz_anthology_bhs_crow_spawner_patch.script",
+    "zzzzzz_anthology_bhs_dotmarks_patch.script",
+    "zzzzzz_anthology_bhs_fdda_patch.script",
+    "zzzzzz_anthology_bhs_find_close_cover_patch.script",
+    "zzzzzz_anthology_bhs_item_repair_patch.script",
+    "zzzzzz_anthology_bhs_repair_recursion_fix.script",
+    "zzzzzz_anthology_bhs_sortingplus_patch.script",
+    "zzzzzz_anthology_bhs_trader_autoinject_patch.script",
+    "zzzzzz_anthology_bhs_trader_furniture_distance_patch.script",
+]
+
+
+def overlay_zip_name(name: str) -> str:
+    if name == pack_bhs.MAIN_OVERLAY:
+        return pack_bhs.MAIN_ZIP
+    return name
+
+
 class PackBhsTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
@@ -59,13 +81,15 @@ class PackBhsTests(unittest.TestCase):
         vendor = self.repo / "reference" / "addons" / "BusyHands_vendor"
         write(vendor / "scripts" / "vendor_bhs.script")
         write(vendor / "scripts" / "fix_bhs_fdda_loot.script", "-- loot sidecar\n")
+        write(vendor / "scripts" / "sequential_load_magazine.script", "-- already in BHS pack\n")
         write(
             self.repo / "reference" / "addons" / "mags_redux" / "scripts" / "sequential_load_magazine.script",
             SEQLOAD_SOURCE,
         )
         overlay = self.repo / "addon" / "anthology_busyhands_stability_fix"
-        write(overlay / "gamedata" / "scripts" / "anthology_bhs_fdda_patch.script")
-        write(overlay / "gamedata" / "scripts" / "anthology_busyhands_stability_fix.script")
+        scripts = overlay / "gamedata" / "scripts"
+        for name in OVERLAY_SCRIPTS:
+            write(scripts / name)
         write(overlay / "CHANGELOG.md", "## [0.6.4]\n")
         write(overlay / "meta.ini", "version=0.6.4\n")
 
@@ -84,13 +108,14 @@ class PackBhsTests(unittest.TestCase):
             names = zf.namelist()
         self.assertIn("gamedata/scripts/vendor_bhs.script", names)
         self.assertIn("gamedata/scripts/sequential_load_magazine.script", names)
-        self.assertIn("gamedata/scripts/zzzzzz_anthology_bhs_fdda_patch.script", names)
-        self.assertIn("gamedata/scripts/zzzzzz_anthology_busyhands_stability_fix.script", names)
+        for name in OVERLAY_SCRIPTS:
+            self.assertIn(f"gamedata/scripts/{overlay_zip_name(name)}", names)
         self.assertIn("CHANGELOG.md", names)
         self.assertIn("meta.ini", names)
         self.assertTrue(all(not name.startswith(pack_bhs.OUT_NAME) for name in names))
         self.assertNotIn("gamedata/scripts/fix_bhs_fdda_loot.script", names)
         self.assertNotIn("gamedata/scripts/anthology_bhs_fdda_patch.script", names)
+        self.assertNotIn(f"gamedata/scripts/{pack_bhs.MAIN_OVERLAY}", names)
 
 
 if __name__ == "__main__":

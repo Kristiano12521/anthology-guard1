@@ -15,24 +15,35 @@ REPO = Path(__file__).resolve().parents[1]
 VERSION = "0.6.4"
 OUT_NAME = "Anthology_BusyHands_Stability_Fix_v0_6_4"
 
-# Addon FDDA keeps the vendor zzzzzz_ name (src == zip name).
-# Main overlay stays unprefixed in addon/; zip restores vendor load order.
-OVERLAY_MAP = {
-    "zzzzzz_anthology_bhs_fdda_patch.script": "zzzzzz_anthology_bhs_fdda_patch.script",
-    "anthology_busyhands_stability_fix.script": "zzzzzz_anthology_busyhands_stability_fix.script",
-}
+# Overlay patches already carry zzzzzz_ / zzzz_zzz_ in addon/.
+# Main script stays unprefixed there; zip restores vendor load order.
+MAIN_OVERLAY = "anthology_busyhands_stability_fix.script"
+MAIN_ZIP = "zzzzzz_anthology_busyhands_stability_fix.script"
 
 
 def bhs_source(repo: Path) -> Path:
     root = repo / "reference" / "addons"
-    for path in root.iterdir():
-        if path.is_dir() and "BusyHands" in path.name:
-            return path
-    raise SystemExit("reference/addons/*BusyHands* not found")
+    if not root.is_dir():
+        raise SystemExit("reference/addons/*BusyHands* not found")
+    preferred = root / f"Anthology_BusyHands_Stability_Fix_v{VERSION.replace('.', '_')}"
+    if preferred.is_dir():
+        return preferred
+    hits = [path for path in root.iterdir() if path.is_dir() and "BusyHands" in path.name]
+    if len(hits) == 1:
+        return hits[0]
+    if not hits:
+        raise SystemExit("reference/addons/*BusyHands* not found")
+    raise SystemExit(
+        f"expected 1 BusyHands source or {preferred.name}, got {len(hits)}"
+    )
 
 
 def mag_seqload_source(repo: Path) -> Path:
-    hits = list((repo / "reference").rglob("sequential_load_magazine.script"))
+    hits = [
+        path
+        for path in (repo / "reference").rglob("sequential_load_magazine.script")
+        if not any("BusyHands" in part for part in path.parts)
+    ]
     if len(hits) != 1:
         raise SystemExit(f"expected 1 sequential_load_magazine.script, got {len(hits)}")
     return hits[0]
@@ -169,9 +180,8 @@ def pack(repo: Path | None = None) -> Path:
     overlay = repo / "addon" / "anthology_busyhands_stability_fix"
     src = bhs_source(repo)
     scripts = overlay / "gamedata" / "scripts"
-    for name in OVERLAY_MAP:
-        if not (scripts / name).is_file():
-            raise SystemExit(f"missing overlay {name}")
+    if not (scripts / MAIN_OVERLAY).is_file():
+        raise SystemExit(f"missing overlay {MAIN_OVERLAY}")
 
     seq_src = mag_seqload_source(repo)
 
@@ -190,8 +200,13 @@ def pack(repo: Path | None = None) -> Path:
         shutil.copy2(path, dst)
         copied += 1
 
-    for overlay_name, zip_name in OVERLAY_MAP.items():
-        shutil.copy2(scripts / overlay_name, gamedata / "scripts" / zip_name)
+    dest_scripts = gamedata / "scripts"
+    dest_scripts.mkdir(parents=True, exist_ok=True)
+    for path in scripts.iterdir():
+        if not path.is_file():
+            continue
+        zip_name = MAIN_ZIP if path.name == MAIN_OVERLAY else path.name
+        shutil.copy2(path, dest_scripts / zip_name)
 
     seq_text = seq_src.read_bytes().decode("cp1251")
     seq_out = gamedata / "scripts" / "sequential_load_magazine.script"
@@ -231,6 +246,10 @@ def pack(repo: Path | None = None) -> Path:
         raise SystemExit("loot sidecar leaked into zip")
     if "gamedata/scripts/anthology_bhs_fdda_patch.script" in names:
         raise SystemExit("overlay name leaked into zip")
+    if f"gamedata/scripts/{MAIN_OVERLAY}" in names:
+        raise SystemExit("unprefixed main overlay leaked into zip")
+    if f"gamedata/scripts/{MAIN_ZIP}" not in names:
+        raise SystemExit("prefixed main overlay missing from zip")
     if "gamedata/scripts/sequential_load_magazine.script" not in names:
         raise SystemExit("seqload overlay missing from zip")
 
