@@ -1,0 +1,187 @@
+-- Trader Restock Callback Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- load-order: после axr_main.script
+-- aaa_* sorts before barter_core.script and exo_loot.script.
+-- axr_main.on_game_start lists $game_scripts$ via file_list_open_ex
+-- (FS.FS_ListFiles | FS.FS_RootOnly, no extra sort). Name order is
+-- load order. Top-level AddScriptCallback must run before those two
+-- RegisterScriptCallback calls in on_game_start.
+--
+-- Declares trader_on_restock at file load. Chain-wraps
+-- trader_autoinject.timed_update in on_game_start and Sends if the
+-- original did not. Campfires overlay strips Add and Send; vanilla
+-- and BHS Send inside timed_update.
+
+local LOG_TAG = "[fix_trader_restock_callback]"
+local VERSION = "1.0.1"
+local CALLBACK = "trader_on_restock"
+
+local declare_result = "pending"
+local orig_timed = nil
+local wrap_status = "pending"
+local wrap_ran = false
+local subscriber_got = false
+local warned_no_subscriber = false
+
+-- intercepts is local in axr_main. callback_add on a live name prints
+-- "callback %s already exists!" and callstack(), and keeps the table.
+-- Swallow that one traceback so a second Add (vanilla after Campfires
+-- is gone, or BHS) is not a new error.
+local function declare()
+	if type(AddScriptCallback) ~= "function" then
+		return "missing"
+	end
+
+	local duplicate = false
+	local orig_printf = printf
+	local orig_callstack = callstack
+
+	printf = function(fmt, ...)
+		if type(fmt) == "string"
+			and string.find(fmt, "callback_add", 1, true)
+			and string.find(fmt, "already exists", 1, true)
+		then
+			duplicate = true
+			return
+		end
+		if orig_printf then
+			return orig_printf(fmt, ...)
+		end
+	end
+	callstack = function() end
+
+	local ok, err = pcall(AddScriptCallback, CALLBACK)
+
+	printf = orig_printf
+	callstack = orig_callstack
+
+	if not ok then
+		if orig_printf then
+			orig_printf("%s AddScriptCallback failed: %s", LOG_TAG, tostring(err))
+		end
+		return "error"
+	end
+	if duplicate then
+		return "exists"
+	end
+	return "added"
+end
+
+declare_result = declare()
+printf("%s trader_on_restock %s v%s", LOG_TAG, declare_result, VERSION)
+
+local function reset_session()
+	wrap_ran = false
+	subscriber_got = false
+	warned_no_subscriber = false
+end
+
+local function on_restock_probe()
+	subscriber_got = true
+end
+
+-- Vanilla timed_update and BHS patched_timed_update pass a game_object.
+-- BHS CreateTimeEvent may pass a numeric id; if orig already bailed on a
+-- dead id, do not Send that number to exo_loot.spawn_psus.
+local function is_npc_object(npc)
+	if npc == nil or type(npc) == "number" then
+		return false
+	end
+	local ok, id = pcall(function()
+		return npc:id()
+	end)
+	return ok and type(id) == "number"
+end
+
+-- Orig Send is inside orig, before we run. A session flag cannot see it.
+-- SendScriptCallback (_g.script:112) dispatches through axr_main.make_callback
+-- (axr_main.script:280). Vanilla trader_autoinject.script:66 and BHS
+-- zzzzzz patch :183 both call SendScriptCallback; Campfires timed_update
+-- does not. Hook make_callback only for the orig call.
+local function orig_already_sent(npc)
+	local sent = false
+	local orig_make = nil
+	if type(axr_main) == "table" and type(axr_main.make_callback) == "function" then
+		orig_make = axr_main.make_callback
+		axr_main.make_callback = function(name, ...)
+			if name == CALLBACK then
+				sent = true
+			end
+			return orig_make(name, ...)
+		end
+	end
+
+	local ok, result = pcall(orig_timed, npc)
+
+	if orig_make then
+		axr_main.make_callback = orig_make
+	end
+
+	return ok, result, sent
+end
+
+local function patched_timed_update(npc)
+	wrap_ran = true
+
+	local ok, result, sent = orig_already_sent(npc)
+	if not ok then
+		printf("%s timed_update orig failed: %s", LOG_TAG, tostring(result))
+		result = true
+	elseif not sent and is_npc_object(npc) and type(SendScriptCallback) == "function" then
+		SendScriptCallback(CALLBACK, npc)
+	end
+
+	if wrap_ran and not subscriber_got and not warned_no_subscriber then
+		printf("%s trader_on_restock wrap ran but subscriber got nothing", LOG_TAG)
+		warned_no_subscriber = true
+	end
+
+	if result == nil then
+		return true
+	end
+	return result
+end
+
+local function install_wrap()
+	if orig_timed then
+		return "already"
+	end
+	if type(trader_autoinject) ~= "table" then
+		return "skipped: no trader_autoinject"
+	end
+	if type(trader_autoinject.timed_update) ~= "function" then
+		return "skipped: no timed_update"
+	end
+	orig_timed = trader_autoinject.timed_update
+	trader_autoinject.timed_update = patched_timed_update
+	return "installed"
+end
+
+local function uninstall_wrap()
+	if orig_timed and type(trader_autoinject) == "table"
+		and trader_autoinject.timed_update == patched_timed_update then
+		trader_autoinject.timed_update = orig_timed
+	end
+	orig_timed = nil
+end
+
+function on_game_start()
+	printf("%s trader_on_restock %s v%s", LOG_TAG, declare_result, VERSION)
+
+	if type(RegisterScriptCallback) == "function" then
+		RegisterScriptCallback(CALLBACK, on_restock_probe)
+		RegisterScriptCallback("on_game_load", reset_session)
+	end
+
+	wrap_status = install_wrap()
+	printf("%s Send wrap %s", LOG_TAG, wrap_status)
+end
+
+function on_game_end()
+	if type(UnregisterScriptCallback) == "function" then
+		UnregisterScriptCallback(CALLBACK, on_restock_probe)
+		UnregisterScriptCallback("on_game_load", reset_session)
+	end
+	uninstall_wrap()
+end
