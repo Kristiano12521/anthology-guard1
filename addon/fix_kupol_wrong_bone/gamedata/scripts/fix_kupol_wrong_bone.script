@@ -23,7 +23,7 @@
 -- This addon writes the packet once per load, then stops.
 
 local LOG_TAG = "[fix_kupol_wrong_bone]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 
 local TARGET_LEVEL = "az_radar"
 local TARGET_NAME = "cit_physic_object_0014"
@@ -96,9 +96,9 @@ local function se_by_id(sim, id)
 end
 
 -- Returns:
---   true  вАФ this object is handled (patched, already empty, or skipped as
+--   true  Ч this object is handled (patched, already empty, or skipped as
 --           a different signature). Caller must not keep searching.
---   false вАФ not the target / not ready; keep looking.
+--   false Ч not the target / not ready; keep looking.
 local function try_fix_object(se_obj, reason)
 	if patched_this_load or object_name(se_obj) ~= TARGET_NAME then
 		return false
@@ -217,6 +217,7 @@ local function scan_alife(reason)
 		end
 	end
 
+	-- alife-scan: запасной путь, основной sim:iterate_objects, если метода нет или pcall упал
 	for id = 1, MAX_ALIFE_ID do
 		if try_fix_object(se_by_id(sim, id), reason) then
 			return patched_this_load

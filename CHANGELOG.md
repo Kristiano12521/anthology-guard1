@@ -2,6 +2,14 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.28] — pitfalls §16 сверен с reference/
+
+Шесть строк «требует перепроверки» в [`docs/pitfalls.md`](docs/pitfalls.md) сверены с эталоном (13 966 файлов). В основной раздел: патч module-table, `printf` только `%s`, конфликт `mod_system_*` / `icon_override`, глобальный wrap `ChangeLevel`/`file_list_open`, Lua-порядок `pcall(obj:id())`. Остались без C++ в эталоне: лог member error при правильном `pcall` и `bIsRootFile` у DLTX.
+
+## [0.1.27] — lint: LUA-003 исключает on_xml_read; LUA-008 снимается комментарием
+
+`tools/lint_addon.py`: LUA-003 не требует `UnregisterScriptCallback` для имени `on_xml_read` (`LUA003_UNREGISTER_EXCEPTIONS`) — `dxml_core` держит обработчик на жизнь процесса. Остальные callback'и по-прежнему. Форма `pcall(UnregisterScriptCallback, "имя", ...)` снятием не считается. LUA-008 на цикле `1..65534` снимается комментарием `-- alife-scan: запасной путь, <причина>` в трёх строках перед `for` (как ORDER-002). Комментарий проставлен в `fix_kupol_wrong_bone` 1.0.2 и `fix_aver_darkvalley` 1.0.1; запасные ветки на месте. Строка в [`docs/pitfalls.md`](docs/pitfalls.md) §16. Тесты в `tests/test_lint_addon.py`.
+
 ## [0.1.26] — fill_reference_addons: моды MO2 в reference/addons/
 
 `tools/fill_reference_addons.py` наполняет `reference/addons/` из включённых модов MO2: `modlist.txt` профиля (`+`/`-`/`_separator`), тот же набор `KEEP_DIRS`, что у `fill_reference.py`. `selected_profile` из `ModOrganizer.ini` разворачивает `@ByteArray` с `\xNN`. `--prune` без `--yes` только показывает лишние папки и выходит. В `anthology/` ничего не кладёт — в этой сборке ядро тоже лежит модами. Раздел в `docs/setup.md` и `reference/README.md`.

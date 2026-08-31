@@ -53,6 +53,8 @@ ANON_CALLBACK_RE = re.compile(
 )
 REGISTER_RE = re.compile(r"\bRegisterScriptCallback\s*\(\s*[\"']([\w_]+)[\"']")
 UNREGISTER_RE = re.compile(r"\bUnregisterScriptCallback\s*\(\s*[\"']([\w_]+)[\"']")
+# on_xml_read живёт в таблице dxml_core на жизнь процесса; снимать в on_game_end нельзя.
+LUA003_UNREGISTER_EXCEPTIONS = frozenset({"on_xml_read"})
 MCM_LOAD_RE = re.compile(r"^\s*function\s+on_mcm_load\s*\(", re.M)
 SECTION_RE = re.compile(r"^\s*(!!|!|@)?\[([^\]\s]+)\]")
 DLTX_NAME_RE = re.compile(r"^mod_(.+)_([^_]+)$")
@@ -63,6 +65,7 @@ CREATE_NAMED_RE = re.compile(
     re.S,
 )
 ALIFE_SCAN_RE = re.compile(r"for\s+\w+\s*=\s*1\s*,\s*(MAX_ALIFE_ID|65534|65535)\b")
+ALIFE_SCAN_JUSTIFICATION_RE = re.compile(r"--\s*alife-scan:\s*запасной путь,\s*\S+", re.I)
 LUA_STRING_OR_COMMENT_RE = re.compile(
     r"--\[\[[\s\S]*?\]\]|--[^\n]*|\[\[.*?\]\]|"
     r"\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'",
@@ -221,6 +224,14 @@ def has_load_order_justification(text: str) -> bool:
         if LOAD_ORDER_JUSTIFICATION_RE.search(line):
             return True
     return False
+
+
+def has_alife_scan_justification(text: str, match_start: int) -> bool:
+    """Комментарий `-- alife-scan: запасной путь, <причина>` в трёх строках перед циклом снимает LUA-008."""
+    line_no = text[:match_start].count("\n")
+    lines = text.splitlines()
+    window = lines[max(0, line_no - 3) : line_no]
+    return any(ALIFE_SCAN_JUSTIFICATION_RE.search(line) for line in window)
 
 
 def gamedata_relpath(path: Path) -> str:
@@ -592,7 +603,7 @@ class AddonLinter:
 
         registered = set(REGISTER_RE.findall(text))
         unregistered = set(UNREGISTER_RE.findall(text))
-        leaked = registered - unregistered
+        leaked = registered - unregistered - LUA003_UNREGISTER_EXCEPTIONS
         if leaked:
             self.add(
                 "LUA-003",
@@ -699,11 +710,14 @@ class AddonLinter:
         """LUA-008: полный проход 1..65534 через alife():object."""
         masked = mask_lua_literals(text)
         for match in ALIFE_SCAN_RE.finditer(masked):
+            if has_alife_scan_justification(text, match.start()):
+                continue
             self.add(
                 "LUA-008",
                 "warn",
                 "Полный проход id 1..65534: каждый шаг — alife():object. "
-                "На загрузке/смене уровня это хитч. Нужен iterate_objects или чанк.",
+                "На загрузке/смене уровня это хитч. Нужен iterate_objects или чанк. "
+                "Запасной путь: `-- alife-scan: запасной путь, <причина>` в трёх строках перед циклом.",
                 path,
                 text[: match.start()].count("\n") + 1,
             )

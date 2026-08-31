@@ -477,10 +477,10 @@ class VerifiedMetaTests(unittest.TestCase):
 
 
 class TimeEventLintTests(unittest.TestCase):
-    def _script(self, root: Path, name: str, source: str) -> Path:
+    def _script(self, root: Path, name: str, source: str, encoding: str = "utf-8") -> Path:
         addon = _minimal_addon(root, name)
         script = addon / "gamedata" / "scripts" / f"{name}.script"
-        script.write_text(source, encoding="utf-8")
+        script.write_text(source, encoding=encoding)
         return addon
 
     def test_named_functor_without_return_true_warns(self):
@@ -619,6 +619,134 @@ class TimeEventLintTests(unittest.TestCase):
             )
             codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
             self.assertNotIn("LUA-008", codes)
+
+    def test_alife_scan_justification_before_loop_suppresses(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "id_scan_ok",
+                "local MAX_ALIFE_ID = 65534\n"
+                "local function scan()\n"
+                "    -- alife-scan: запасной путь, iterate_objects отказал\n"
+                "    for id = 1, MAX_ALIFE_ID do\n"
+                "        alife():object(id)\n"
+                "    end\n"
+                "end\n",
+                encoding="cp1251",
+            )
+            codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
+            self.assertNotIn("LUA-008", codes)
+
+    def test_alife_scan_justification_in_file_header_does_not_suppress(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pad = "\n".join(f"-- pad {i}" for i in range(1, 8))
+            addon = self._script(
+                Path(tmp),
+                "id_scan_header",
+                "-- alife-scan: запасной путь, iterate_objects отказал\n"
+                f"{pad}\n"
+                "local MAX_ALIFE_ID = 65534\n"
+                "local function scan()\n"
+                "    for id = 1, MAX_ALIFE_ID do\n"
+                "        alife():object(id)\n"
+                "    end\n"
+                "end\n",
+                encoding="cp1251",
+            )
+            self.assertIn(
+                "LUA-008",
+                {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)},
+            )
+
+    def test_alife_scan_justification_without_reason_does_not_suppress(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "id_scan_empty",
+                "local MAX_ALIFE_ID = 65534\n"
+                "local function scan()\n"
+                "    -- alife-scan: запасной путь,\n"
+                "    for id = 1, MAX_ALIFE_ID do\n"
+                "        alife():object(id)\n"
+                "    end\n"
+                "end\n",
+                encoding="cp1251",
+            )
+            self.assertIn(
+                "LUA-008",
+                {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)},
+            )
+
+
+class Lua003LintTests(unittest.TestCase):
+    def _script(self, root: Path, name: str, source: str) -> Path:
+        addon = _minimal_addon(root, name)
+        (addon / "gamedata" / "scripts" / f"{name}.script").write_text(source, encoding="utf-8")
+        return addon
+
+    def test_on_xml_read_without_unregister_is_silent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "modxml_ok",
+                "function on_xml_read()\n"
+                '    RegisterScriptCallback("on_xml_read", strip_pair)\n'
+                "end\n",
+            )
+            codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
+            self.assertNotIn("LUA-003", codes)
+
+    def test_other_callback_without_unregister_still_warns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "mixed_cb",
+                "function on_xml_read()\n"
+                '    RegisterScriptCallback("on_xml_read", strip_pair)\n'
+                "end\n"
+                "function on_game_start()\n"
+                '    RegisterScriptCallback("actor_on_update", tick)\n'
+                "end\n",
+            )
+            hit = [
+                f
+                for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)
+                if f.code == "LUA-003"
+            ]
+            self.assertEqual(len(hit), 1)
+            self.assertIn("actor_on_update", hit[0].message)
+            self.assertNotIn("on_xml_read", hit[0].message)
+
+    def test_pcall_unregister_does_not_count(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "pcall_unreg",
+                "local function register_destroy(self)\n"
+                '    RegisterScriptCallback("game_object_on_net_destroy", self)\n'
+                "end\n"
+                "local function unregister_destroy(self)\n"
+                '    pcall(UnregisterScriptCallback, "game_object_on_net_destroy", self)\n'
+                "end\n",
+            )
+            hit = [
+                f
+                for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)
+                if f.code == "LUA-003"
+            ]
+            self.assertEqual(len(hit), 1)
+            self.assertIn("game_object_on_net_destroy", hit[0].message)
+
+    def test_inventory_antifreeze_still_warns(self):
+        addon = REPO_ROOT / "addon" / "seamless_inventory_sort_anthology"
+        findings = lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)
+        hit = [
+            f
+            for f in findings
+            if f.code == "LUA-003" and "inventory_antifreeze" in f.path.replace("\\", "/")
+        ]
+        self.assertEqual(len(hit), 1)
+        self.assertIn("game_object_on_net_destroy", hit[0].message)
 
 
 if __name__ == "__main__":

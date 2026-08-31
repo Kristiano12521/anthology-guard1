@@ -1,5 +1,32 @@
 # Aver Dark Valley Transition Fix
 
+## [1.0.1] — 2026-08-31
+
+**Изменено**
+
+- `gamedata/scripts/fix_aver_darkvalley.script` — перед запасным `for id = 1, MAX_ALIFE_ID` комментарий `-- alife-scan: запасной путь, …` (LUA-008).
+
+**Причина**
+
+Цикл остаётся: `pcall` вокруг `iterate_objects` ловит любую ошибку обхода, не только отсутствие метода. Без запасного пути мод молча ничего не сделает. Линтер снимает предупреждение комментарием в трёх строках перед циклом.
+
+**Не затронуто**
+
+- отбор целей, `try_fix_object`, callback'и, кэш id
+- сам обход: сначала `sim:iterate_objects`, цикл только если метода нет или `pcall` упал
+- `all.spawn`, LTX, `save_state` / `load_state`
+- `verified_*` в `meta.ini`
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_aver_darkvalley` — LUA-008 нет
+- VERIFY-001: в игре не прогонялось. `verified_*` не ставились.
+
 ## [1.0.0] — 2026-08-29
 
 **Изменено**
