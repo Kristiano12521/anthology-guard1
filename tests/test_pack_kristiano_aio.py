@@ -55,6 +55,14 @@ class PackKristianoTests(unittest.TestCase):
             self.addon_root / "fix_bhs_fdda_loot" / "gamedata" / "scripts" / "skip_loot.script",
             "-- skipped\n",
         )
+        write(
+            self.addon_root
+            / "anthology_busyhands_stability_fix"
+            / "gamedata"
+            / "scripts"
+            / "skip_bhs.script",
+            "-- bhs packed separately\n",
+        )
 
     def tearDown(self) -> None:
         self.tmp.cleanup()
@@ -76,6 +84,7 @@ class PackKristianoTests(unittest.TestCase):
         self.assertNotIn("gamedata/scripts/quickqk_only.script", names)
         self.assertNotIn("gamedata/scripts/st2_only.script", names)
         self.assertNotIn("gamedata/scripts/skip_loot.script", names)
+        self.assertNotIn("gamedata/scripts/skip_bhs.script", names)
 
     def test_separate_zips_layout_and_version(self):
         self.pack()

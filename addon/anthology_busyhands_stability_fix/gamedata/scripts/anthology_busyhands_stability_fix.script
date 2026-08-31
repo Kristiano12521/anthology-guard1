@@ -1,5 +1,6 @@
--- Anthology Busy Hands Stability Fix v0.6.6
+-- Anthology Busy Hands Stability Fix v0.6.7
 --
+-- v0.6.7: find_close_cover logs one "patched via <path>" line (log only).
 -- v0.6.6: repair capture marker on env and _G; recursion-fix reads both.
 -- v0.6.5: lookup paths for crow / UIRepair / UIInventory / repair capture.
 -- Guard behaviour unchanged; only how the target is found.
@@ -16,7 +17,7 @@
 -- documented full-file exceptions (mon_sleep, guaranteed_loot,
 -- sequential_load_magazine).
 
-local VERSION = "0.6.6"
+local VERSION = "0.6.7"
 local installed = false
 
 local function safe_object_id(obj)

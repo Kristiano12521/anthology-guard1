@@ -1,4 +1,4 @@
--- Anthology Busy Hands Stability Fix v0.5.0 - find_close_cover runtime patch
+-- Anthology Busy Hands Stability Fix v0.6.7 - find_close_cover runtime patch
 -- load-order: ����� utils_obj
 --
 -- ПРАВИЛО 2/3: настоящий monkey-patch ОДНОЙ глобальной функции.
@@ -18,7 +18,7 @@
 -- ошибки так же идёт "Saving spawns... tempsave.scop saved - Disconnect",
 -- то есть игру аварийно кидает в меню, как и при mon_sleep.
 
-local VERSION = "0.5.0"
+local VERSION = "0.6.7"
 ANTHOLOGY_BHS_FIND_COVER_PATCH_VERSION = VERSION
 
 -- Мини-копия приватного validate(npc,vid) из utils_obj.script (5 строк,
@@ -93,14 +93,21 @@ end
 -- снапшот-таблицей, собранной один раз при загрузке файла (тогда патчить
 -- нужно её отдельно, иначе реальный вызывающий код продолжит звать старую
 -- версию). Дублирование безвредно в любом случае.
+local via = nil
 if type(find_close_cover) == "function" then
 	find_close_cover = patched_find_close_cover
-	printf("[BusyHandsFix v%s] find_close_cover patched (function-level, utils_obj.script untouched)", VERSION)
-else
-	printf("[BusyHandsFix v%s] global find_close_cover was not found - guard NOT installed", VERSION)
+	via = "find_close_cover"
 end
-
 if type(utils_obj) == "table" and type(utils_obj.find_close_cover) == "function" then
 	utils_obj.find_close_cover = patched_find_close_cover
-	printf("[BusyHandsFix v%s] utils_obj.find_close_cover patched (module-table path)", VERSION)
+	if via then
+		via = via .. " + utils_obj.find_close_cover"
+	else
+		via = "utils_obj.find_close_cover"
+	end
+end
+if via then
+	printf("[BusyHandsFix v%s] find_close_cover patched via %s (function-level, utils_obj.script untouched)", VERSION, via)
+else
+	printf("[BusyHandsFix v%s] find_close_cover was not found via find_close_cover / utils_obj.find_close_cover - guard NOT installed", VERSION)
 end

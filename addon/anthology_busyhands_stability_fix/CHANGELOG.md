@@ -1,5 +1,34 @@
 # Anthology Busy Hands Stability Fix
 
+## [0.6.7] — 2026-08-31
+
+**Изменено**
+
+- `zzzzzz_anthology_bhs_find_close_cover_patch.script` — одна строка `patched via <путь>` вместо пары «global was not found - guard NOT installed» + «module-table path». Оба пути по-прежнему патчатся, если найдены.
+
+**Причина**
+
+Голый `find_close_cover` в `_G` пустой, цель живёт на `utils_obj`. Первая строка всегда промахивалась и выглядела как отказ, хотя гард вставал вторым путём.
+
+**Как исправлено**
+
+Тот же формат, что у crow / UIRepair / UIInventory после 0.6.5. Менялся только вывод в лог, не поведение.
+
+**Не затронуто**
+
+- Логика `pcall` вокруг `best_cover`, остальные патчи, сохраняемое состояние.
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+- В MO2 заменить предыдущий overlay BHS 0.6.6.
+
+**Проверено**
+
+- lint overlay и `--cross`: см. прогон после правки
+- В игре: сессия 31.08.2026, 0.6.6 — девять патчей, все guards ненулевые, capture и repair chain встали, 0 traceback. 0.6.7 меняет только текст лога find_close_cover.
+
 ## [0.6.6] — 2026-08-31
 
 **Изменено**

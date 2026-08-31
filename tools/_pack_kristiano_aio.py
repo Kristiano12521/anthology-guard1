@@ -27,8 +27,9 @@ SEPARATE = {
     "fix_st2_footstep": "[SND] Anthology ST2 Mutant Footstep Sound",
 }
 
-# Withdrawn: logic lives in anthology_busyhands_stability_fix 0.6.4.
-SKIP = {"fix_bhs_fdda_loot"}
+# Packed by pack_bhs.py, not this AIO.
+# fix_bhs_fdda_loot withdrawn: logic lives in BusyHands 0.6.4+.
+SKIP = {"anthology_busyhands_stability_fix", "fix_bhs_fdda_loot"}
 
 AIO_NAME = "[DBG] Kristiano Fixes ALL IN ONE"
 VERSION_RE = re.compile(r"^##\s*\[?v?(\d+\.\d+(?:\.\d+)?)\]?", re.M)
@@ -203,6 +204,9 @@ def pack_aio(addons: list[Path], *, out_dir: Path | None = None) -> Path:
                 "  quickqk_task_complete",
                 "  fix_st2_footstep",
                 "",
+                "Not included (separate archive, tools/pack_bhs.py):",
+                "  anthology_busyhands_stability_fix",
+                "",
                 "Not included (withdrawn, lives in BusyHands 0.6.4):",
                 "  fix_bhs_fdda_loot",
                 "",
@@ -268,6 +272,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Pack Kristiano AIO + separate mods")
     parser.add_argument("--addon-root", type=Path, default=ADDON_ROOT)
     parser.add_argument("--out", type=Path, default=OUT_DIR)
+    parser.add_argument(
+        "--aio-only",
+        action="store_true",
+        help="Pack only [DBG] Kristiano Fixes ALL IN ONE, skip CMO/QuickQK/ST2 zips",
+    )
     args = parser.parse_args(argv)
 
     addon_root = args.addon_root
@@ -275,8 +284,9 @@ def main(argv: list[str] | None = None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     addons = aio_addons(addon_root)
     pack_aio(addons, out_dir=out_dir)
-    for mod_id, mo2_name in SEPARATE.items():
-        pack_separate(mod_id, mo2_name, addon_root=addon_root, out_dir=out_dir)
+    if not args.aio_only:
+        for mod_id, mo2_name in SEPARATE.items():
+            pack_separate(mod_id, mo2_name, addon_root=addon_root, out_dir=out_dir)
     staging = out_dir / "_staging"
     if staging.exists():
         shutil.rmtree(staging)

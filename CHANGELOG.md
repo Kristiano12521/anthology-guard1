@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.34] — pack_bhs 0.6.7: лог find_close_cover и verified_*
+
+`tools/pack_bhs.py` VERSION 0.6.7. Overlay пишет одну строку `find_close_cover patched via <путь>` вместо ложного `guard NOT installed`. `fix_trader_restock_callback` 1.0.3 не повторяет `added` в `on_game_start`, если статус не изменился. `verified_*` у обоих по сессии 31.08.2026.
+
 ## [0.1.33] — fill_reference_addons: не копировать свои пакеты
 
 `tools/fill_reference_addons.py` по умолчанию пропускает наши сборки в MO2: маркеры `BUILD_INFO.txt` / `CONTENTS.txt` / `meta.ini` (notes со `STALKER Anthology Dev`, `vendor_fork`, путь `Anthology/build`) и префиксы имён из `AIO_NAME` + `SEPARATE` (`_pack_kristiano_aio.py`) и `OUT_STEM` (`pack_bhs.py`) — ловят и старые копии без `BUILD_INFO`, и суффиксы вроде `(NEW)`. `--include-own` включает их; `--prune` считает свои лишними. `pack_bhs.py` отказывается брать источник с `BUILD_INFO.txt`. Kristiano-пакер пишет `BUILD_INFO.txt`. Из `reference/addons/` убраны одиннадцать своих/устаревших папок (вендорский BusyHands `v0_6_1` оставлен). LUA-001 снова два: `fix_crowkiller_hello`, `fix_xr_effects_sounds`. Тесты и строка в `docs/setup.md` / README.

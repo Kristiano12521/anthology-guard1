@@ -1,7 +1,7 @@
 -- Trader Restock Callback Fix
 -- Anomaly 1.5.3 / Anthology 2.1
 --
--- load-order: ïîñëå axr_main.script
+-- load-order: ˜˜˜˜˜ axr_main.script
 -- aaa_* file-load runs before barter_core / exo_loot on_game_start
 -- Register. axr_main file_list_open_ex has no extra sort, so
 -- on_game_start order is not a safe place to first-Add.
@@ -13,7 +13,7 @@
 -- axr_main.callback_add wrap.
 
 local LOG_TAG = "[fix_trader_restock_callback]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 local CALLBACK = "trader_on_restock"
 
 local declare_result = "pending"
@@ -205,7 +205,11 @@ local function uninstall_wrap()
 end
 
 function on_game_start()
-	printf("%s trader_on_restock %s v%s", LOG_TAG, declare_result, VERSION)
+	local previous = declare_result
+	declare_result = declare()
+	if declare_result ~= previous then
+		printf("%s trader_on_restock %s v%s", LOG_TAG, declare_result, VERSION)
+	end
 
 	if type(RegisterScriptCallback) == "function" then
 		RegisterScriptCallback(CALLBACK, on_restock_probe)
