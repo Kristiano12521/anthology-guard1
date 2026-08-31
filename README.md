@@ -7,7 +7,7 @@
 ## Что внутри
 
 ```
-.cursor/commands/       slash-команды чата (/check, /crash, /newmod)
+.cursor/commands/       slash-команды чата (/check, /crash, /newmod, /mine, /verify, /fork, /deploy)
 .cursor/rules/          правила Cursor (.mdc)
   anomaly-core.mdc          always-apply, короткое: стек, границы, запреты
   no-hallucinated-api.mdc   always-apply, короткое: протокол проверки API
@@ -92,6 +92,10 @@ Markdown в [`.cursor/commands/`](.cursor/commands/), вызов через `/` 
 | `/check` | тесты, `lint_addon.py --cross`, `check_changelog_tools.py`, git status/log; сводка, без правок |
 | `/crash <лог>` | карточка `xraylog.py --archive` (`--errors-only`, если FATAL нет), сверка с `logs/cards/`, этапы 1–3 [`docs/plans/crash.md`](docs/plans/crash.md) |
 | `/newmod <mod_id>` | `new_addon.py`, дальше [`.cursor/rules/workflow-addon.mdc`](.cursor/rules/workflow-addon.mdc); в конце lint, `--cross`, `build_addon.py` |
+| `/mine <лог>` | `xraylog.py --mine`: что доехало до игры, «Не появились в логе», отказы; [`docs/mo2.md`](docs/mo2.md) |
+| `/verify` | `lint_addon.py --unverified`, чек-лист в игре по CHANGELOG; приоритет поведения над текстом |
+| `/fork <mod_id>` | сверка `vendor_fork=1` с `reference/addons/` (`FORK-001`, префиксы `zzz`/`aaa`) |
+| `/deploy` | `pack_bhs.py`, `_pack_kristiano_aio.py`, `build_addon.py` для остальных; список для MO2 |
 
 Промпты из [`docs/prompts.md`](docs/prompts.md), ставшие командами, вызываются через `/`.
 
