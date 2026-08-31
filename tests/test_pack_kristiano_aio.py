@@ -105,6 +105,17 @@ class PackKristianoTests(unittest.TestCase):
         self.assertTrue(addons.isdisjoint(packer.SEPARATE))
         self.assertTrue(addons.isdisjoint(packer.SKIP))
 
+    def test_version_from_meta_ini_without_changelog(self):
+        write(self.addon_root / "keep_me" / "meta.ini", "version=7.7.7\n")
+        (self.addon_root / "keep_me" / "CHANGELOG.md").unlink()
+        self.assertEqual(packer.detect_version(self.addon_root / "keep_me"), "7.7.7")
+        self.pack()
+        aio = self.out_dir / f"{packer.AIO_NAME}.zip"
+        with zipfile.ZipFile(aio) as zf:
+            contents = zf.read("CONTENTS.txt").decode("utf-8")
+        self.assertIn("keep_me", contents)
+        self.assertIn("v7.7.7", contents)
+
 
 if __name__ == "__main__":
     unittest.main()

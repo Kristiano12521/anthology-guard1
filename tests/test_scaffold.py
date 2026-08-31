@@ -145,6 +145,19 @@ class BuildAddonTests(unittest.TestCase):
         meta = (self.build_root / "my_test_mod" / "meta.ini").read_text(encoding="utf-8")
         self.assertIn("version=2.3.1", meta)
 
+    def test_version_comes_from_meta_ini(self):
+        changelog = self.addon_root / "my_test_mod" / "CHANGELOG.md"
+        changelog.write_text("# Mod without a version heading\n", encoding="utf-8")
+        meta_src = self.addon_root / "my_test_mod" / "meta.ini"
+        text = meta_src.read_text(encoding="utf-8")
+        meta_src.write_text(text.replace("version=1.0.0", "version=8.1.0"), encoding="utf-8")
+        code, out = self.build()
+        self.assertEqual(code, 0, msg=out)
+        meta = (self.build_root / "my_test_mod" / "meta.ini").read_text(encoding="utf-8")
+        self.assertIn("version=8.1.0", meta)
+        info = (self.build_root / "my_test_mod" / "BUILD_INFO.txt").read_text(encoding="utf-8")
+        self.assertIn("version: 8.1.0", info)
+
     def test_zip_layout_is_mo2_ready(self):
         code, out = self.build("--zip")
         self.assertEqual(code, 0, msg=out)

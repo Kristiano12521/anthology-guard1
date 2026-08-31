@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Iterable, Iterator
 
@@ -10,7 +11,31 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 GAME_TEXT_SUFFIXES = {".script", ".lua", ".ltx", ".xml", ".seq"}
 
+VERSION_RE = re.compile(r"^##\s*\[?v?(\d+\.\d+(?:\.\d+)?)\]?", re.M)
+
 SKIP_DIRS = {".git", ".cache", "__pycache__", "node_modules", ".idea", ".vs"}
+
+
+def detect_version(addon_dir: Path) -> str:
+    """Версия мода: первый заголовок CHANGELOG, иначе version= из meta.ini."""
+    changelog = addon_dir / "CHANGELOG.md"
+    if changelog.exists():
+        match = VERSION_RE.search(decode_bytes(changelog.read_bytes()))
+        if match:
+            return match.group(1)
+    changelog_txt = addon_dir / "CHANGELOG.txt"
+    if changelog_txt.exists():
+        match = VERSION_RE.search(decode_bytes(changelog_txt.read_bytes()))
+        if match:
+            return match.group(1)
+    meta = addon_dir / "meta.ini"
+    if meta.exists():
+        for line in decode_bytes(meta.read_bytes()).splitlines():
+            if line.lower().startswith("version="):
+                value = line.split("=", 1)[1].strip()
+                if value:
+                    return value
+    return "1.0.0"
 
 
 def read_text(path: Path) -> str:

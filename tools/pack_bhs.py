@@ -7,14 +7,25 @@
 from __future__ import annotations
 
 import shutil
+import sys
 import zipfile
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _common import detect_version  # noqa: E402
+
 REPO = Path(__file__).resolve().parents[1]
-VERSION = "0.6.7"
 OUT_STEM = "Anthology_BusyHands_Stability_Fix"
-OUT_NAME = f"{OUT_STEM}_v{VERSION.replace('.', '_')}"
+
+# Папка вендорского BusyHands в reference/addons/. Это исходник, на который
+# кладётся overlay; номер не следует за версией фикса (та — в CHANGELOG/meta.ini).
+VENDOR_SOURCE_VERSION = "0.6.4"
+
+
+def packed_name(version: str) -> str:
+    return f"{OUT_STEM}_v{version.replace('.', '_')}"
 
 # Overlay patches already carry zzzzzz_ / zzzz_zzz_ in addon/.
 # Main script stays unprefixed there; zip restores vendor load order.
@@ -41,7 +52,7 @@ def bhs_source(repo: Path) -> Path:
     root = repo / "reference" / "addons"
     if not root.is_dir():
         raise SystemExit("reference/addons/*BusyHands* not found")
-    preferred = root / f"Anthology_BusyHands_Stability_Fix_v{VERSION.replace('.', '_')}"
+    preferred = root / packed_name(VENDOR_SOURCE_VERSION)
     if preferred.is_dir():
         reject_own_bhs_source(preferred)
         return preferred
@@ -196,6 +207,8 @@ end"""
 def pack(repo: Path | None = None) -> Path:
     repo = repo or REPO
     overlay = repo / "addon" / "anthology_busyhands_stability_fix"
+    version = detect_version(overlay)
+    out_name = packed_name(version)
     src = bhs_source(repo)
     scripts = overlay / "gamedata" / "scripts"
     if not (scripts / MAIN_OVERLAY).is_file():
@@ -203,7 +216,7 @@ def pack(repo: Path | None = None) -> Path:
 
     seq_src = mag_seqload_source(repo)
 
-    out_dir = repo / "build" / OUT_NAME
+    out_dir = repo / "build" / out_name
     if out_dir.exists():
         shutil.rmtree(out_dir)
     gamedata = out_dir / "gamedata"
@@ -240,7 +253,7 @@ def pack(repo: Path | None = None) -> Path:
         "\n".join(
             [
                 "mod_id: Anthology_BusyHands_Stability_Fix",
-                f"version: {VERSION}",
+                f"version: {version}",
                 f"built: {datetime.now().isoformat(timespec='seconds')}",
                 f"source: {src.name} + addon/anthology_busyhands_stability_fix",
                 f"seqload: {seq_src.parent.parent.name}",
@@ -251,7 +264,7 @@ def pack(repo: Path | None = None) -> Path:
         encoding="utf-8",
     )
 
-    archive = repo / "build" / f"{OUT_NAME}.zip"
+    archive = repo / "build" / f"{out_name}.zip"
     if archive.exists():
         archive.unlink()
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:

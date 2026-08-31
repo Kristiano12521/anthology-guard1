@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _common import REPO_ROOT, decode_bytes  # noqa: E402
+from _common import REPO_ROOT, decode_bytes, detect_version  # noqa: E402
 
 ADDON_ROOT = REPO_ROOT / "addon"
 OUT_DIR = REPO_ROOT / "build"
@@ -32,26 +32,6 @@ SEPARATE = {
 SKIP = {"anthology_busyhands_stability_fix", "fix_bhs_fdda_loot"}
 
 AIO_NAME = "[DBG] Kristiano Fixes ALL IN ONE"
-VERSION_RE = re.compile(r"^##\s*\[?v?(\d+\.\d+(?:\.\d+)?)\]?", re.M)
-
-
-def detect_version(addon_dir: Path) -> str:
-    changelog = addon_dir / "CHANGELOG.md"
-    if changelog.exists():
-        match = VERSION_RE.search(decode_bytes(changelog.read_bytes()))
-        if match:
-            return match.group(1)
-    changelog_txt = addon_dir / "CHANGELOG.txt"
-    if changelog_txt.exists():
-        match = VERSION_RE.search(decode_bytes(changelog_txt.read_bytes()))
-        if match:
-            return match.group(1)
-    meta = addon_dir / "meta.ini"
-    if meta.exists():
-        for line in decode_bytes(meta.read_bytes()).splitlines():
-            if line.lower().startswith("version="):
-                return line.split("=", 1)[1].strip()
-    return "1.0.0"
 
 
 def copy_gamedata(source: Path, destination: Path) -> int:

@@ -90,17 +90,24 @@ class PackBhsTests(unittest.TestCase):
         scripts = overlay / "gamedata" / "scripts"
         for name in OVERLAY_SCRIPTS:
             write(scripts / name)
-        write(overlay / "CHANGELOG.md", "## [0.6.4]\n")
-        write(overlay / "meta.ini", "version=0.6.4\n")
+        write(overlay / "CHANGELOG.md", "## [0.9.9]\n")
+        write(overlay / "meta.ini", "version=0.0.0\n")
 
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
-    def test_zip_name_includes_version(self):
-        expected = f"Anthology_BusyHands_Stability_Fix_v{pack_bhs.VERSION.replace('.', '_')}.zip"
-        self.assertEqual(f"{pack_bhs.OUT_NAME}.zip", expected)
+    def test_zip_name_follows_overlay_changelog(self):
+        overlay = self.repo / "addon" / "anthology_busyhands_stability_fix"
+        version = pack_bhs.detect_version(overlay)
+        self.assertEqual(version, "0.9.9")
+        self.assertNotEqual(version, pack_bhs.VENDOR_SOURCE_VERSION)
+        expected = f"{pack_bhs.packed_name(version)}.zip"
         archive = pack_bhs.pack(self.repo)
         self.assertEqual(archive.name, expected)
+        info = (self.repo / "build" / pack_bhs.packed_name(version) / "BUILD_INFO.txt").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("version: 0.9.9", info)
 
     def test_mo2_layout_and_contents(self):
         archive = pack_bhs.pack(self.repo)
@@ -112,17 +119,33 @@ class PackBhsTests(unittest.TestCase):
             self.assertIn(f"gamedata/scripts/{overlay_zip_name(name)}", names)
         self.assertIn("CHANGELOG.md", names)
         self.assertIn("meta.ini", names)
-        self.assertTrue(all(not name.startswith(pack_bhs.OUT_NAME) for name in names))
+        self.assertTrue(all(not name.startswith(pack_bhs.OUT_STEM) for name in names))
         self.assertNotIn("gamedata/scripts/fix_bhs_fdda_loot.script", names)
         self.assertNotIn("gamedata/scripts/anthology_bhs_fdda_patch.script", names)
         self.assertNotIn(f"gamedata/scripts/{pack_bhs.MAIN_OVERLAY}", names)
+
+    def test_vendor_folder_uses_source_version_not_overlay(self):
+        preferred = (
+            self.repo
+            / "reference"
+            / "addons"
+            / pack_bhs.packed_name(pack_bhs.VENDOR_SOURCE_VERSION)
+        )
+        preferred.mkdir(parents=True)
+        write(preferred / "scripts" / "from_vendor_version.script")
+        archive = pack_bhs.pack(self.repo)
+        with zipfile.ZipFile(archive) as zf:
+            names = zf.namelist()
+        self.assertIn("gamedata/scripts/from_vendor_version.script", names)
+        self.assertNotIn("gamedata/scripts/vendor_bhs.script", names)
+        self.assertEqual(archive.name, "Anthology_BusyHands_Stability_Fix_v0_9_9.zip")
 
     def test_rejects_source_with_build_info(self):
         preferred = (
             self.repo
             / "reference"
             / "addons"
-            / f"Anthology_BusyHands_Stability_Fix_v{pack_bhs.VERSION.replace('.', '_')}"
+            / pack_bhs.packed_name(pack_bhs.VENDOR_SOURCE_VERSION)
         )
         preferred.mkdir(parents=True)
         write(preferred / "scripts" / "vendor_bhs.script")

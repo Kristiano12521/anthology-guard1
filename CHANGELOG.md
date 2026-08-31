@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.35] — verified_build с номером; версия упаковки из мода
+
+`verified_build` у пяти проверенных модов — `Anthology 2.1 / Modded Exes MT 10063` (номер из карточек `logs/cards/`, `xrCore build 10063`). Формат в `docs/mo2.md`: номер обязателен, берётся из лога или карточки. `tools/pack_bhs.py` читает версию overlay из CHANGELOG/meta.ini (`_common.detect_version`); вендорская папка в `reference/addons/` — отдельная `VENDOR_SOURCE_VERSION` (0.6.4, исходник BusyHands, не версия фикса). Тот же `detect_version` в `_pack_kristiano_aio.py` и `build_addon.py`. Тесты на чтение версии из мода.
+
 ## [0.1.34] — pack_bhs 0.6.7: лог find_close_cover и verified_*
 
 `tools/pack_bhs.py` VERSION 0.6.7. Overlay пишет одну строку `find_close_cover patched via <путь>` вместо ложного `guard NOT installed`. `fix_trader_restock_callback` 1.0.3 не повторяет `added` в `on_game_start`, если статус не изменился. `verified_*` у обоих по сессии 31.08.2026.

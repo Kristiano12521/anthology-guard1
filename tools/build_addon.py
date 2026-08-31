@@ -22,24 +22,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _common import REPO_ROOT, decode_bytes, rel  # noqa: E402
+from _common import REPO_ROOT, decode_bytes, detect_version, rel  # noqa: E402
 from lint_addon import ReferenceView, lint  # noqa: E402
 from refindex import DEFAULT_ROOT  # noqa: E402
 
 ADDON_ROOT = REPO_ROOT / "addon"
 BUILD_ROOT = REPO_ROOT / "build"
 
-VERSION_RE = re.compile(r"^##\s*\[?v?(\d+\.\d+(?:\.\d+)?)\]?", re.M)
 META_VERSION_RE = re.compile(r"^version\s*=.*$", re.M)
-
-
-def detect_version(addon_dir: Path) -> str:
-    changelog = addon_dir / "CHANGELOG.md"
-    if changelog.exists():
-        match = VERSION_RE.search(decode_bytes(changelog.read_bytes()))
-        if match:
-            return match.group(1)
-    return "1.0.0"
 
 
 def git_revision() -> str:
@@ -158,7 +148,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=BUILD_ROOT)
     parser.add_argument("--addon-root", type=Path, default=ADDON_ROOT)
     parser.add_argument("--reference", type=Path, default=DEFAULT_ROOT)
-    parser.add_argument("--version", help="переопределить версию (по умолчанию из CHANGELOG.md)")
+    parser.add_argument("--version", help="переопределить версию (по умолчанию из CHANGELOG.md / meta.ini)")
     parser.add_argument("--zip", action="store_true", help="дополнительно собрать архив")
     parser.add_argument("--install", type=Path, help="папка mods в MO2")
     parser.add_argument("--skip-lint", action="store_true")
