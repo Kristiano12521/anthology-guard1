@@ -9,7 +9,7 @@
     python3 tools/xraylog.py logs/xray_ivan.log --out logs/card.md
     python3 tools/xraylog.py logs/xray_ivan.log --archive
     python3 tools/xraylog.py logs/xray_ivan.log --warnings-only
-    python3 tools/xraylog.py logs/xray_ivan.log --errors-only
+    python3 tools/xraylog.py logs/xray_ivan.log --errors-only     # нефатальные ошибки + «Мои моды»
     python3 tools/xraylog.py logs/xray_ivan.log --mine
     python3 tools/xraylog.py logs/xray_ivan.log --json
 """
@@ -540,6 +540,9 @@ class LogReport:
             out.append(f"- Среда: {', '.join(env)}")
         out.append("")
 
+        out.append(self.mine_markdown().rstrip())
+        out.append("")
+
         if self.crashed and not hide_crash:
             out.append("## FATAL ERROR")
             out.append("")
@@ -563,11 +566,6 @@ class LogReport:
                 out.extend(self.stack_lines[:20])
                 out.append("```")
                 out.append("")
-
-        mine_section = self.mine_markdown()
-        if mine_section.strip():
-            out.append(mine_section.rstrip())
-            out.append("")
 
         shown_errors = self.nonfatal_errors[:MAX_NONFATAL_GROUPS]
         if shown_errors:
@@ -607,7 +605,7 @@ class LogReport:
                 out.append(f"- {marker}`{text[:200]}`")
             out.append("")
 
-        if self.context:
+        if self.context and not errors_only:
             title = "Последние строки лога" if not self.crashed else "Строки перед падением"
             out.append(f"## {title} ({len(self.context)})")
             out.append("")
@@ -670,7 +668,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--context", type=int, default=40, help="строк контекста перед падением")
     parser.add_argument("--max-warnings", type=int, default=15, help="сколько предупреждений показать")
     parser.add_argument("--warnings-only", action="store_true", help="без блока вылета")
-    parser.add_argument("--errors-only", action="store_true", help="только нефатальные ошибки, без вылета и предупреждений")
+    parser.add_argument("--errors-only", action="store_true", help="без вылета и предупреждений; секция «Мои моды» всегда включена")
     parser.add_argument("--mine", action="store_true", help="только секция «Мои моды»")
     parser.add_argument(
         "--addon-dir",

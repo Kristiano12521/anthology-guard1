@@ -1,0 +1,5 @@
+local LOG_TAG = "[fix_trader_restock_callback]"
+local VERSION = "1.0.2"
+
+printf("%s trader_on_restock added v%s", LOG_TAG, VERSION)
+printf("%s Send wrap installed", LOG_TAG)

@@ -1,4 +1,6 @@
 * Starting engine...
+[fix_trader_restock_callback] trader_on_restock added v1.0.2
+[fix_trader_restock_callback] Send wrap installed
 ~ [mod_loaded] loaded v1.0.0
 ~ [mod_loaded] actor ready
 ! [mod_failed] ui_target not found - guard NOT installed

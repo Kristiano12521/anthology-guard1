@@ -227,9 +227,11 @@ class CliTests(unittest.TestCase):
             code = xraylog.main([str(SAMPLES / "nonfatal_traceback.log"), "--errors-only"])
         self.assertEqual(code, 0)
         card = buffer.getvalue()
+        self.assertIn("## Мои моды", card)
         self.assertIn("## Нефатальные ошибки", card)
         self.assertNotIn("## Предупреждения", card)
         self.assertNotIn("## FATAL ERROR", card)
+        self.assertNotIn("## Последние строки лога", card)
 
     def test_missing_file_returns_error_code(self):
         with contextlib.redirect_stderr(io.StringIO()):
@@ -239,12 +241,13 @@ class CliTests(unittest.TestCase):
 
 class ArchiveCardTests(unittest.TestCase):
     def test_name_includes_date_and_source_stem(self):
-        path = xraylog.unique_archive_path(
-            Path("logs/cards"),
-            Path(r"C:\Users\someone\AppData\xray_barkid.log"),
-            analyzed_on=date(2026, 8, 31),
-        )
-        self.assertEqual(path.name, "2026-08-31_xray_barkid.md")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = xraylog.unique_archive_path(
+                Path(tmp),
+                Path(r"C:\Users\someone\AppData\xray_barkid.log"),
+                analyzed_on=date(2026, 8, 31),
+            )
+            self.assertEqual(path.name, "2026-08-31_xray_barkid.md")
 
     def test_collision_adds_numeric_suffix(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -327,6 +330,8 @@ class MineSectionTests(unittest.TestCase):
         assert self.report.mod_scan is not None
         self.assertIn("mod_loaded", self.report.mod_scan.present)
         self.assertTrue(self.report.mod_scan.present["mod_loaded"].loaded_hint)
+        self.assertIn("fix_trader_restock_callback", self.report.mod_scan.present)
+        self.assertTrue(self.report.mod_scan.present["fix_trader_restock_callback"].loaded_hint)
 
     def test_failed_mod_has_failure_marker(self) -> None:
         assert self.report.mod_scan is not None
@@ -343,6 +348,46 @@ class MineSectionTests(unittest.TestCase):
         report = parse("nonfatal_traceback.log", addon_dir=ADDON_MINE)
         card = report.to_markdown(max_warnings=10, warnings_only=False)
         self.assertLess(card.index("## Мои моды"), card.index("## Нефатальные ошибки"))
+
+    def test_errors_only_includes_mine_with_loaded_mod(self) -> None:
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = xraylog.main(
+                [
+                    str(self.log_path),
+                    "--errors-only",
+                    "--addon-dir",
+                    str(ADDON_MINE),
+                ]
+            )
+        self.assertEqual(code, 0)
+        card = buffer.getvalue()
+        self.assertIn("## Мои моды", card)
+        self.assertIn("trader_on_restock added", card)
+        self.assertIn("Send wrap installed", card)
+        self.assertIn("`fix_trader_restock_callback`", card)
+        self.assertIn("`mod_loaded`", card)
+        self.assertIn("### Не появились в логе", card)
+        self.assertIn("`mod_missing`", card)
+        self.assertNotIn("## Предупреждения", card)
+        self.assertNotIn("## Последние строки лога", card)
+
+    def test_warnings_only_includes_mine_section(self) -> None:
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = xraylog.main(
+                [
+                    str(self.log_path),
+                    "--warnings-only",
+                    "--addon-dir",
+                    str(ADDON_MINE),
+                ]
+            )
+        self.assertEqual(code, 0)
+        card = buffer.getvalue()
+        self.assertIn("## Мои моды", card)
+        self.assertIn("trader_on_restock added", card)
+        self.assertNotIn("## FATAL ERROR", card)
 
     def test_mine_flag_outputs_only_mine_section(self) -> None:
         buffer = io.StringIO()
@@ -362,8 +407,9 @@ class MineSectionTests(unittest.TestCase):
         self.assertIn("`mod_missing`", card)
         self.assertIn("### С отказами (1)", card)
         self.assertIn("`mod_failed`", card)
-        self.assertIn("### В логе без отказов (1)", card)
+        self.assertIn("### В логе без отказов (2)", card)
         self.assertIn("`mod_loaded`", card)
+        self.assertIn("`fix_trader_restock_callback`", card)
         self.assertNotIn("## Нефатальные ошибки", card)
         self.assertNotIn("## FATAL ERROR", card)
 
