@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import os
 import sys
 import tempfile
@@ -11,6 +13,65 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 import build_prune  # noqa: E402
 import pack_bhs  # noqa: E402
+
+# Минимальный MAG Redux для patch_seqload — те же якоря, что в test_pack_bhs.py.
+SEQLOAD_SOURCE = """----------------------------------------------------------------
+-- Sequential (alternating) magazine loading.
+----------------------------------------------------------------
+local presets = {}
+
+local function take_one_round(pool)
+	while #pool.boxes > 0 do
+		local box = pool.boxes[1]
+		local count = box:ammo_get_count()
+		if count > 1 then
+			box:ammo_set_count(count - 1)
+			pool.total = pool.total - 1
+			return true
+		elseif count == 1 then
+			alife_release_id(box:id())
+			table.remove(pool.boxes, 1)
+			pool.total = pool.total - 1
+			return true
+		else
+			table.remove(pool.boxes, 1)
+		end
+	end
+	return false
+end
+
+	-- Don't double-schedule.
+	if in_progress[mag_id] then return end
+
+	-- Don't show a second time if we're already loading this mag.
+	if in_progress[obj:id()] then return false end
+	return true
+
+	-- If a gradual load is already running on this mag, ignore further clicks.
+	if in_progress[mag_id] then return end
+"""
+
+
+def write(path: Path, text: str = "x\n") -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def stage_minimal_bhs_repo(root: Path) -> None:
+    """Временный reference/addons + overlay, как setUp в test_pack_bhs.py."""
+    vendor = root / "reference" / "addons" / "BusyHands_vendor"
+    write(vendor / "scripts" / "vendor_bhs.script")
+    write(vendor / "scripts" / "fix_bhs_fdda_loot.script", "-- loot sidecar\n")
+    write(
+        root / "reference" / "addons" / "mags_redux" / "scripts" / "sequential_load_magazine.script",
+        SEQLOAD_SOURCE,
+    )
+    overlay = root / "addon" / "anthology_busyhands_stability_fix"
+    scripts = overlay / "gamedata" / "scripts"
+    write(scripts / pack_bhs.MAIN_OVERLAY)
+    write(overlay / "CHANGELOG.md", "## [0.9.9]\n")
+    write(overlay / "meta.ini", "version=0.0.0\n")
+    (root / "build").mkdir(exist_ok=True)
 
 
 class BuildPruneTests(unittest.TestCase):
@@ -83,33 +144,19 @@ class BuildPruneTests(unittest.TestCase):
         self.assertTrue(old_zip.exists())
 
     def test_pack_bhs_cleans_old_versions(self) -> None:
-        repo = REPO_ROOT
-        overlay = repo / "addon" / "anthology_busyhands_stability_fix"
-        if not overlay.is_dir():
-            self.skipTest("overlay fixture missing in repo")
+        repo = self.build / "repo"
+        stage_minimal_bhs_repo(repo)
 
-        vendor = repo / "reference" / "addons"
-        if not any("BusyHands" in p.name for p in vendor.iterdir() if p.is_dir()):
-            self.skipTest("BusyHands vendor missing in reference/")
-
-        import contextlib
-        import io
-        import shutil
-
-        tmp_repo = self.build / "repo"
-        shutil.copytree(repo / "addon", tmp_repo / "addon")
-        shutil.copytree(repo / "reference", tmp_repo / "reference")
-        (tmp_repo / "build").mkdir()
-
-        stale = tmp_repo / "build" / "Anthology_BusyHands_Stability_Fix_v0_6_2.zip"
+        stale = repo / "build" / "Anthology_BusyHands_Stability_Fix_v0_6_2.zip"
         stale.write_text("old\n", encoding="utf-8")
-        stale2 = tmp_repo / "build" / "anthology_busyhands_stability_fix-0.6.1.zip"
+        stale2 = repo / "build" / "anthology_busyhands_stability_fix-0.6.1.zip"
         stale2.write_text("old\n", encoding="utf-8")
 
         with contextlib.redirect_stdout(io.StringIO()):
-            archive = pack_bhs.pack(tmp_repo, keep_old=False)
+            archive = pack_bhs.pack(repo, keep_old=False)
 
         self.assertTrue(archive.is_file())
+        self.assertEqual(archive.name, "Anthology_BusyHands_Stability_Fix_v0_9_9.zip")
         self.assertFalse(stale.exists())
         self.assertFalse(stale2.exists())
 

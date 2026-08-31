@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.45] — test_build_prune без reference/
+
+`tests/test_build_prune.py::test_pack_bhs_cleans_old_versions` переведён на временные фикстуры (как `test_pack_bhs.py`): свой `reference/addons` с вендором BusyHands и MAG Redux. Больше не копирует реальный `reference/` — тест проходит на чистом клоне и в CI.
+
 ## [0.1.44] — очистка build/ и prune_builds
 
 Перед сборкой `build_addon.py`, `pack_bhs.py` и `_pack_kristiano_aio.py` удаляют предыдущие артефакты того же мода в `build/` (папки и zip разных имён — для BHS это и `Anthology_BusyHands_Stability_Fix_v*`, и `anthology_busyhands_stability_fix-*`). Флаг `--keep-old` отключает очистку. `tools/prune_builds.py` — ротация по образцу `prune_logs.py`: `--dry-run` по умолчанию, `--keep N`, `--yes`. В docstring `pack_bhs.py` зафиксировано: MO2-канал — AIO, standalone zip — для проверки и fill_reference. Тесты `test_build_prune`, `test_prune_builds`.
