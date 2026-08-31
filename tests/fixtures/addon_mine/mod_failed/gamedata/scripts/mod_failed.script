@@ -1,0 +1,5 @@
+local LOG_TAG = "[mod_failed]"
+
+function on_game_start()
+	printf(LOG_TAG .. " ui_target not found - guard NOT installed")
+end

@@ -1,0 +1,5 @@
+local LOG_TAG = "[mod_loaded]"
+
+function on_game_start()
+	printf(LOG_TAG .. " loaded v1.0.0")
+end

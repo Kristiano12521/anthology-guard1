@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.39] — xraylog: секция «Мои моды»
+
+`tools/xraylog.py` + `tools/mod_mine.py`: секция **«Мои моды»** в карточке (перед нефатальными ошибками). Идентификаторы собираются из `addon/<mod_id>/` и имён скриптов, плюс `LOG_TAG` / `printf("[…]")` из исходников. Для каждого мода — строки в логе и признаки отказа (`not found`, `NOT installed`, `guard NOT installed`, …). Отдельный блок **«Не появились в логе»** — мод в `addon/`, но ни одной строки (не в MO2 / не в пакете). Флаг `--mine` — только эта секция. В `.cursor/commands/crash.md` — шаг проверки перед разбором. Тесты на фикстурах `tests/fixtures/addon_mine/`, `tests/fixtures/xraylog_mine.log`.
+
 ## [0.1.38] — CI: actions/checkout и setup-python на Node 24
 
 `.github/workflows/ci.yml`: `actions/checkout@v7` (релиз [v7.0.1](https://github.com/actions/checkout/releases/tag/v7.0.1), ESM, Node 24) и `actions/setup-python@v7` (релиз [v7.0.0](https://github.com/actions/setup-python/releases/tag/v7.0.0)). Убирает предупреждение о принудительном запуске v4/v5 на Node 20. Матрица Python 3.9/3.12, шаги и `fetch-depth: 0` без изменений.

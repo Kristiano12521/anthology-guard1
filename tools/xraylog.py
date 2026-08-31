@@ -10,6 +10,7 @@
     python3 tools/xraylog.py logs/xray_ivan.log --archive
     python3 tools/xraylog.py logs/xray_ivan.log --warnings-only
     python3 tools/xraylog.py logs/xray_ivan.log --errors-only
+    python3 tools/xraylog.py logs/xray_ivan.log --mine
     python3 tools/xraylog.py logs/xray_ivan.log --json
 """
 
@@ -26,6 +27,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _common import REPO_ROOT, decode_bytes, filename, rel  # noqa: E402
+from mod_mine import (  # noqa: E402
+    DEFAULT_ADDON_DIR,
+    ModScanResult,
+    discover_addon_mods,
+    format_mine_markdown,
+    scan_log_for_mods,
+)
 
 DEFAULT_ARCHIVE_DIR = REPO_ROOT / "logs" / "cards"
 
@@ -187,8 +195,9 @@ class NonfatalGroup:
 
 
 class LogReport:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, addon_dir: Path | None = None) -> None:
         self.path = path
+        self.addon_dir = addon_dir or DEFAULT_ADDON_DIR
         self.size = path.stat().st_size
         self.line_count = 0
         self.fatal_lines: list[str] = []
@@ -198,6 +207,8 @@ class LogReport:
         self.script_refs: list[str] = []
         self.warnings: Counter[str] = Counter()
         self.nonfatal_errors: list[NonfatalGroup] = []
+        self.log_lines: list[str] = []
+        self.mod_scan: ModScanResult | None = None
         self.engine_build: str | None = None
         self.exe: str | None = None
         self.crashed = False
@@ -243,6 +254,7 @@ class LogReport:
 
                 if stripped:
                     recent_raw.append(stripped)
+                    self.log_lines.append(stripped)
 
                 if self.engine_build is None:
                     match = BUILD_RE.search(line)
@@ -329,6 +341,9 @@ class LogReport:
 
         if not self.crashed:
             self.context = list(recent)
+
+        catalog = discover_addon_mods(self.addon_dir)
+        self.mod_scan = scan_log_for_mods(self.log_lines, catalog)
 
     # -- выводы ------------------------------------------------------
 
@@ -476,9 +491,20 @@ class LogReport:
             "warnings": self.warnings.most_common(max_warnings),
             "nonfatal_groups": len(self.nonfatal_errors),
             "nonfatal_errors": [group.to_dict() for group in self.nonfatal_errors[:MAX_NONFATAL_GROUPS]],
+            "mods": self.mod_scan.to_dict() if self.mod_scan else None,
             "context": self.context,
             "stack": self.stack_lines[:30],
         }
+
+    def mine_markdown(self, mine_only: bool = False) -> str:
+        if self.mod_scan is None:
+            catalog = discover_addon_mods(self.addon_dir)
+            self.mod_scan = scan_log_for_mods(self.log_lines, catalog)
+        return format_mine_markdown(
+            self.mod_scan,
+            filename(self.path),
+            mine_only=mine_only,
+        )
 
     def to_markdown(
         self,
@@ -486,7 +512,11 @@ class LogReport:
         warnings_only: bool,
         errors_only: bool = False,
         analyzed_on: date | None = None,
+        mine_only: bool = False,
     ) -> str:
+        if mine_only:
+            return self.mine_markdown(mine_only=True)
+
         crash_class, hints = self.classify()
         hide_crash = warnings_only or errors_only
         if self.size >= 1024 * 1024:
@@ -533,6 +563,11 @@ class LogReport:
                 out.extend(self.stack_lines[:20])
                 out.append("```")
                 out.append("")
+
+        mine_section = self.mine_markdown()
+        if mine_section.strip():
+            out.append(mine_section.rstrip())
+            out.append("")
 
         shown_errors = self.nonfatal_errors[:MAX_NONFATAL_GROUPS]
         if shown_errors:
@@ -636,6 +671,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-warnings", type=int, default=15, help="сколько предупреждений показать")
     parser.add_argument("--warnings-only", action="store_true", help="без блока вылета")
     parser.add_argument("--errors-only", action="store_true", help="только нефатальные ошибки, без вылета и предупреждений")
+    parser.add_argument("--mine", action="store_true", help="только секция «Мои моды»")
+    parser.add_argument(
+        "--addon-dir",
+        type=Path,
+        default=None,
+        help="каталог addon/ для секции «Мои моды» (по умолчанию addon/)",
+    )
     parser.add_argument("--json", action="store_true", help="машиночитаемый вывод")
     args = parser.parse_args(argv)
 
@@ -643,7 +685,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Файл не найден: {args.log}", file=sys.stderr)
         return 2
 
-    report = LogReport(args.log)
+    if args.mine and args.json:
+        print("укажите либо --mine, либо --json, не оба", file=sys.stderr)
+        return 2
+
+    report = LogReport(args.log, addon_dir=args.addon_dir)
     report.parse(context_lines=max(5, args.context))
     analyzed_on = date.today()
 
@@ -651,13 +697,21 @@ def main(argv: list[str] | None = None) -> int:
         text = json.dumps(report.to_dict(args.max_warnings), ensure_ascii=False, indent=2)
     else:
         text = report.to_markdown(
-            args.max_warnings, args.warnings_only, args.errors_only, analyzed_on=analyzed_on
+            args.max_warnings,
+            args.warnings_only,
+            args.errors_only,
+            analyzed_on=analyzed_on,
+            mine_only=args.mine,
         )
 
     if args.archive:
         dest_dir = args.archive_dir if args.archive_dir is not None else DEFAULT_ARCHIVE_DIR
         card_md = report.to_markdown(
-            args.max_warnings, args.warnings_only, args.errors_only, analyzed_on=analyzed_on
+            args.max_warnings,
+            args.warnings_only,
+            args.errors_only,
+            analyzed_on=analyzed_on,
+            mine_only=args.mine,
         )
         archive_path = write_archive(card_md, args.log, dest_dir, analyzed_on)
         sink = sys.stderr if args.json else sys.stdout

@@ -16,10 +16,12 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 import xraylog  # noqa: E402
 
 SAMPLES = REPO_ROOT / "logs" / "samples"
+FIXTURES = REPO_ROOT / "tests" / "fixtures"
+ADDON_MINE = FIXTURES / "addon_mine"
 
 
-def parse(name: str) -> xraylog.LogReport:
-    report = xraylog.LogReport(SAMPLES / name)
+def parse(name: str, *, addon_dir: Path | None = None) -> xraylog.LogReport:
+    report = xraylog.LogReport(SAMPLES / name, addon_dir=addon_dir)
     report.parse(context_lines=40)
     return report
 
@@ -127,8 +129,10 @@ class NonfatalTracebackTests(unittest.TestCase):
     def test_markdown_lists_errors_before_warnings(self):
         card = self.report.to_markdown(max_warnings=10, warnings_only=False)
         self.assertNotIn("## FATAL ERROR", card)
+        mine_at = card.index("## Мои моды")
         errors_at = card.index("## Нефатальные ошибки")
         warnings_at = card.index("## Предупреждения")
+        self.assertLess(mine_at, errors_at)
         self.assertLess(errors_at, warnings_at)
         self.assertIn("`axr_main.script` ×2", card)
         self.assertIn("`sound_theme.script` ×1", card)
@@ -311,6 +315,73 @@ class ArchiveCardTests(unittest.TestCase):
             card = files[0].read_text(encoding="utf-8")
             self.assertIn("- Дата разбора:", card)
             self.assertIn("- Файл: `crash_lua_nil.log`", card)
+
+
+class MineSectionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.log_path = FIXTURES / "xraylog_mine.log"
+        self.report = xraylog.LogReport(self.log_path, addon_dir=ADDON_MINE)
+        self.report.parse(context_lines=40)
+
+    def test_loaded_mod_is_present(self) -> None:
+        assert self.report.mod_scan is not None
+        self.assertIn("mod_loaded", self.report.mod_scan.present)
+        self.assertTrue(self.report.mod_scan.present["mod_loaded"].loaded_hint)
+
+    def test_failed_mod_has_failure_marker(self) -> None:
+        assert self.report.mod_scan is not None
+        presence = self.report.mod_scan.present["mod_failed"]
+        self.assertTrue(presence.has_failures)
+        self.assertIn("guard NOT installed", next(iter(presence.failure_lines)))
+
+    def test_missing_mod_listed_as_absent(self) -> None:
+        assert self.report.mod_scan is not None
+        self.assertIn("mod_missing", self.report.mod_scan.absent)
+        self.assertNotIn("mod_missing", self.report.mod_scan.present)
+
+    def test_markdown_mine_before_nonfatal(self) -> None:
+        report = parse("nonfatal_traceback.log", addon_dir=ADDON_MINE)
+        card = report.to_markdown(max_warnings=10, warnings_only=False)
+        self.assertLess(card.index("## Мои моды"), card.index("## Нефатальные ошибки"))
+
+    def test_mine_flag_outputs_only_mine_section(self) -> None:
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = xraylog.main(
+                [
+                    str(self.log_path),
+                    "--mine",
+                    "--addon-dir",
+                    str(ADDON_MINE),
+                ]
+            )
+        self.assertEqual(code, 0)
+        card = buffer.getvalue()
+        self.assertIn("# Мои моды — xraylog_mine.log", card)
+        self.assertIn("### Не появились в логе (1)", card)
+        self.assertIn("`mod_missing`", card)
+        self.assertIn("### С отказами (1)", card)
+        self.assertIn("`mod_failed`", card)
+        self.assertIn("### В логе без отказов (1)", card)
+        self.assertIn("`mod_loaded`", card)
+        self.assertNotIn("## Нефатальные ошибки", card)
+        self.assertNotIn("## FATAL ERROR", card)
+
+    def test_json_includes_mod_scan(self) -> None:
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = xraylog.main(
+                [
+                    str(self.log_path),
+                    "--json",
+                    "--addon-dir",
+                    str(ADDON_MINE),
+                ]
+            )
+        self.assertEqual(code, 0)
+        payload = json.loads(buffer.getvalue())
+        self.assertIn("mod_missing", payload["mods"]["absent"])
+        self.assertIn("mod_loaded", payload["mods"]["present"])
 
 
 if __name__ == "__main__":

@@ -1,0 +1,5 @@
+local LOG_TAG = "[mod_missing]"
+
+function on_game_start()
+	-- silent mod for absence detection tests
+end
