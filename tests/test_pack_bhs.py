@@ -117,6 +117,24 @@ class PackBhsTests(unittest.TestCase):
         self.assertNotIn("gamedata/scripts/anthology_bhs_fdda_patch.script", names)
         self.assertNotIn(f"gamedata/scripts/{pack_bhs.MAIN_OVERLAY}", names)
 
+    def test_rejects_source_with_build_info(self):
+        preferred = (
+            self.repo
+            / "reference"
+            / "addons"
+            / f"Anthology_BusyHands_Stability_Fix_v{pack_bhs.VERSION.replace('.', '_')}"
+        )
+        preferred.mkdir(parents=True)
+        write(preferred / "scripts" / "vendor_bhs.script")
+        write(
+            preferred / "BUILD_INFO.txt",
+            "mod_id: Anthology_BusyHands_Stability_Fix\nversion: 0.6.4\n",
+        )
+        with self.assertRaises(SystemExit) as ctx:
+            pack_bhs.pack(self.repo)
+        self.assertIn("BUILD_INFO.txt", str(ctx.exception))
+        self.assertIn("own pack", str(ctx.exception).lower())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -13,12 +13,28 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 VERSION = "0.6.4"
-OUT_NAME = "Anthology_BusyHands_Stability_Fix_v0_6_4"
+OUT_STEM = "Anthology_BusyHands_Stability_Fix"
+OUT_NAME = f"{OUT_STEM}_v{VERSION.replace('.', '_')}"
 
 # Overlay patches already carry zzzzzz_ / zzzz_zzz_ in addon/.
 # Main script stays unprefixed there; zip restores vendor load order.
 MAIN_OVERLAY = "anthology_busyhands_stability_fix.script"
 MAIN_ZIP = "zzzzzz_anthology_busyhands_stability_fix.script"
+
+
+def reject_own_bhs_source(path: Path) -> None:
+    """Нельзя паковать из нашей же сборки — петля в reference/addons.
+
+    BUILD_INFO.txt кладёт pack_bhs / build_addon в корень пакета. В эталоне
+    после fill_reference_addons его обычно нет (копируется только gamedata/),
+    но полный каталог из build/ или MO2 mods/ отвергаем явно.
+    """
+    marker = path / "BUILD_INFO.txt"
+    if marker.is_file():
+        raise SystemExit(
+            f"BusyHands source is our own pack (BUILD_INFO.txt): {path}\n"
+            "Use the vendor folder in reference/addons/ without BUILD_INFO.txt."
+        )
 
 
 def bhs_source(repo: Path) -> Path:
@@ -27,9 +43,11 @@ def bhs_source(repo: Path) -> Path:
         raise SystemExit("reference/addons/*BusyHands* not found")
     preferred = root / f"Anthology_BusyHands_Stability_Fix_v{VERSION.replace('.', '_')}"
     if preferred.is_dir():
+        reject_own_bhs_source(preferred)
         return preferred
     hits = [path for path in root.iterdir() if path.is_dir() and "BusyHands" in path.name]
     if len(hits) == 1:
+        reject_own_bhs_source(hits[0])
         return hits[0]
     if not hits:
         raise SystemExit("reference/addons/*BusyHands* not found")

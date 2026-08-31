@@ -86,6 +86,7 @@ class PackKristianoTests(unittest.TestCase):
             self.assertTrue(any(n.startswith("gamedata/") for n in names), msg=names)
             self.assertFalse(any(n.startswith(mo2_name) for n in names), msg=names)
             self.assertIn("meta.ini", names)
+            self.assertIn("BUILD_INFO.txt", names)
             with zipfile.ZipFile(archive) as zf:
                 meta = zf.read("meta.ini").decode("utf-8")
             self.assertIn("version=3.2.1", meta)

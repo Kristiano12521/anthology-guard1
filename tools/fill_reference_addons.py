@@ -7,10 +7,15 @@ ModOrganizer.ini (selected_profile, включая @ByteArray с \\xNN).
 materials/ в reference/addons/<имя из modlist>/. reference/anthology/
 не трогает: ядро Anthology в этой сборке тоже лежит модами MO2.
 
+Свои сборки (BUILD_INFO.txt / meta notes / CONTENTS.txt от packers)
+по умолчанию не копируются — иначе lint видит addon/ как «замену себя».
+Флаг --include-own включает их.
+
     python3 tools/fill_reference_addons.py "C:/Games/.../mo2"
     python3 tools/fill_reference_addons.py "C:/Games/.../mo2" --dry-run
     python3 tools/fill_reference_addons.py "C:/Games/.../mo2" --profile "Anthology 2.1 HARD Сложный"
     python3 tools/fill_reference_addons.py "C:/Games/.../mo2" --prune --yes
+    python3 tools/fill_reference_addons.py "C:/Games/.../mo2" --include-own
 """
 
 from __future__ import annotations
@@ -48,6 +53,81 @@ NAMED_ESCAPES = {
 }
 HEX_DIGITS = "0123456789abcdefABCDEF"
 OCT_DIGITS = "01234567"
+
+# Маркеры пакетов из tools/build_addon.py, pack_bhs.py, _pack_kristiano_aio.py.
+OWN_NOTES_NEEDLE = "STALKER Anthology Dev"
+OWN_CONTENTS_NEEDLES = (
+    "Rewritten DLTX",
+    "Not included (separate archives)",
+    OWN_NOTES_NEEDLE,
+)
+
+
+def _read_text_best_effort(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError:
+        return path.read_bytes().decode("cp1251", errors="replace")
+    except OSError:
+        return ""
+
+
+def own_mo2_name_prefixes() -> tuple[str, ...]:
+    """Префиксы MO2-имён наших пакетов из упаковщиков (один источник правды)."""
+    import _pack_kristiano_aio as kristiano_pack  # noqa: PLC0415
+    import pack_bhs  # noqa: PLC0415
+
+    return (kristiano_pack.AIO_NAME, *kristiano_pack.SEPARATE.values(), pack_bhs.OUT_STEM)
+
+
+def is_own_package_name(name: str) -> bool:
+    """Имя начинается с AIO_NAME / SEPARATE / BusyHands OUT_STEM (суффикс NEW и т.п.)."""
+    return any(name.startswith(prefix) for prefix in own_mo2_name_prefixes())
+
+
+def is_own_mo2_package(mod_dir: Path) -> bool:
+    """True, если корень мода MO2 — наша сборка, а не чужой эталон.
+
+    Признаки (любой):
+    1) имя начинается с префикса из AIO_NAME / SEPARATE / pack_bhs.OUT_STEM
+       (MO2 часто добавляет « (NEW)» и другие суффиксы);
+    2) BUILD_INFO.txt (build_addon / pack_bhs / kristiano packer);
+    3) CONTENTS.txt от Kristiano AIO;
+    4) meta.ini notes/comments со «STALKER Anthology Dev»; vendor_fork=1;
+       installationFile с путём на .../Anthology/build/.
+    """
+    if not mod_dir.is_dir():
+        return False
+    if is_own_package_name(mod_dir.name):
+        return True
+    if (mod_dir / "BUILD_INFO.txt").is_file():
+        return True
+    contents = mod_dir / "CONTENTS.txt"
+    if contents.is_file():
+        text = _read_text_best_effort(contents)
+        if any(needle in text for needle in OWN_CONTENTS_NEEDLES):
+            return True
+    meta = mod_dir / "meta.ini"
+    if not meta.is_file():
+        return False
+    for raw in _read_text_best_effort(meta).splitlines():
+        line = raw.strip()
+        if not line or line.startswith("[") or line.startswith("#") or line.startswith(";"):
+            continue
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key_l = key.strip().lower()
+        value = value.strip().strip('"')
+        if key_l in ("notes", "comments") and OWN_NOTES_NEEDLE in value:
+            return True
+        if key_l == "vendor_fork" and value.lower() in ("1", "true", "yes"):
+            return True
+        if key_l == "installationfile":
+            normalized = value.replace("\\", "/").lower()
+            if "/anthology/build/" in normalized:
+                return True
+    return False
 
 
 def unescape_qt_ini(text: str) -> str:
@@ -234,6 +314,22 @@ def resolve_profile(mo2: Path, profile: str | None) -> str:
     return read_selected_profile(ini)
 
 
+def keep_addon_names(
+    enabled: list[str],
+    mods_dir: Path,
+    *,
+    include_own: bool,
+) -> set[str]:
+    """Имена папок reference/addons/, которые prune не трогает."""
+    keep = set(enabled)
+    if include_own:
+        return keep
+    for name in enabled:
+        if is_own_mo2_package(mods_dir / name):
+            keep.discard(name)
+    return keep
+
+
 def fill_addons(
     mo2: Path,
     reference_root: Path,
@@ -242,6 +338,7 @@ def fill_addons(
     dry_run: bool = False,
     prune: bool = False,
     yes: bool = False,
+    include_own: bool = False,
 ) -> tuple[dict[str, int], list[str], list[Path], bool]:
     """Возвращает (counts, skip kinds, extra dirs, aborted).
 
@@ -264,7 +361,8 @@ def fill_addons(
 
     enabled = parse_modlist(modlist)
     addons_root = reference_root / ADDONS_DIR_NAME
-    extra = extra_addon_dirs(addons_root, set(enabled))
+    keep_names = keep_addon_names(enabled, mods_dir, include_own=include_own)
+    extra = extra_addon_dirs(addons_root, keep_names)
 
     counts = {
         "mods": 0,
@@ -272,6 +370,7 @@ def fill_addons(
         "written": 0,
         "unchanged": 0,
         "enabled": len(enabled),
+        "own_skipped": 0,
     }
     skips: list[str] = []
 
@@ -281,6 +380,11 @@ def fill_addons(
     action = "будет" if dry_run else "взято"
     keep_label = "/".join(KEEP_DIRS)
     for name in enabled:
+        source = mods_dir / name
+        if not include_own and is_own_mo2_package(source):
+            counts["own_skipped"] += 1
+            print(f"пропуск {name}: свой пакет", file=sys.stderr)
+            continue
         kept, written, unchanged, mod_skips = copy_mod(
             name, mods_dir, addons_root, dry_run=dry_run
         )
@@ -341,6 +445,12 @@ def print_summary(
         f"в reference/{ADDONS_DIR_NAME}/ "
         f"(включено в профиле: {counts['enabled']})."
     )
+    own_skipped = counts.get("own_skipped", 0)
+    if own_skipped:
+        print(
+            f"пропущено своих пакетов: {own_skipped} "
+            "(маркер сборки; см. --include-own)."
+        )
     if not dry_run:
         print(
             f"записано новых/изменённых: {counts['written']}, "
@@ -388,6 +498,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="подтвердить --prune (без этого только список и выход)",
     )
+    parser.add_argument(
+        "--include-own",
+        action="store_true",
+        help="копировать и свои сборки (BUILD_INFO / meta notes / CONTENTS)",
+    )
     args = parser.parse_args(argv)
 
     if not args.mo2.is_dir():
@@ -401,6 +516,7 @@ def main(argv: list[str] | None = None) -> int:
             dry_run=args.dry_run,
             prune=args.prune,
             yes=args.yes,
+            include_own=args.include_own,
         )
     except FileNotFoundError as exc:
         print(str(exc), file=sys.stderr)

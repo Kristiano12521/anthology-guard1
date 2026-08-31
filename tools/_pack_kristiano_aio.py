@@ -149,6 +149,20 @@ def pack_separate(
             flags=re.M,
         )
         (staging / "meta.ini").write_text(text, encoding="utf-8")
+    (staging / "BUILD_INFO.txt").write_text(
+        "\n".join(
+            [
+                f"mod_id: {mod_id}",
+                f"version: {version}",
+                f"built: {datetime.now().isoformat(timespec='seconds')}",
+                f"source: addon/{mod_id}",
+                f"gamedata_files: {files}",
+                "target: Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     archive = out_dir / f"{mo2_name}.zip"
     write_zip(staging, archive)
     print(f"{mo2_name}: {files} files, v{version} -> {archive.name}")
@@ -230,6 +244,19 @@ def pack_aio(addons: list[Path], *, out_dir: Path | None = None) -> Path:
             "for Anomaly 1.5.3 / Anthology 2.1"
         ),
         install_name=AIO_NAME,
+    )
+    (staging / "BUILD_INFO.txt").write_text(
+        "\n".join(
+            [
+                f"mod_id: {AIO_NAME}",
+                f"built: {datetime.now().isoformat(timespec='seconds')}",
+                f"addons: {len(addons)}",
+                f"gamedata_files: {total}",
+                "target: Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
     )
     archive = out_dir / f"{AIO_NAME}.zip"
     write_zip(staging, archive)

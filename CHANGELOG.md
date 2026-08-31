@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.33] — fill_reference_addons: не копировать свои пакеты
+
+`tools/fill_reference_addons.py` по умолчанию пропускает наши сборки в MO2: маркеры `BUILD_INFO.txt` / `CONTENTS.txt` / `meta.ini` (notes со `STALKER Anthology Dev`, `vendor_fork`, путь `Anthology/build`) и префиксы имён из `AIO_NAME` + `SEPARATE` (`_pack_kristiano_aio.py`) и `OUT_STEM` (`pack_bhs.py`) — ловят и старые копии без `BUILD_INFO`, и суффиксы вроде `(NEW)`. `--include-own` включает их; `--prune` считает свои лишними. `pack_bhs.py` отказывается брать источник с `BUILD_INFO.txt`. Kristiano-пакер пишет `BUILD_INFO.txt`. Из `reference/addons/` убраны одиннадцать своих/устаревших папок (вендорский BusyHands `v0_6_1` оставлен). LUA-001 снова два: `fix_crowkiller_hello`, `fix_xr_effects_sounds`. Тесты и строка в `docs/setup.md` / README.
+
 ## [0.1.32] — pack_bhs: overlay без тождественной карты
 
 `tools/pack_bhs.py`: `OVERLAY_MAP` убран. Патчи копируются как есть (имена уже с `zzzzzz_` / `zzzz_zzz_`); главный скрипт переименовывается в `zzzzzz_anthology_busyhands_stability_fix.script` явно. `sequential_load_magazine.script` берётся из MAG Redux, не из копий BHS в `reference/addons/`. База — `Anthology_BusyHands_Stability_Fix_v<VERSION>`, если такая папка есть. Фикстуры `tests/test_pack_bhs.py` — одиннадцать файлов overlay.

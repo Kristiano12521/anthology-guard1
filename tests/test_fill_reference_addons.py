@@ -227,6 +227,101 @@ class FillAddonsTests(unittest.TestCase):
             (self.reference / "addons" / SIMPLE_MOD / "scripts" / "simple.script").exists()
         )
 
+    def _put_own_package(self, name: str, *, marker: str) -> Path:
+        """Корень мода MO2 с признаком нашей сборки + gamedata."""
+        root = self.mods / name
+        self._put_mod(name, {"scripts/own.script": b"-- own\n"})
+        if marker == "BUILD_INFO":
+            (root / "BUILD_INFO.txt").write_text(
+                "mod_id: own\nversion: 1.0.0\n",
+                encoding="utf-8",
+            )
+        elif marker == "notes":
+            (root / "meta.ini").write_text(
+                "[General]\n"
+                "notes=Built from STALKER Anthology Dev, addon/demo\n",
+                encoding="utf-8",
+            )
+        elif marker == "CONTENTS":
+            (root / "CONTENTS.txt").write_text(
+                "Rewritten DLTX / callback pack\n"
+                "Not included (separate archives):\n",
+                encoding="utf-8",
+            )
+        else:
+            raise ValueError(marker)
+        return root
+
+    def test_skips_own_package_by_build_info(self):
+        own = "Our Built Mod (NEW)"
+        self._put_own_package(own, marker="BUILD_INFO")
+        modlist = self.profiles / STANDART / "modlist.txt"
+        modlist.write_text(f"+{own}\n+{SIMPLE_MOD}\n", encoding="utf-8")
+        code, out = run_fill(self.mo2, self.reference)
+        self.assertEqual(code, 0, msg=out)
+        self.assertIn("свой пакет", out)
+        self.assertIn("пропущено своих пакетов: 1", out)
+        self.assertFalse((self.reference / "addons" / own).exists())
+        self.assertTrue(
+            (self.reference / "addons" / SIMPLE_MOD / "scripts" / "simple.script").exists()
+        )
+
+    def test_skips_own_package_by_packer_name_without_build_info(self):
+        """Старые копии без BUILD_INFO: имя из AIO_NAME / SEPARATE / OUT_STEM."""
+        import _pack_kristiano_aio as kristiano_pack
+        import pack_bhs
+
+        own = f"{kristiano_pack.AIO_NAME} (NEW)"
+        self._put_mod(own, {"scripts/own.script": b"-- own\n"})
+        self.assertFalse((self.mods / own / "BUILD_INFO.txt").exists())
+        self.assertFalse((self.mods / own / "meta.ini").exists())
+        self.assertTrue(fill_reference_addons.is_own_package_name(own))
+        self.assertTrue(
+            fill_reference_addons.is_own_package_name(
+                f"{pack_bhs.OUT_STEM}_v0_6_3"
+            )
+        )
+        self.assertFalse(
+            fill_reference_addons.is_own_package_name("unrelated_mod")
+        )
+        modlist = self.profiles / STANDART / "modlist.txt"
+        modlist.write_text(f"+{own}\n+{SIMPLE_MOD}\n", encoding="utf-8")
+        code, out = run_fill(self.mo2, self.reference)
+        self.assertEqual(code, 0, msg=out)
+        self.assertIn("свой пакет", out)
+        self.assertFalse((self.reference / "addons" / own).exists())
+        self.assertTrue(
+            (self.reference / "addons" / SIMPLE_MOD / "scripts" / "simple.script").exists()
+        )
+
+    def test_include_own_copies_marked_package(self):
+        own = "Our Built Mod (NEW)"
+        self._put_own_package(own, marker="notes")
+        modlist = self.profiles / STANDART / "modlist.txt"
+        modlist.write_text(f"+{own}\n+{SIMPLE_MOD}\n", encoding="utf-8")
+        code, out = run_fill(self.mo2, self.reference, "--include-own")
+        self.assertEqual(code, 0, msg=out)
+        self.assertNotIn("свой пакет", out)
+        self.assertTrue(
+            (self.reference / "addons" / own / "scripts" / "own.script").exists()
+        )
+
+    def test_prune_treats_own_enabled_as_extra(self):
+        own = "Our Built Mod (NEW)"
+        self._put_own_package(own, marker="CONTENTS")
+        leftover = self.reference / "addons" / own
+        leftover.mkdir(parents=True)
+        (leftover / "scripts").mkdir()
+        (leftover / "scripts" / "stale.script").write_bytes(b"-- stale\n")
+        modlist = self.profiles / STANDART / "modlist.txt"
+        modlist.write_text(f"+{own}\n+{SIMPLE_MOD}\n", encoding="utf-8")
+        code, out = run_fill(self.mo2, self.reference, "--prune", "--yes")
+        self.assertEqual(code, 0, msg=out)
+        self.assertFalse(leftover.exists(), msg=out)
+        self.assertTrue(
+            (self.reference / "addons" / SIMPLE_MOD / "scripts" / "simple.script").exists()
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
