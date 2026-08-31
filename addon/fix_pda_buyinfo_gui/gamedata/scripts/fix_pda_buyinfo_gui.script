@@ -10,7 +10,9 @@
 -- the live window for the original call, then restores the field.
 
 local LOG_TAG = "[fix_pda_buyinfo_gui]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local orig = {}
 local installed = false

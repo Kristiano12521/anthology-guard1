@@ -12,6 +12,9 @@
 -- not by a save-specific object id.
 
 local LOG_TAG = "[fix_sim_mechanic_trade]"
+local VERSION = "1.0.1"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local GENERIC_CFG = "items\\trade\\trade_generic.ltx"
 local MECHANIC_CFG = "items\\trade\\trade_generic_mechanic.ltx"
@@ -96,7 +99,7 @@ local function install()
 			trade_manager.trade_init = patched_trade_init
 		end
 	else
-		printf(LOG_TAG .. " trade_manager.trade_init not found")
+		printf("%s trade_manager.trade_init not found - guard NOT installed", LOG_TAG)
 	end
 
 	if type(trade_manager) == "table" and type(trade_manager.update) == "function" then
@@ -105,7 +108,7 @@ local function install()
 			trade_manager.update = patched_update
 		end
 	else
-		printf(LOG_TAG .. " trade_manager.update not found")
+		printf("%s trade_manager.update not found - guard NOT installed", LOG_TAG)
 	end
 
 	if type(stalker_generic) == "table" and type(stalker_generic.reset_show_spot) == "function" then
@@ -114,7 +117,7 @@ local function install()
 			stalker_generic.reset_show_spot = patched_reset_show_spot
 		end
 	else
-		printf(LOG_TAG .. " stalker_generic.reset_show_spot not found")
+		printf("%s stalker_generic.reset_show_spot not found - guard NOT installed", LOG_TAG)
 	end
 end
 

@@ -17,8 +17,10 @@
 --    No on_use. This gates play_sound, accepts any hit, toggles on use.
 
 local LOG_TAG = "[fix_radio]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 local TIP_ID = "st_fix_radio_use"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local orig = {}
 local installed = false

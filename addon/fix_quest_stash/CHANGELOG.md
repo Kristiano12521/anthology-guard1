@@ -1,5 +1,15 @@
 # Quest Stash Type Migration Fix
 
+## [1.0.3] — 2026-08-31
+
+**Изменено**
+
+- Только логирование: безусловная presence-строка при загрузке; `printf` с причиной при раннем выходе из `install_status_wrap()`.
+
+**Не затронуто**
+
+- Миграция stash_type, status functor, CreateTimeEvent.
+
 ## [1.0.2] — 2026-08-30
 
 **Изменено**

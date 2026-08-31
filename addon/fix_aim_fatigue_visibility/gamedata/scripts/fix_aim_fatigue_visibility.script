@@ -13,8 +13,10 @@
 -- the same callbacks and relied on filename order instead.
 
 local LOG_TAG = "[fix_aim_fatigue_visibility]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local MODULE_NAME = "aim_stamina"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 local MCM_NAME = "aim_stamina_mcm"
 
 local orig_on_option_change = nil
@@ -93,6 +95,12 @@ local function install()
 
 	local as = module_of(MODULE_NAME)
 	if not (as and type(as.on_option_change) == "function" and type(as.load_state) == "function") then
+		printf(
+			"%s %s.on_option_change or %s.load_state not found - guard NOT installed",
+			LOG_TAG,
+			MODULE_NAME,
+			MODULE_NAME
+		)
 		return false
 	end
 

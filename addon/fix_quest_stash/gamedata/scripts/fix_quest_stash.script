@@ -18,8 +18,10 @@
 -- are restored via DLTX. Does not wrap treasure_manager.get_random_stash.
 
 local LOG_TAG = "[fix_quest_stash]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 local EVENT_ID = "fix_quest_stash"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 local REPAIR_ACTION = "migrate"
 local REPAIR_DELAY = 1.0
 local REPAIR_MAX_ATTEMPTS = 10
@@ -433,7 +435,7 @@ end
 
 local function install_status_wrap()
 	if not task_status_functor or type(task_status_functor.drx_sl_quest_item_task_status) ~= "function" then
-		log("status functor is not ready")
+		printf("%s task_status_functor.drx_sl_quest_item_task_status not found - guard NOT installed", LOG_TAG)
 		return false
 	end
 	if task_status_functor.drx_sl_quest_item_task_status == patched_status then

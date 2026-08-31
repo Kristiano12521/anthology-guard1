@@ -13,7 +13,10 @@
 -- callback and a zzzz_ filename. That never touched the XML source.
 
 local LOG_TAG = "[fix_gonta_duplicate_dialog]"
+local VERSION = "1.0.2"
 local CHAR_XML = [[gameplay\character_desc_cop_zaton.xml]]
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 local GONTA_ID = "zat_b106_stalker_gonta"
 
 local COP_ABOUT_HIMSELF = "zat_b106_stalker_gonta_about_himself"

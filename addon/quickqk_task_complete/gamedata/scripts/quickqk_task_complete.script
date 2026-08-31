@@ -1,5 +1,5 @@
 -- QuickQK Task Status Tool -- Anomaly Anthology 2.1
--- v1.4.1
+-- v1.4.2
 --
 -- Default controls:
 --   F7 + Q -- force-close the currently tracked task as completed
@@ -7,6 +7,11 @@
 --
 -- This changes the task status through Task Manager. on_complete / on_fail
 -- condlists still run. Dialog rewards are not guaranteed.
+
+local LOG_TAG = "[quickqk_task_complete]"
+local VERSION = "1.4.2"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local DEF = {
     enable             = true,

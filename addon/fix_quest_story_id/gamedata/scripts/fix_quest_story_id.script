@@ -10,8 +10,10 @@
 -- quests actually look up. Does not rewind NPC XR logic.
 
 local LOG_TAG = "[fix_quest_story_id]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 local TASK_ID_LEVSHA = "yan_quest_levsha"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 local LEVSHA_SECTION = "yan_stalker_levsha"
 local EVENT_ID = "fix_quest_story_id"
 local REPAIR_ACTION = "levsha_task"
@@ -154,7 +156,7 @@ end
 
 local function install()
 	if not story_objects or type(story_objects.register) ~= "function" then
-		log("story_objects.register is not ready")
+		printf("%s story_objects.register not found - guard NOT installed", LOG_TAG)
 		return false
 	end
 	if story_objects.register == patched_register then

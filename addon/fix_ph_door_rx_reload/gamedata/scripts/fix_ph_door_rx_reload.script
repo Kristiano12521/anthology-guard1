@@ -20,7 +20,9 @@
 -- crash.
 
 local LOG_TAG = "[fix_ph_door_rx_reload]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 local SKIP_LOG_LIMIT = 8
 
 local orig = {}
@@ -140,6 +142,7 @@ local function install_door()
 
 	local ph_door = module_of("ph_door")
 	if not ph_door then
+		printf("%s ph_door not found - guard NOT installed", LOG_TAG)
 		return false
 	end
 
@@ -162,6 +165,7 @@ local function install_rx()
 
 	local rx_ai = module_of("rx_ai")
 	if not (rx_ai and type(rx_ai.enable_schemes) == "function") then
+		printf("%s rx_ai.enable_schemes not found - guard NOT installed", LOG_TAG)
 		return false
 	end
 

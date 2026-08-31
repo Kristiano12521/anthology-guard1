@@ -881,7 +881,7 @@ class LogPresenceTests(unittest.TestCase):
             )
             self.assertEqual(lint_addon.mod_presence_script_paths(addon), [])
 
-    def test_log001_disabled_in_linter(self):
+    def test_log001_enabled_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
             addon = _minimal_addon(Path(tmp), "presence_silent")
             (addon / "gamedata" / "scripts" / "presence_silent.script").write_text(
@@ -891,7 +891,7 @@ class LogPresenceTests(unittest.TestCase):
                 encoding="utf-8",
             )
             codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
-            self.assertNotIn("LOG-001", codes)
+            self.assertIn("LOG-001", codes)
 
     def test_log001_fires_when_enabled(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -906,10 +906,10 @@ class LogPresenceTests(unittest.TestCase):
                 codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
             self.assertIn("LOG-001", codes)
 
-    def test_current_addon_failures_above_threshold(self):
+    def test_current_addon_failures_below_threshold(self):
         count, _failed = lint_addon.count_presence_log_failures(REPO_ROOT / "addon")
-        self.assertGreater(count, 10)
-        self.assertFalse(lint_addon.LOG_PRESENCE_CHECK_ENABLED)
+        self.assertEqual(count, 0)
+        self.assertTrue(lint_addon.LOG_PRESENCE_CHECK_ENABLED)
 
 
 if __name__ == "__main__":

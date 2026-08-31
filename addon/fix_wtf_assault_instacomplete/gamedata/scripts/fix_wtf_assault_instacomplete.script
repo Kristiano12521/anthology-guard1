@@ -17,7 +17,9 @@
 -- and retry that collect in status() only while the snapshot is still empty.
 
 local LOG_TAG = "[fix_wtf_assault_instacomplete]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local orig = {}
 local installed = false
@@ -154,6 +156,7 @@ local function install()
 
 	local Assault = assault_table()
 	if not (Assault and type(Assault.on_init) == "function" and type(Assault.status) == "function") then
+		printf("%s igi_target_assault.Assault.on_init or status not found - guard NOT installed", LOG_TAG)
 		return false
 	end
 

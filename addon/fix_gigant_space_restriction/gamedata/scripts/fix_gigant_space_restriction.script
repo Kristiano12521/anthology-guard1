@@ -18,8 +18,10 @@
 -- or a missing smart terrain: alife_release (squad-safe) while offline.
 
 local LOG_TAG = "[fix_gigant_space_restriction]"
-local VERSION = "1.1.0"
+local VERSION = "1.1.1"
 local EVENT_ID = "fix_gigant_space_restriction"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 local PROCESS_ACTION = "process"
 local PROCESS_DELAY = 0.05
 local INVALID_ID = 65535
@@ -594,7 +596,7 @@ end
 
 local function install_can_switch_online()
 	if type(se_monster) ~= "table" then
-		log("se_monster table missing; can_switch_online wrap skipped")
+		printf("%s se_monster not found - guard NOT installed", LOG_TAG)
 		return
 	end
 	if se_monster.can_switch_online == patched_can_switch_online then

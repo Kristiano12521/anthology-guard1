@@ -13,8 +13,10 @@
 -- xr_effects.effect_swiming_true/false.
 
 local LOG_TAG = "[fix_x2_gravity_room]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local EVENT_ID = "fix_x2_gravity_room"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 local RESTORE_ACTION = "restore_gravity"
 local PULSE_SECONDS = 6.0
 local FALLBACK_GRAVITY = 19.62
@@ -113,7 +115,7 @@ function on_game_start()
 	if type(xr_effects) == "table" then
 		xr_effects.bas_no_gravity_anomaly = apply_no_gravity_anomaly
 	else
-		log("xr_effects missing, functor not installed")
+		printf("%s xr_effects not found - guard NOT installed", LOG_TAG)
 	end
 
 	if callbacks_registered then

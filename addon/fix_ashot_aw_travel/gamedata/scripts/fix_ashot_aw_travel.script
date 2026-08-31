@@ -12,7 +12,10 @@
 -- Patch get_named_location: the single reader of those coords.
 
 local LOG_TAG = "[fix_ashot_aw_travel]"
+local VERSION = "1.0.1"
 local DEST_NAME = "western_goods_guide_dest_mil_base"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 local TARGET_SMART = "mil_smart_terrain_7_7"
 
 local orig_get = nil

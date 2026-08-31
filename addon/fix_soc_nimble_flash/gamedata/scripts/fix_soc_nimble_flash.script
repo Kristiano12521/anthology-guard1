@@ -12,8 +12,10 @@
 -- and item-take after Nimble. Does not complete the task or pay the reward.
 
 local LOG_TAG = "[fix_soc_nimble_flash]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local EVENT_ID = "fix_soc_nimble_flash"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 local REPAIR_ACTION = "recover"
 local REPAIR_DELAY = 1.0
 local REPAIR_RETRY = 1.0

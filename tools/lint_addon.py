@@ -84,8 +84,8 @@ LUA_BLOCK_KW_RE = re.compile(r"\b(function|if|for|while|repeat|do|end|until)\b")
 LUA_BLOCK_OPEN = frozenset({"function", "if", "for", "while", "repeat", "do"})
 LUA_BLOCK_CLOSE = frozenset({"end", "until"})
 PRESENCE_SCRIPT_SUFFIXES = ("_diag", "_mcm")
-# LOG-001 disabled until existing addons migrate (25/37 scripted mods fail, threshold >10).
-LOG_PRESENCE_CHECK_ENABLED = False
+# LOG-001 enabled after presence-log migration (25 scripted mods, 2026-08-31).
+LOG_PRESENCE_CHECK_ENABLED = True
 
 VAL_REQUIRED_TYPES = {"check", "track", "list", "radio_h", "radio_v", "input", "key_bind", "combo"}
 

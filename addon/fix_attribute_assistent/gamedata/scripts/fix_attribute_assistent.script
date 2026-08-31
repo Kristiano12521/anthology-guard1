@@ -12,7 +12,9 @@
 -- fields that were dead or too narrow.
 
 local LOG_TAG = "[fix_attribute_assistent]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 
 -- CP1251 letter a (0xE0). LTX/script keys must match the byte
 -- the condlist parser actually stored, not a UTF-8 lookalike.
@@ -40,7 +42,7 @@ end
 
 local function install()
 	if type(xr_effects) ~= "table" then
-		log("xr_effects missing, functor not installed")
+		printf("%s xr_effects not found - guard NOT installed", LOG_TAG)
 		return false
 	end
 

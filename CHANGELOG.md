@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.42] — LOG-001 включён: миграция presence-логирования
+
+25 модов приведены к контракту «Мои моды»: безусловный `printf("%s loaded v%s", LOG_TAG, VERSION)` при загрузке; `guard NOT installed` на молчаливых выходах из `install()` / аналога. Образец — `fix_aim_fatigue_visibility` (pitfalls §17). `LOG_PRESENCE_CHECK_ENABLED = True` в `tools/lint_addon.py`. Тест порога заменён на `count == 0`. `verified_*` не трогали — повторная проверка в игре отдельно.
+
 ## [0.1.41] — контракт presence-логирования для «Мои моды»
 
 Единый контракт: безусловная presence-строка при загрузке `.script` и `printf` на каждый молчаливый guard в `install()`. Правило в `.cursor/rules/anomaly-lua.mdc`, заготовка в `templates/addon-skeleton`, случай `fix_aim_fatigue_visibility` — в `docs/pitfalls.md` §17. `tools/lint_addon.py`: проверка LOG-001 (top-level / `on_game_start` до первого `if`); **отключена** — 25 из 37 модов со скриптами не проходят (порог >10). Тесты на детектор и порог. Скрипты существующих модов не менялись.
