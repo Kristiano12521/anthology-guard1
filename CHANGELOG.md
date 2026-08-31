@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.26] — fill_reference_addons: моды MO2 в reference/addons/
+
+`tools/fill_reference_addons.py` наполняет `reference/addons/` из включённых модов MO2: `modlist.txt` профиля (`+`/`-`/`_separator`), тот же набор `KEEP_DIRS`, что у `fill_reference.py`. `selected_profile` из `ModOrganizer.ini` разворачивает `@ByteArray` с `\xNN`. `--prune` без `--yes` только показывает лишние папки и выходит. В `anthology/` ничего не кладёт — в этой сборке ядро тоже лежит модами. Раздел в `docs/setup.md` и `reference/README.md`.
+
 ## [0.1.25] — LZO1X, materials в reference, сводка пропусков
 
 `tools/xdb_unpack.py`: декодер LZO1X сверен с Linux `Documentation/lzo.txt`, `lzo1x_decompress_safe.c`, minilzo и lzokay. Чинится рассинхрон на M2 (лишний байт H) и `first_literal_run`/`state`; совпадения с перекрытием копируются побайтно. На `00_modded_exes_gamedata.db0` все 157 файлов распаковываются, CRC совпадает. `tools/fill_reference.py` кладёт ещё `materials/` (линтер больше не даёт ложный LTX-002 на `fix_st2_footstep`). Оба скрипта в конце печатают сводку пропусков по классу ошибки, если пропуски были.
