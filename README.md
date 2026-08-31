@@ -2,7 +2,7 @@
 
 Рабочее место для разработки фиксов и аддонов к сборке **S.T.A.L.K.E.R. Anomaly 1.5.3 / Anthology 2.1** (Modded Exes MT) вместе с Cursor.
 
-Репозиторий решает три задачи: **фиксы багов**, **новые аддоны**, **разбор вылетов**. Под каждую есть правило-плейбук для агента, набор промптов и инструменты.
+Репозиторий решает четыре задачи: **фиксы багов**, **правка STATE alife-объекта**, **новые аддоны**, **разбор вылетов**. Под каждую есть правило-плейбук для агента, набор промптов и инструменты.
 
 ## Что внутри
 
@@ -16,6 +16,7 @@
   anomaly-mcm.mdc           auto-attached: addon/**/*_mcm.script
   anomaly-xml.mdc           auto-attached: addon/**/*.xml
   workflow-fix.mdc          agent-requested: фикс бага
+  workflow-state.mdc        agent-requested: правка STATE alife-объекта
   workflow-addon.mdc        agent-requested: новый аддон
   workflow-crash.mdc        agent-requested: разбор вылета
 
@@ -95,9 +96,10 @@ Markdown в [`.cursor/commands/`](.cursor/commands/), вызов через `/` 
 
 ## Как работать с агентом
 
-Три плейбука с готовыми промптами:
+Четыре плейбука с готовыми промптами:
 
 - [`docs/plans/fix.md`](docs/plans/fix.md) — фикс бага
+- [`docs/plans/state-repair.md`](docs/plans/state-repair.md) — правка STATE alife-объекта
 - [`docs/plans/addon.md`](docs/plans/addon.md) — новый аддон
 - [`docs/plans/crash.md`](docs/plans/crash.md) — разбор вылета
 

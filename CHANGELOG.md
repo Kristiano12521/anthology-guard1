@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.22] — плейбук правки STATE alife-объекта
+
+Четвёртый процесс рядом с fix / addon / crash: [`docs/plans/state-repair.md`](docs/plans/state-repair.md) и agent-requested [`.cursor/rules/workflow-state.mdc`](.cursor/rules/workflow-state.mdc). Каркас выведен из `fix_kupol_wrong_bone`, `fix_aver_darkvalley`, `fix_gigant_space_restriction` (единственные носители `server_entity_on_register` в `addon/`); пути A (`utils_stpk`) и B (quarantine/release) не усреднены. В README и `docs/rules.md` — четыре плейбука.
+
 ## [0.1.21] — имя файла в карточке независимо от платформы
 
 `filename()` в `_common.py` режет путь по `/` и `\\`: pathlib на POSIX оставляет Windows-путь целиком в `.name` / `.stem`. `xraylog.py` берёт имя оттуда в шапке карточки и в `--archive`, чтобы в CI на Linux в git не уезжал абсолютный путь с именем пользователя.

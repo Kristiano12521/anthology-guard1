@@ -1,0 +1,23 @@
+---
+description: Правка битых данных в STATE-пакете alife-объекта (не LTX). Подключать, когда баг в сейве/spawn-данных объекта, DLTX бесполезен, all.spawn трогать нельзя; эталоны fix_kupol_wrong_bone, fix_aver_darkvalley, fix_gigant_space_restriction.
+alwaysApply: false
+---
+
+# Workflow: правка STATE
+
+Этапы строго по порядку. Правки файлов — не раньше этапа 5. Полные промпты и каркас из эталонов: [`docs/plans/state-repair.md`](../../docs/plans/state-repair.md).
+
+## Когда не этот workflow
+
+Значение в LTX → `workflow-fix` + DLTX. Объект уже online (схема/активация) → приём как в `fix_vows_ambush_stash`, не этот плейбук.
+
+## 1–4. Без кода
+
+1. Локализуй se-объект и поле; выбери путь A (`utils_stpk` get/set, как kupol/aver) или B (quarantine/`can_switch_online`/release, как gigant).
+2. Покажи по эталону, почему это не LTX. API вне трёх скриптов не выдумывай.
+3. Callback'и, фильтр `server_entity_on_register`, поведение на смене уровня, флаг «уже не нужно», сброс `on_game_load`.
+4. Предложение в 2–3 предложениях; дождись подтверждения.
+
+## 5–6. Патч и проверка
+
+Только `addon/<mod_id>/`. Lint + `--cross`. Сейв с багом и без; смена уровня; идемпотентность. `verified_*` — человек. CHANGELOG мода.
