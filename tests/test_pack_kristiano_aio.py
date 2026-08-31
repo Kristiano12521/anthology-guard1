@@ -12,6 +12,43 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 import _pack_kristiano_aio as packer  # noqa: E402
+import pack_bhs  # noqa: E402
+
+SEQLOAD_SOURCE = """----------------------------------------------------------------
+-- Sequential (alternating) magazine loading.
+----------------------------------------------------------------
+local presets = {}
+
+local function take_one_round(pool)
+	while #pool.boxes > 0 do
+		local box = pool.boxes[1]
+		local count = box:ammo_get_count()
+		if count > 1 then
+			box:ammo_set_count(count - 1)
+			pool.total = pool.total - 1
+			return true
+		elseif count == 1 then
+			alife_release_id(box:id())
+			table.remove(pool.boxes, 1)
+			pool.total = pool.total - 1
+			return true
+		else
+			table.remove(pool.boxes, 1)
+		end
+	end
+	return false
+end
+
+	-- Don't double-schedule.
+	if in_progress[mag_id] then return end
+
+	-- Don't show a second time if we're already loading this mag.
+	if in_progress[obj:id()] then return false end
+	return true
+
+	-- If a gradual load is already running on this mag, ignore further clicks.
+	if in_progress[mag_id] then return end
+"""
 
 
 def write(path: Path, text: str = "x\n") -> None:
@@ -64,8 +101,22 @@ class PackKristianoTests(unittest.TestCase):
             / "anthology_busyhands_stability_fix"
             / "gamedata"
             / "scripts"
-            / "skip_bhs.script",
-            "-- bhs packed separately\n",
+            / pack_bhs.MAIN_OVERLAY,
+            "-- bhs overlay\n",
+        )
+        write(self.addon_root / "anthology_busyhands_stability_fix" / "CHANGELOG.md", "## [0.6.7]\n")
+
+        vendor = self.addon_root.parent / "reference" / "addons" / "BusyHands_vendor"
+        write(vendor / "scripts" / "vendor_bhs.script")
+        write(vendor / "scripts" / "fix_bhs_fdda_loot.script", "-- loot sidecar\n")
+        write(
+            self.addon_root.parent
+            / "reference"
+            / "addons"
+            / "mags_redux"
+            / "scripts"
+            / "sequential_load_magazine.script",
+            SEQLOAD_SOURCE,
         )
 
     def tearDown(self) -> None:
@@ -73,8 +124,18 @@ class PackKristianoTests(unittest.TestCase):
 
     def pack(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()):
-            code = packer.main(["--addon-root", str(self.addon_root), "--out", str(self.out_dir)])
+            code = packer.main(
+                [
+                    "--addon-root",
+                    str(self.addon_root),
+                    "--out",
+                    str(self.out_dir),
+                ]
+            )
         self.assertEqual(code, 0)
+
+    def _repo_root(self) -> Path:
+        return self.addon_root.parent
 
     def test_aio_excludes_skip_and_separate(self):
         self.pack()
@@ -90,6 +151,13 @@ class PackKristianoTests(unittest.TestCase):
         self.assertNotIn("gamedata/scripts/st2_only.script", names)
         self.assertNotIn("gamedata/scripts/skip_loot.script", names)
         self.assertNotIn("gamedata/scripts/skip_bhs.script", names)
+        self.assertIn(f"gamedata/scripts/{pack_bhs.MAIN_ZIP}", names)
+        self.assertIn("gamedata/scripts/sequential_load_magazine.script", names)
+        with zipfile.ZipFile(aio) as zf:
+            contents = zf.read("CONTENTS.txt").decode("utf-8")
+        self.assertIn("anthology_busyhands_stability_fix", contents)
+        self.assertIn("pack_bhs", contents)
+        self.assertNotIn("Not included (separate archive, tools/pack_bhs.py)", contents)
 
     def test_separate_zips_layout_and_version(self):
         self.pack()
@@ -107,8 +175,6 @@ class PackKristianoTests(unittest.TestCase):
 
         addons = {p.name for p in packer.aio_addons(self.addon_root)}
         self.assertEqual(addons, {"also_keep", "keep_me"})
-        self.assertTrue(addons.isdisjoint(packer.SEPARATE))
-        self.assertTrue(addons.isdisjoint(packer.SKIP))
 
     def test_version_from_meta_ini_without_changelog(self):
         write(self.addon_root / "keep_me" / "meta.ini", "version=7.7.7\n")

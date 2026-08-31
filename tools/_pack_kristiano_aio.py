@@ -13,6 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import pack_bhs  # noqa: E402
+
 from _common import REPO_ROOT, decode_bytes, detect_version  # noqa: E402
 
 ADDON_ROOT = REPO_ROOT / "addon"
@@ -27,9 +29,10 @@ SEPARATE = {
     "fix_st2_footstep": "[SND] Anthology ST2 Mutant Footstep Sound",
 }
 
-# Packed by pack_bhs.py, not this AIO.
+# Raw addon/ copy is wrong for BHS — merged via pack_bhs.stage_gamedata in pack_aio.
 # fix_bhs_fdda_loot withdrawn: logic lives in BusyHands 0.6.4+.
 SKIP = {"anthology_busyhands_stability_fix", "fix_bhs_fdda_loot"}
+BHS_MOD_ID = "anthology_busyhands_stability_fix"
 
 AIO_NAME = "[DBG] Kristiano Fixes ALL IN ONE"
 
@@ -150,7 +153,13 @@ def pack_separate(
     return archive
 
 
-def pack_aio(addons: list[Path], *, out_dir: Path | None = None) -> Path:
+def pack_aio(
+    addons: list[Path],
+    *,
+    repo: Path | None = None,
+    out_dir: Path | None = None,
+) -> Path:
+    repo = repo or REPO_ROOT
     out_dir = out_dir or OUT_DIR
     staging = out_dir / "_staging" / AIO_NAME
     if staging.exists():
@@ -167,13 +176,17 @@ def pack_aio(addons: list[Path], *, out_dir: Path | None = None) -> Path:
         total += n
         rows.append(f"{addon_dir.name:<42} v{version:<10} {n:>3} files")
 
+    bhs_version, bhs_files, _, _ = pack_bhs.stage_gamedata(repo, gamedata)
+    total += bhs_files
+    rows.append(f"{BHS_MOD_ID:<42} v{bhs_version:<10} {bhs_files:>3} files (pack_bhs)")
+
     contents = (
         "\n".join(
             [
                 AIO_NAME,
                 "Rewritten DLTX / callback pack for Anomaly 1.5.3 / Anthology 2.1",
                 f"Built: {datetime.now().isoformat(timespec='seconds')}",
-                f"Addons: {len(addons)}",
+                f"Addons: {len(addons) + 1}",
                 f"gamedata files: {total}",
                 "",
                 "Included:",
@@ -183,9 +196,6 @@ def pack_aio(addons: list[Path], *, out_dir: Path | None = None) -> Path:
                 "  context_menu_overhaul_anthology",
                 "  quickqk_task_complete",
                 "  fix_st2_footstep",
-                "",
-                "Not included (separate archive, tools/pack_bhs.py):",
-                "  anthology_busyhands_stability_fix",
                 "",
                 "Not included (withdrawn, lives in BusyHands 0.6.4):",
                 "  fix_bhs_fdda_loot",
@@ -209,10 +219,11 @@ def pack_aio(addons: list[Path], *, out_dir: Path | None = None) -> Path:
                 "   и список в чате).",
                 "3. Поставить этот архив через Install mod from archive.",
                 "4. Поставить его НИЖЕ сборки и модов, которые он патчит:",
-                "   MAG Redux, R.A.K, Catspaw, Exo System, Aim Fatigue,",
-                "   Interactive PDA, Classes & Talents, Hideout Furniture,",
-                "   WTF / iTheon, Western Goods, SYS_Balance, Burn Shit,",
-                "   Sorting Plus, DotMarks, Tosox, Grok Stash, HoC Icons, FDDA.",
+                "   MAG Redux (важно для sequential_load_magazine), R.A.K, Catspaw,",
+                "   Exo System, Aim Fatigue, Interactive PDA, Classes & Talents,",
+                "   Hideout Furniture, WTF / iTheon, Western Goods, SYS_Balance,",
+                "   Burn Shit, Sorting Plus, DotMarks, Tosox, Grok Stash, HoC Icons, FDDA.",
+                "   BusyHands внутри этого архива — отдельный zip BHS не нужен.",
                 "5. Context Menu, QuickQK и ST2 Footstep ставятся отдельными модами.",
                 "",
             ]
@@ -234,7 +245,7 @@ def pack_aio(addons: list[Path], *, out_dir: Path | None = None) -> Path:
             [
                 f"mod_id: {AIO_NAME}",
                 f"built: {datetime.now().isoformat(timespec='seconds')}",
-                f"addons: {len(addons)}",
+                f"addons: {len(addons) + 1}",
                 f"gamedata_files: {total}",
                 "target: Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT",
             ]
@@ -261,9 +272,10 @@ def main(argv: list[str] | None = None) -> int:
 
     addon_root = args.addon_root
     out_dir = args.out
+    repo = addon_root.parent
     out_dir.mkdir(parents=True, exist_ok=True)
     addons = aio_addons(addon_root)
-    pack_aio(addons, out_dir=out_dir)
+    pack_aio(addons, repo=repo, out_dir=out_dir)
     if not args.aio_only:
         for mod_id, mo2_name in SEPARATE.items():
             pack_separate(mod_id, mo2_name, addon_root=addon_root, out_dir=out_dir)

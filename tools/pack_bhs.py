@@ -204,34 +204,44 @@ end"""
     return text.replace("\n", "\r\n")
 
 
-def pack(repo: Path | None = None) -> Path:
-    repo = repo or REPO
+def validate_gamedata(gamedata: Path) -> None:
+    scripts = gamedata / "scripts"
+    if (scripts / "fix_bhs_fdda_loot.script").is_file():
+        raise SystemExit("loot sidecar leaked into gamedata")
+    if (scripts / "anthology_bhs_fdda_patch.script").is_file():
+        raise SystemExit("overlay name leaked into gamedata")
+    if (scripts / MAIN_OVERLAY).is_file():
+        raise SystemExit("unprefixed main overlay leaked into gamedata")
+    if not (scripts / MAIN_ZIP).is_file():
+        raise SystemExit("prefixed main overlay missing from gamedata")
+    if not (scripts / "sequential_load_magazine.script").is_file():
+        raise SystemExit("seqload overlay missing from gamedata")
+
+
+def stage_gamedata(repo: Path, dest_gamedata: Path) -> tuple[str, int, str, Path]:
+    """Merge vendor BHS + overlay into dest_gamedata.
+
+    Returns (version, gamedata_file_count, vendor_folder_name, seqload_source).
+    """
     overlay = repo / "addon" / "anthology_busyhands_stability_fix"
     version = detect_version(overlay)
-    out_name = packed_name(version)
     src = bhs_source(repo)
     scripts = overlay / "gamedata" / "scripts"
     if not (scripts / MAIN_OVERLAY).is_file():
         raise SystemExit(f"missing overlay {MAIN_OVERLAY}")
 
     seq_src = mag_seqload_source(repo)
+    dest_gamedata.mkdir(parents=True, exist_ok=True)
+    before = sum(1 for path in dest_gamedata.rglob("*") if path.is_file())
 
-    out_dir = repo / "build" / out_name
-    if out_dir.exists():
-        shutil.rmtree(out_dir)
-    gamedata = out_dir / "gamedata"
-    gamedata.mkdir(parents=True)
-
-    copied = 0
     for path in src.rglob("*"):
         if not path.is_file():
             continue
-        dst = gamedata / path.relative_to(src)
+        dst = dest_gamedata / path.relative_to(src)
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(path, dst)
-        copied += 1
 
-    dest_scripts = gamedata / "scripts"
+    dest_scripts = dest_gamedata / "scripts"
     dest_scripts.mkdir(parents=True, exist_ok=True)
     for path in scripts.iterdir():
         if not path.is_file():
@@ -240,12 +250,29 @@ def pack(repo: Path | None = None) -> Path:
         shutil.copy2(path, dest_scripts / zip_name)
 
     seq_text = seq_src.read_bytes().decode("cp1251")
-    seq_out = gamedata / "scripts" / "sequential_load_magazine.script"
+    seq_out = dest_gamedata / "scripts" / "sequential_load_magazine.script"
     seq_out.write_bytes(patch_seqload(seq_text).encode("cp1251"))
 
-    loot = gamedata / "scripts" / "fix_bhs_fdda_loot.script"
+    loot = dest_gamedata / "scripts" / "fix_bhs_fdda_loot.script"
     if loot.exists():
         loot.unlink()
+
+    validate_gamedata(dest_gamedata)
+    after = sum(1 for path in dest_gamedata.rglob("*") if path.is_file())
+    return version, after - before, src.name, seq_src
+
+
+def pack(repo: Path | None = None) -> Path:
+    repo = repo or REPO
+    overlay = repo / "addon" / "anthology_busyhands_stability_fix"
+    version = detect_version(overlay)
+    out_name = packed_name(version)
+
+    out_dir = repo / "build" / out_name
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    gamedata = out_dir / "gamedata"
+    version, _, vendor_name, seq_src = stage_gamedata(repo, gamedata)
 
     shutil.copy2(overlay / "CHANGELOG.md", out_dir / "CHANGELOG.md")
     shutil.copy2(overlay / "meta.ini", out_dir / "meta.ini")
@@ -255,9 +282,8 @@ def pack(repo: Path | None = None) -> Path:
                 "mod_id: Anthology_BusyHands_Stability_Fix",
                 f"version: {version}",
                 f"built: {datetime.now().isoformat(timespec='seconds')}",
-                f"source: {src.name} + addon/anthology_busyhands_stability_fix",
+                f"source: {vendor_name} + addon/anthology_busyhands_stability_fix",
                 f"seqload: {seq_src.parent.parent.name}",
-                f"bhs_files: {copied}",
             ]
         )
         + "\n",
@@ -273,18 +299,9 @@ def pack(repo: Path | None = None) -> Path:
                 zf.write(path, path.relative_to(out_dir).as_posix())
 
     names = zipfile.ZipFile(archive).namelist()
-    if "gamedata/scripts/fix_bhs_fdda_loot.script" in names:
-        raise SystemExit("loot sidecar leaked into zip")
-    if "gamedata/scripts/anthology_bhs_fdda_patch.script" in names:
-        raise SystemExit("overlay name leaked into zip")
-    if f"gamedata/scripts/{MAIN_OVERLAY}" in names:
-        raise SystemExit("unprefixed main overlay leaked into zip")
-    if f"gamedata/scripts/{MAIN_ZIP}" not in names:
-        raise SystemExit("prefixed main overlay missing from zip")
-    if "gamedata/scripts/sequential_load_magazine.script" not in names:
-        raise SystemExit("seqload overlay missing from zip")
+    validate_gamedata(out_dir / "gamedata")
 
-    print(f"source: {src}")
+    print(f"source: {vendor_name}")
     print(f"seqload: {seq_src}")
     print(f"dir: {out_dir}")
     print(f"zip: {archive} ({archive.stat().st_size} bytes)")
