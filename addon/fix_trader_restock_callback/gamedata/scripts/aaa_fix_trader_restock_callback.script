@@ -2,19 +2,18 @@
 -- Anomaly 1.5.3 / Anthology 2.1
 --
 -- load-order: после axr_main.script
--- aaa_* sorts before barter_core.script and exo_loot.script.
--- axr_main.on_game_start lists $game_scripts$ via file_list_open_ex
--- (FS.FS_ListFiles | FS.FS_RootOnly, no extra sort). Name order is
--- load order. Top-level AddScriptCallback must run before those two
--- RegisterScriptCallback calls in on_game_start.
+-- aaa_* file-load runs before barter_core / exo_loot on_game_start
+-- Register. axr_main file_list_open_ex has no extra sort, so
+-- on_game_start order is not a safe place to first-Add.
 --
 -- Declares trader_on_restock at file load. Chain-wraps
 -- trader_autoinject.timed_update in on_game_start and Sends if the
 -- original did not. Campfires overlay strips Add and Send; vanilla
--- and BHS Send inside timed_update.
+-- and BHS Send inside timed_update. Later BHS Add is a no-op via
+-- axr_main.callback_add wrap.
 
 local LOG_TAG = "[fix_trader_restock_callback]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 local CALLBACK = "trader_on_restock"
 
 local declare_result = "pending"
@@ -24,20 +23,56 @@ local wrap_ran = false
 local subscriber_got = false
 local warned_no_subscriber = false
 
--- intercepts is local in axr_main. callback_add on a live name prints
--- "callback %s already exists!" and callstack(), and keeps the table.
--- Swallow that one traceback so a second Add (vanilla after Campfires
--- is gone, or BHS) is not a new error.
+-- intercepts is local in axr_main.script:49; there is no callback_exists.
+-- callback_add (axr_main.script:246) on a live name prints
+-- "![axr_main callback_add] callback %s already exists!" via _G.printf
+-- (_g.script:612) and callstack(), and keeps the table.
+-- A bare `printf = ...` writes this file's env, not _G - axr_main never
+-- sees it. Wrap _G.printf / _G.callstack for our Add. After the first
+-- Add, wrap axr_main.callback_add so a later BHS Add is a no-op.
+local orig_callback_add = nil
+local wrapped_callback_add = nil
+local restock_declared = false
+
+local function wrap_callback_add()
+	if wrapped_callback_add then
+		return
+	end
+	if type(axr_main) ~= "table" or type(axr_main.callback_add) ~= "function" then
+		return
+	end
+	orig_callback_add = axr_main.callback_add
+	wrapped_callback_add = function(name)
+		if name == CALLBACK and restock_declared then
+			return
+		end
+		orig_callback_add(name)
+		if name == CALLBACK then
+			restock_declared = true
+		end
+	end
+	axr_main.callback_add = wrapped_callback_add
+end
+
+local function unwrap_callback_add()
+	if orig_callback_add and type(axr_main) == "table"
+		and axr_main.callback_add == wrapped_callback_add then
+		axr_main.callback_add = orig_callback_add
+	end
+	orig_callback_add = nil
+	wrapped_callback_add = nil
+end
+
 local function declare()
 	if type(AddScriptCallback) ~= "function" then
 		return "missing"
 	end
 
 	local duplicate = false
-	local orig_printf = printf
-	local orig_callstack = callstack
+	local orig_printf = _G.printf
+	local orig_callstack = _G.callstack
 
-	printf = function(fmt, ...)
+	_G.printf = function(fmt, ...)
 		if type(fmt) == "string"
 			and string.find(fmt, "callback_add", 1, true)
 			and string.find(fmt, "already exists", 1, true)
@@ -49,12 +84,15 @@ local function declare()
 			return orig_printf(fmt, ...)
 		end
 	end
-	callstack = function() end
+	_G.callstack = function() end
 
 	local ok, err = pcall(AddScriptCallback, CALLBACK)
 
-	printf = orig_printf
-	callstack = orig_callstack
+	_G.printf = orig_printf
+	_G.callstack = orig_callstack
+
+	restock_declared = true
+	wrap_callback_add()
 
 	if not ok then
 		if orig_printf then
@@ -184,4 +222,5 @@ function on_game_end()
 		UnregisterScriptCallback("on_game_load", reset_session)
 	end
 	uninstall_wrap()
+	unwrap_callback_add()
 end

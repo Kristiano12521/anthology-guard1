@@ -30,7 +30,7 @@
 -- ресурса по фиксированному пути, не логика - воспроизведена как есть.
 -- outfit_repair.script вообще не имеет ни одного top-level local (проверено).
 
-local VERSION = "0.6.5"
+local VERSION = "0.6.6"
 ANTHOLOGY_BHS_REPAIR_CHAIN_PATCH_VERSION = VERSION
 
 local ini_custom_repair = ini_file("repair\\importer.ltx")
@@ -150,8 +150,22 @@ local function add_ui_repair_target(list, seen, obj, via)
 	list[#list + 1] = { obj = obj, via = via }
 end
 
+-- Capture writes the marker on its own env (and _G). A bare read here
+-- only sees _G via __index - same env vs _G miss as other BHS markers.
+local function read_vendor_base()
+	local key = "ANTHOLOGY_BHS_REPAIR_VENDOR_BASE_ON_ITEM_SELECT"
+	if type(_G) == "table" and type(_G[key]) == "function" then
+		return _G[key]
+	end
+	local cap = zzzz_zzz_anthology_bhs_repair_capture_vendor_base
+	if type(cap) == "table" and type(cap[key]) == "function" then
+		return cap[key]
+	end
+	return nil
+end
+
 local function install()
-	local vendor_base = ANTHOLOGY_BHS_REPAIR_VENDOR_BASE_ON_ITEM_SELECT
+	local vendor_base = read_vendor_base()
 	if type(vendor_base) ~= "function" then
 		printf("[BusyHandsFix v%s] vendor base OnItemSelect was not captured (load-order marker missing) - repair chain fix NOT installed, recursion bug remains", VERSION)
 		return false

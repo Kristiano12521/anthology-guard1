@@ -1,13 +1,14 @@
--- Anthology Busy Hands Stability Fix v0.6.5
+-- Anthology Busy Hands Stability Fix v0.6.6
 --
+-- v0.6.6: repair capture marker on env and _G; recursion-fix reads both.
 -- v0.6.5: lookup paths for crow / UIRepair / UIInventory / repair capture.
 -- Guard behaviour unchanged; only how the target is found.
 -- v0.6.4: FDDA idle must not reopen loot after Esc. Re-entry during an
 -- active body_search is a vendor no-op; idle sets is_ui_enabled if GUI
 -- is already shown.
--- v0.6.3: sequential_load_magazine â€” one gradual load at a time; pcall
+-- v0.6.3: sequential_load_magazine — one gradual load at a time; pcall
 -- ammo_get_count (two jobs shared a released ammo box).
--- v0.6.2: FDDA loot window â€” patch functions on liz_fdda_redone_body_search
+-- v0.6.2: FDDA loot window — patch functions on liz_fdda_redone_body_search
 -- module table; open loot via LMode_Init, not wrapped ui_inventory.start.
 -- Verify markers via patch-script module tables (env is not always _G).
 --
@@ -15,7 +16,7 @@
 -- documented full-file exceptions (mon_sleep, guaranteed_loot,
 -- sequential_load_magazine).
 
-local VERSION = "0.6.5"
+local VERSION = "0.6.6"
 local installed = false
 
 local function safe_object_id(obj)

@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-VERSION = "0.6.4"
+VERSION = "0.6.6"
 OUT_STEM = "Anthology_BusyHands_Stability_Fix"
 OUT_NAME = f"{OUT_STEM}_v{VERSION.replace('.', '_')}"
 

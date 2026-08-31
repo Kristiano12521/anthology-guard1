@@ -76,10 +76,15 @@ local function resolve_vendor_base_on_item_select()
 	return nil, nil
 end
 
+-- Bare assign lives on this file's env, not _G (same as other BHS markers).
+-- Recursion-fix reads _G first, then this module table.
 local vendor_base, resolved_via = resolve_vendor_base_on_item_select()
 if vendor_base then
 	ANTHOLOGY_BHS_REPAIR_VENDOR_BASE_ON_ITEM_SELECT = vendor_base
-	printf("[BusyHandsFix v0.6.5] Captured OnItemSelect via %s before outfit_repair overwrites the shared RepairOnItemSelect global", resolved_via)
+	if type(_G) == "table" then
+		_G.ANTHOLOGY_BHS_REPAIR_VENDOR_BASE_ON_ITEM_SELECT = vendor_base
+	end
+	printf("[BusyHandsFix v0.6.6] Captured OnItemSelect via %s before outfit_repair overwrites the shared RepairOnItemSelect global", resolved_via)
 else
-	printf("[BusyHandsFix v0.6.5] RepairOnItemSelect was not found via jamming module / bare global / UIRepair.OnItemSelect - repair chain capture NOT installed (patch not functional in this build if jamming never exported the original)")
+	printf("[BusyHandsFix v0.6.6] RepairOnItemSelect was not found via jamming module / bare global / UIRepair.OnItemSelect - repair chain capture NOT installed (patch not functional in this build if jamming never exported the original)")
 end

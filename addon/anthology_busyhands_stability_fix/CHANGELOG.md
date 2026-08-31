@@ -1,5 +1,36 @@
 # Anthology Busy Hands Stability Fix
 
+## [0.6.6] — 2026-08-31
+
+**Изменено**
+
+- `zzzz_zzz_anthology_bhs_repair_capture_vendor_base.script` — маркер `ANTHOLOGY_BHS_REPAIR_VENDOR_BASE_ON_ITEM_SELECT` пишется и в env файла, и в `_G`.
+- `zzzzzz_anthology_bhs_repair_recursion_fix.script` — читает маркер как сводка гардов: `_G`, затем таблица модуля capture.
+
+**Причина**
+
+Захват писал голым присвоением в env `zzzz_zzz_*`. Recursion-fix читал голое имя и через `__index` попадал только в `_G`. В логе подряд: `Captured OnItemSelect via ...` и `vendor base OnItemSelect was not captured`. Та же дыра env vs `_G`, что у маркеров версии в 0.6.2.
+
+**Как исправлено**
+
+Тот же `read_marker`, что в главном скрипте. Имя файла `zzzz_zzz_` не трогали.
+
+**Не затронуто**
+
+- Реконструкция OnItemSelect, слот load-order, остальные гарды.
+- Сохраняемое состояние.
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+- В MO2 заменить предыдущий overlay BHS 0.6.5.
+
+**Проверено**
+
+- lint overlay и `--cross`: см. прогон после правки
+- В игре: не прогонялось. Не должно быть пары `Captured` + `was not captured`; должна быть `repair chain UIRepair.OnItemSelect set via`.
+
 ## [0.6.5] — 2026-08-31
 
 **Изменено**

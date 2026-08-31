@@ -1,5 +1,35 @@
 # Trader Restock Callback Fix
 
+## [1.0.2] — 2026-08-31
+
+**Изменено**
+
+- `gamedata/scripts/aaa_fix_trader_restock_callback.script` — обёртка `printf`/`callstack` ставится на `_G`, не в env файла. После первого Add `axr_main.callback_add` для `trader_on_restock` становится no-op, чтобы поздний Add из BHS не писал traceback.
+
+**Причина**
+
+`intercepts` в `axr_main.script:49` — `local`, геттера нет. Проверка 1.0.1 подменяла `printf` в env `aaa_*`; `callback_add` зовёт `_G.printf` (`_g.script:612`). Обёртка не вызывалась, `duplicate` оставался false, в лог шло `![axr_main callback_add] callback trader_on_restock already exists!`. Add на top-level `aaa_*` раньше BHS `zzzzzz_*`, поэтому traceback печатал уже второй Add.
+
+**Как исправлено**
+
+Целимся в `_G.printf` / `_G.callstack` на время своего Add. Публичный `axr_main.callback_add` (его зовёт `AddScriptCallback`) после первого объявления имени пропускает повтор. Таблица `intercepts` не читается снаружи.
+
+**Не затронуто**
+
+- wrap `timed_update`, файлы Campfires / BHS / `barter_core` / `exo_loot`
+- сохраняемое состояние
+- top-level Add (порядок `on_game_start` у `file_list_open_ex` без сортировки не гарантирован)
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+
+**Проверено**
+
+- lint: см. прогон после правки
+- В игре: не прогонялось. Не должно быть `callback trader_on_restock already exists!`. Ожидаемый лог: `trader_on_restock added` или `exists`, затем `Send wrap installed`.
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**
