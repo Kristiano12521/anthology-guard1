@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.38] — CI: actions/checkout и setup-python на Node 24
+
+`.github/workflows/ci.yml`: `actions/checkout@v7` (релиз [v7.0.1](https://github.com/actions/checkout/releases/tag/v7.0.1), ESM, Node 24) и `actions/setup-python@v7` (релиз [v7.0.0](https://github.com/actions/setup-python/releases/tag/v7.0.0)). Убирает предупреждение о принудительном запуске v4/v5 на Node 20. Матрица Python 3.9/3.12, шаги и `fetch-depth: 0` без изменений.
+
 ## [0.1.37] — CI: тихие тесты упаковщиков
 
 Тесты `test_pack_bhs` и `test_pack_kristiano_aio` глушат stdout упаковщиков (`redirect_stdout`), чтобы в логе CI не терялись настоящие ошибки среди списков файлов архива. Совместимость с Python 3.9 (аннотации, прогон unittest/lint_addon/check_changelog_tools) — в [0.1.36].
