@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
-"""Pack Anthology Busy Hands Stability Fix from reference + addon overlays.
+"""Сборка BusyHands: merge vendor reference + overlay и опциональный zip для MO2.
+
+`stage_gamedata()` — общий merge для AIO (`_pack_kristiano_aio.py`) и standalone.
+В MO2 ставится через `[DBG] Kristiano Fixes ALL IN ONE`; отдельный zip здесь —
+для проверки, fill_reference_addons и отладки load order, не второй канал раздачи.
+
+Full-file из reference/ (mon_sleep, guaranteed_loot, sequential_load_magazine,
+aes_crow_spawner.ltx) попадают и в AIO, и в standalone через `stage_gamedata()`.
 
     python tools/pack_bhs.py
+    python tools/pack_bhs.py --keep-old
 """
 
 from __future__ import annotations
 
+import argparse
 import shutil
 import sys
 import zipfile
@@ -15,6 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _common import detect_version  # noqa: E402
+from build_prune import BHS_MOD_ID, cleanup_before_build  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 OUT_STEM = "Anthology_BusyHands_Stability_Fix"
@@ -262,13 +272,16 @@ def stage_gamedata(repo: Path, dest_gamedata: Path) -> tuple[str, int, str, Path
     return version, after - before, src.name, seq_src
 
 
-def pack(repo: Path | None = None) -> Path:
+def pack(repo: Path | None = None, *, keep_old: bool = False) -> Path:
     repo = repo or REPO
     overlay = repo / "addon" / "anthology_busyhands_stability_fix"
     version = detect_version(overlay)
     out_name = packed_name(version)
+    build_dir = repo / "build"
+    build_dir.mkdir(parents=True, exist_ok=True)
+    cleanup_before_build(build_dir, f"mod:{BHS_MOD_ID}", keep_old=keep_old)
 
-    out_dir = repo / "build" / out_name
+    out_dir = build_dir / out_name
     if out_dir.exists():
         shutil.rmtree(out_dir)
     gamedata = out_dir / "gamedata"
@@ -290,7 +303,7 @@ def pack(repo: Path | None = None) -> Path:
         encoding="utf-8",
     )
 
-    archive = repo / "build" / f"{out_name}.zip"
+    archive = build_dir / f"{out_name}.zip"
     if archive.exists():
         archive.unlink()
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -310,9 +323,17 @@ def pack(repo: Path | None = None) -> Path:
     return archive
 
 
-def main() -> None:
-    pack()
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Pack Anthology Busy Hands Stability Fix")
+    parser.add_argument(
+        "--keep-old",
+        action="store_true",
+        help="не удалять предыдущие сборки BHS в build/ перед упаковкой",
+    )
+    args = parser.parse_args(argv)
+    pack(keep_old=args.keep_old)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

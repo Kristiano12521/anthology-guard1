@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.44] — очистка build/ и prune_builds
+
+Перед сборкой `build_addon.py`, `pack_bhs.py` и `_pack_kristiano_aio.py` удаляют предыдущие артефакты того же мода в `build/` (папки и zip разных имён — для BHS это и `Anthology_BusyHands_Stability_Fix_v*`, и `anthology_busyhands_stability_fix-*`). Флаг `--keep-old` отключает очистку. `tools/prune_builds.py` — ротация по образцу `prune_logs.py`: `--dry-run` по умолчанию, `--keep N`, `--yes`. В docstring `pack_bhs.py` зафиксировано: MO2-канал — AIO, standalone zip — для проверки и fill_reference. Тесты `test_build_prune`, `test_prune_builds`.
+
 ## [0.1.43] — slash-команды mine, verify, fork, deploy
 
 Четыре команды в `.cursor/commands/`: `/mine <лог>` (`xraylog.py --mine`, разбор «Мои моды»), `/verify` (`lint_addon.py --unverified`, чек-лист по CHANGELOG), `/fork <mod_id>` (сверка `vendor_fork=1` / `FORK-001`), `/deploy` (`pack_bhs.py`, `_pack_kristiano_aio.py`, `build_addon.py`). В `docs/prompts.md` — раздел «Команды и разовые промпты»; таблица команд в `README.md` дополнена.

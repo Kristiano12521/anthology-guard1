@@ -23,6 +23,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _common import REPO_ROOT, decode_bytes, detect_version, rel  # noqa: E402
+from build_prune import cleanup_before_build  # noqa: E402
 from lint_addon import ReferenceView, lint  # noqa: E402
 from refindex import DEFAULT_ROOT  # noqa: E402
 
@@ -81,6 +82,8 @@ def build_one(addon_dir: Path, args: argparse.Namespace, reference: ReferenceVie
     if not gamedata.is_dir():
         print(f"{mod_id}: нет gamedata/ — нечего собирать.", file=sys.stderr)
         return 1
+
+    cleanup_before_build(args.out, f"mod:{mod_id}", keep_old=args.keep_old)
 
     out_dir = args.out / mod_id
     if out_dir.exists():
@@ -153,6 +156,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--install", type=Path, help="папка mods в MO2")
     parser.add_argument("--skip-lint", action="store_true")
     parser.add_argument("--force", action="store_true", help="собрать несмотря на ошибки линтера")
+    parser.add_argument(
+        "--keep-old",
+        action="store_true",
+        help="не удалять предыдущие сборки этого мода в build/ перед упаковкой",
+    )
     args = parser.parse_args(argv)
 
     if args.mod_id:

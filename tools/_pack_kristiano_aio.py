@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pack_bhs  # noqa: E402
 
 from _common import REPO_ROOT, decode_bytes, detect_version  # noqa: E402
+from build_prune import cleanup_before_build  # noqa: E402
 
 ADDON_ROOT = REPO_ROOT / "addon"
 OUT_DIR = REPO_ROOT / "build"
@@ -111,9 +112,11 @@ def pack_separate(
     *,
     addon_root: Path | None = None,
     out_dir: Path | None = None,
+    keep_old: bool = False,
 ) -> Path:
     addon_root = addon_root or ADDON_ROOT
     out_dir = out_dir or OUT_DIR
+    cleanup_before_build(out_dir, f"pack:separate:{mo2_name}", keep_old=keep_old)
     addon_dir = addon_root / mod_id
     version = detect_version(addon_dir)
     staging = out_dir / "_staging" / mo2_name
@@ -158,9 +161,11 @@ def pack_aio(
     *,
     repo: Path | None = None,
     out_dir: Path | None = None,
+    keep_old: bool = False,
 ) -> Path:
     repo = repo or REPO_ROOT
     out_dir = out_dir or OUT_DIR
+    cleanup_before_build(out_dir, "pack:kristiano_aio", keep_old=keep_old)
     staging = out_dir / "_staging" / AIO_NAME
     if staging.exists():
         shutil.rmtree(staging)
@@ -268,6 +273,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Pack only [DBG] Kristiano Fixes ALL IN ONE, skip CMO/QuickQK/ST2 zips",
     )
+    parser.add_argument(
+        "--keep-old",
+        action="store_true",
+        help="не удалять предыдущие zip AIO / separate в build/ перед упаковкой",
+    )
     args = parser.parse_args(argv)
 
     addon_root = args.addon_root
@@ -275,10 +285,16 @@ def main(argv: list[str] | None = None) -> int:
     repo = addon_root.parent
     out_dir.mkdir(parents=True, exist_ok=True)
     addons = aio_addons(addon_root)
-    pack_aio(addons, repo=repo, out_dir=out_dir)
+    pack_aio(addons, repo=repo, out_dir=out_dir, keep_old=args.keep_old)
     if not args.aio_only:
         for mod_id, mo2_name in SEPARATE.items():
-            pack_separate(mod_id, mo2_name, addon_root=addon_root, out_dir=out_dir)
+            pack_separate(
+                mod_id,
+                mo2_name,
+                addon_root=addon_root,
+                out_dir=out_dir,
+                keep_old=args.keep_old,
+            )
     staging = out_dir / "_staging"
     if staging.exists():
         shutil.rmtree(staging)
