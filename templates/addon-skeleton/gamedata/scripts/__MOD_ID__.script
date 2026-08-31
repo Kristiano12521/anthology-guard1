@@ -24,11 +24,82 @@ local function reset_state()
 end
 
 ----------------------------------------------------------------------
+-- Two-layer repair (optional). Uncomment when the case matches.
+--
+-- Pattern from addon code (not a project rule):
+--   full:   fix_rogue_hostility, fix_soc_nimble_flash, fix_noosphere_voice_x18
+--   partial: fix_quest_story_id (DLTX + CreateTimeEvent + also register wrap)
+--   partial: fix_wtf_assault_instacomplete (runtime merge only — no DLTX,
+--            no CreateTimeEvent)
+--
+-- Layer 1 — DLTX (see mod_items_food___MOD_ID__.ltx):
+--   Fixes FUTURE spawns / scheme / jobs. New objects pick it up from config.
+--
+-- Layer 2 — one-shot CreateTimeEvent (this stub):
+--   Fixes ALREADY broken saves after load. Schedule from actor_on_first_update.
+--   Retry: ResetTimeEvent + return false. Done / give up: return true
+--   (Create with the same ids while the slot lives is a no-op).
+--   Cancel on on_game_end. Reset attempt counter on on_game_load.
+--   Do not poll actor_on_update / scan 1..65534 for this.
+--
+-- Extra triggers seen in the full mods (optional):
+--   actor_on_item_take (nimble), npc_on_death_callback (noosphere).
+----------------------------------------------------------------------
+--[[
+local EVENT_ID = "__MOD_ID__"
+local REPAIR_ACTION = "repair"
+local REPAIR_DELAY = 1.0
+local REPAIR_MAX_ATTEMPTS = 10
+local repair_attempts = 0
+
+-- Returns true when repair finished or should stop; false to keep the slot.
+local function try_repair()
+	if not db.actor then
+		return false
+	end
+	-- if already healthy / not applicable -> return true
+	-- if fixed this tick -> return true
+	-- if target not ready yet -> return false
+	return true
+end
+
+function repair_tick()
+	repair_attempts = repair_attempts + 1
+	if try_repair() then
+		return true
+	end
+	if repair_attempts >= REPAIR_MAX_ATTEMPTS then
+		-- Future cases: Layer 1 DLTX. Stop the timer.
+		return true
+	end
+	ResetTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY)
+	return false
+end
+
+local function cancel_repair()
+	if type(RemoveTimeEvent) == "function" then
+		pcall(RemoveTimeEvent, EVENT_ID, REPAIR_ACTION)
+	end
+	repair_attempts = 0
+end
+
+local function schedule_repair()
+	cancel_repair()
+	if not db.actor then
+		return
+	end
+	-- Optional early exit if quest/info already OK (see rogue / noosphere).
+	CreateTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY, repair_tick)
+end
+--]]
+
+----------------------------------------------------------------------
 -- Callbacks
 ----------------------------------------------------------------------
 
 local function on_game_load()
 	reset_state()
+	-- repair_attempts = 0
 	log("loaded")
 end
 
@@ -37,6 +108,7 @@ local function actor_on_first_update()
 	if not opt("__MOD_ID__/enable", true) then
 		return
 	end
+	-- schedule_repair()
 	log("actor ready")
 end
 
@@ -83,6 +155,7 @@ function on_game_start()
 end
 
 function on_game_end()
+	-- cancel_repair()
 	UnregisterScriptCallback("on_game_load", on_game_load)
 	UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	UnregisterScriptCallback("actor_on_update", actor_on_update)

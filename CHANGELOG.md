@@ -2,6 +2,14 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.24] — скелет: двухслойный repair; pitfalls ORDER-002
+
+В `templates/addon-skeleton`: закомментированная заготовка DLTX + `CreateTimeEvent`/`ResetTimeEvent` по коду `fix_rogue_hostility` / `fix_soc_nimble_flash` / `fix_noosphere_voice_x18` (частичные: `fix_quest_story_id`, `fix_wtf_assault_instacomplete`). В [`docs/pitfalls.md`](docs/pitfalls.md) §9 — оговорка, что старые CHANGELOG модов про запрет `zzz` не отменяют ORDER-002 для `.script`.
+
+## [0.1.23] — pitfalls: повторные ошибки из истории модов
+
+В [`docs/pitfalls.md`](docs/pitfalls.md) §16: три грабли, подтверждённые проверкой (`CreateTimeEvent`/`ResetTimeEvent`, `RegisterScriptCallback("on_game_end")`, цикл `1..65534` / LUA-008), и шесть — только по CHANGELOG модов, подзаголовок «требует перепроверки по reference/». Источник у каждой строки — мод и версия.
+
 ## [0.1.22] — плейбук правки STATE alife-объекта
 
 Четвёртый процесс рядом с fix / addon / crash: [`docs/plans/state-repair.md`](docs/plans/state-repair.md) и agent-requested [`.cursor/rules/workflow-state.mdc`](.cursor/rules/workflow-state.mdc). Каркас выведен из `fix_kupol_wrong_bone`, `fix_aver_darkvalley`, `fix_gigant_space_restriction` (единственные носители `server_entity_on_register` в `addon/`); пути A (`utils_stpk`) и B (quarantine/release) не усреднены. В README и `docs/rules.md` — четыре плейбука.

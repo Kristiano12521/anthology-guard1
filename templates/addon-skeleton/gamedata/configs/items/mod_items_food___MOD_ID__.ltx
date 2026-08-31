@@ -2,6 +2,12 @@
 ; Patches: gamedata/configs/items/items_food.ltx
 ; Why: <one line>
 ;
+; Two-layer repair (optional): this file is Layer 1 — future spawns / scheme.
+; Layer 2 (old saves) is the commented CreateTimeEvent stub in __MOD_ID__.script.
+; Full examples: fix_rogue_hostility, fix_soc_nimble_flash, fix_noosphere_voice_x18.
+; Partial: fix_quest_story_id (also register wrap). Not this pattern:
+;   fix_wtf_assault_instacomplete (monkey-patch only, no DLTX / CreateTimeEvent).
+;
 ; Rules:
 ;   ![section]  edit an existing section (do NOT repeat parents)
 ;   @[section]  same, but create it if missing

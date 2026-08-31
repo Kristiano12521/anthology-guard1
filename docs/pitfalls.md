@@ -49,7 +49,9 @@ RegisterScriptCallback("actor_on_update", function() ... end)
 
 Для `.ltx` префикс `zzz_`/`aaa_` ничего не даёт: порядок патчей задаёт список модов в MO2. `tools/lint_addon.py` это ловит как ошибку ORDER-001.
 
-Для `.script` имя файла как раз определяет порядок выполнения: движок грузит все скрипты и сортирует их по имени. Префикс — способ выиграть гонку `install()` на загрузке модуля (как `zzzzzz_anthology_bhs_fdda_patch.script` в сборке). Линтер предупреждает ORDER-002; снимается комментарием в первых 10 строках: `-- load-order: после <что>`.
+Для `.script` имя файла как раз определяет порядок выполнения: движок грузит все скрипты и сортирует их по имени. Префикс — способ выиграть гонку `install()` на загрузке модуля (как `zzzzzz_anthology_bhs_fdda_patch.script` в сборке). Линтер предупреждает ORDER-002; снимается комментарием в первых 10 строках: `-- load-order: после <что>`. Актуальное правило: [`anomaly-core.mdc`](../.cursor/rules/anomaly-core.mdc) (запрет `zzz`/`aaa` только у `.ltx`; у `.script` префикс допустим с этим комментарием).
+
+Формулировки в старых CHANGELOG модов («префикс — проблема, порядок через MO2») отражают правило до разделения ORDER-001 / ORDER-002. Читать их как действующий запрет префикса для `.script` не нужно.
 
 ## 10. Кодировка
 
@@ -102,6 +104,27 @@ run_string for name,_ in pairs(db.actor_inside_zones or {}) do printf("inside_zo
 - явная запись в `_G` (`rawset(_G, "name", ...)`). В `addon/` так делает `fix_replace_quest_corpse`.
 
 Симптом — неверное значение переменной или подменившаяся функция, без ошибки в логе. Диагностика: `printf("%s", type(имя))` в начале своего callback. В `addon/` десятки `.script`, риск реальный. Новые хелперы — `local`.
+
+## 16. Повторные ошибки из истории модов
+
+Из отчёта по CHANGELOG/`addon/` (13 строк). Сюда попали только подтверждённые кодом или CHANGELOG; источник — мод и версия.
+
+### Подтверждено проверкой
+
+- **`CreateTimeEvent` + `return true` снимает слот, retry не срабатывает; нужен `ResetTimeEvent` + `return false`.** Источники: `fix_quest_story_id` 1.0.1, `seamless_inventory_sort_anthology` 1.5.7.
+- **`RegisterScriptCallback("on_game_end")` — такого callback нет; `on_game_end` — точка входа скрипта** (как `on_game_start`). Источник: `seamless_inventory_sort_anthology` 1.5.6; в текущем коде регистрации не осталось.
+- **Полный проход id `1..65534` вместо `alife():iterate_objects`.** Источники: `fix_aver_darkvalley` 1.0.0, `fix_kupol_wrong_bone` 1.0.1 (запасной цикл остаётся, если `iterate_objects` нет или упал). Ловится LUA-008.
+
+### Требует перепроверки по `reference/`
+
+Подтверждено только собственным CHANGELOG мода, без сверки с исходниками сборки (`reference/` пуст).
+
+- **`pcall` не глушит C++ member error** на destroyed `CScriptGameObject` (`cannot access class member …::ID!`). Не звать `:id()` «на всякий случай» — отсекать по данным без метода объекта. Источник: `fix_stash_id_desync` 1.0.2.
+- **Патч таблицы модуля, а не `_G`.** Функция живёт на модуле; `_G.start_body_search` пустой — wrap глобала не встаёт. Источники: `fix_bhs_fdda_loot` 1.0.1, `anthology_busyhands_stability_fix` 0.6.2.
+- **`printf` с `%d` в Anomaly не подставляет числа.** Источник: `fix_ashot_aw_travel` (бета v1.0.5, зафиксировано в CHANGELOG 1.0.0).
+- **DLTX не на root-файле.** `mod_*` к файлу из `#include` не подхватывается; нужен патч корня (`system.ltx` / `mod_system_*`). Источник: `fix_quest_stash` 1.0.1 → 1.0.2.
+- **DLTX перебит поздним `mod_system_*`.** Патч `o_sts.ltx` затёрся; победил канал `icon_override`. Источник: `fix_hoc_monolith_icon` 1.0.0 (уход в 1.0.1).
+- **Глобальный wrap (`ChangeLevel`, `getFS():file_list_open`) бьёт чужие вызовы / CTD.** Источники: `fix_ashot_aw_travel` (бета v1.0.5, CHANGELOG 1.0.0), `fix_radio` 1.0.0 → 1.0.1.
 
 ## Открытые вопросы
 
