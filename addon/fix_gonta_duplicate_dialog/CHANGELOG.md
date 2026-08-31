@@ -1,5 +1,30 @@
 # Gonta Duplicate Dialog Fix
 
+## [1.0.1] — 2026-08-31
+
+**Изменено**
+
+- `gamedata/scripts/modxml_fix_gonta_duplicate_dialog.script` — в логе `%s` вместо `%d`: `printf` Anomaly подставляет только `%s`.
+
+**Причина**
+
+В сессии 2026-08-31 строка была `stripped %d LTTZ actor_dialog(s) from 2` — число съехало на имя персонажа.
+
+**Не затронуто**
+
+- DXML, какие узлы снимаются, callback `on_xml_read`
+- `verified_*` в `meta.ini`
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_gonta_duplicate_dialog`
+- VERIFY-001: в игре не прогонялось. `verified_*` не ставились.
+
 ## [1.0.0] — 2026-08-29
 
 **Изменено**

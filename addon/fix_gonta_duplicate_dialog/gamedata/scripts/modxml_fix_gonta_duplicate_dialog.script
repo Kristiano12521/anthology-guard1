@@ -74,7 +74,7 @@ local function strip_lttz_pair(xml_file_name, xml_obj)
 	end
 
 	if removed > 0 then
-		printf(LOG_TAG .. " stripped %d LTTZ actor_dialog(s) from %s", removed, GONTA_ID)
+		printf(LOG_TAG .. " stripped %s LTTZ actor_dialog(s) from %s", tostring(removed), GONTA_ID)
 	end
 end
 

@@ -1,5 +1,30 @@
 # XR Effects Sound Paths Fix
 
+## [1.0.1] — 2026-08-31
+
+**Изменено**
+
+- `gamedata/scripts/fix_xr_effects_sounds.script` — сводка `wrapped` / `missing` через `%s`: `printf` Anomaly подставляет только `%s`.
+
+**Причина**
+
+В сессии 2026-08-31 в логе было `wrapped %d functions, missing %d` без чисел.
+
+**Не затронуто**
+
+- обёртки `xr_effects`, пути к звукам
+- `verified_*` в `meta.ini`
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_xr_effects_sounds`
+- VERIFY-001: в игре не прогонялось. `verified_*` не ставились.
+
 ## [1.0.0] — 2026-08-28
 
 **Изменено**

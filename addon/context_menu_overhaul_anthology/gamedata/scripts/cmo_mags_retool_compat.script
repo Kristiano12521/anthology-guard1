@@ -55,9 +55,14 @@ local STYLE_WORDS = {
 local PLACEHOLDER_VISUAL = "dynamics\\devices\\dev_harmonica\\dev_harmonica.ogf"
 
 local function log(fmt, ...)
-    if type(printf) == "function" then
-        printf(TAG .. " " .. fmt, ...)
+    if type(printf) ~= "function" then
+        return
     end
+    local ok, message = pcall(string.format, fmt, ...)
+    if not ok then
+        message = tostring(fmt)
+    end
+    printf(TAG .. " " .. message)
 end
 
 local function trim(value)

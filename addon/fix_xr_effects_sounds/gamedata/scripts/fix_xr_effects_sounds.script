@@ -150,7 +150,7 @@ local function install()
     wrap("weapon_shoot_mod", patched.weapon_shoot_mod)
     wrap("weapon_shoot_mod_sniper", patched.weapon_shoot_mod_sniper)
 
-    printf(LOG_TAG .. " wrapped %d functions, missing %d", wrapped, missing)
+    printf(LOG_TAG .. " wrapped %s functions, missing %s", tostring(wrapped), tostring(missing))
     return wrapped > 0
 end
 
