@@ -447,7 +447,7 @@ local function scan_alife(reason)
 				return
 			end
 		end
-		-- alife-scan: запасной путь, основной sim:iterate_objects, если метода нет или pcall упал
+		-- alife-scan: запасной путь, основной sim:iterate_objects, если метода нет или pcall упал; 31.08.2026 type(alife().iterate_objects)=function, docs/pitfalls.md §16
 		for id = 1, MAX_ALIFE_ID do
 			if all_done() then
 				return

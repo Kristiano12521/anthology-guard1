@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.29] — pitfalls: DLTX-мост и iterate_objects проверены в игре
+
+В [`docs/pitfalls.md`](docs/pitfalls.md) §16 из «требует перепроверки» в основной раздел: DLTX-патч к файлу из `#include` грузится только через мост `mod_system_*` (`fix_quest_stash` 1.0.2, 31.08.2026, Anthology 2.1 / Modded Exes MT, `-dbg`; замеры А/Б `ini_sys:section_exist` / `r_string_ex` и диагностика `drx_sl_quest_item_1014`). Там же `type(alife().iterate_objects)=function` на той же сборке; ссылка в комментариях `-- alife-scan` у `fix_kupol_wrong_bone` и `fix_aver_darkvalley`.
+
 ## [0.1.28] — pitfalls §16 сверен с reference/
 
 Шесть строк «требует перепроверки» в [`docs/pitfalls.md`](docs/pitfalls.md) сверены с эталоном (13 966 файлов). В основной раздел: патч module-table, `printf` только `%s`, конфликт `mod_system_*` / `icon_override`, глобальный wrap `ChangeLevel`/`file_list_open`, Lua-порядок `pcall(obj:id())`. Остались без C++ в эталоне: лог member error при правильном `pcall` и `bIsRootFile` у DLTX.
