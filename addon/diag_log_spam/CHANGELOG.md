@@ -1,5 +1,24 @@
 # Log Spam Diagnostic
 
+## [1.2.2] — 2026-09-01
+
+**Изменено**
+
+- TRACE: `debug.traceback("", 2)` заменён на `_G.callstack()` — в Lua `debug.traceback` только возвращает строку; в лог пишет `callstack()` из `_g.script` через `log()`.
+- `on_game_start`: сброс `traced_go`, `traced_release`, `traced_printe`, `miss_counts`, `release_miss_count` после `install_wrappers` — сводка и «первый TRACE» за текущую сессию, не накопительно.
+- `on_game_end`: безусловный `printf("%s on_game_end", …)`; `print_miss_summary` в `pcall` с `printe` при ошибке. Сводка подписана `summary session`.
+- `docs/pitfalls.md` §16: грабля `debug.traceback` vs `callstack()`.
+
+**Не затронуто**
+
+- Early hook `_diag_log_spam_printe.script`, MCM, `fix_alife_release_nil`.
+- `verified_*` не ставились.
+
+**Проверено**
+
+- lint: см. прогон после правки
+- В игре: не прогонялось
+
 ## [1.2.1] — 2026-09-01
 
 **Изменено**

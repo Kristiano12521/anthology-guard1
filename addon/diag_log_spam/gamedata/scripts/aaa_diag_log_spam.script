@@ -1,9 +1,9 @@
 -- Log Spam Diagnostic (aaa_ load order: after _diag_log_spam_printe.script)
--- load-order: ïîñëå _diag_log_spam_printe.script
+-- load-order: ˜˜˜˜˜ _diag_log_spam_printe.script
 -- Trace first miss per id for get_object_by_id / alife_release; printe via _diag_log_spam_printe.script.
 -- Anomaly 1.5.3 / Anthology 2.1
 
-local VERSION = "1.2.1"
+local VERSION = "1.2.2"
 local LOG_TAG = "[diag_log_spam]"
 
 _G.__diag_log_spam = _G.__diag_log_spam or {}
@@ -50,8 +50,10 @@ end
 
 local function log_trace(kind, detail)
 	printf("%s TRACE %s | %s", LOG_TAG, kind, tostring(detail))
-	printf("%s STACK TRACEBACK:", LOG_TAG)
-	debug.traceback("", 2)
+	local cs = _G.callstack
+	if type(cs) == "function" then
+		cs()
+	end
 end
 
 local function format_printe_msg(fmt, ...)
@@ -162,7 +164,7 @@ local function print_miss_summary()
 		n_pe = n_pe + 1
 	end
 	printf(
-		"%s summary v%s: traced_go_ids=%s traced_printe_patterns=%s release_misses=%s",
+		"%s summary session v%s: traced_go_ids=%s traced_printe_patterns=%s release_misses=%s",
 		LOG_TAG,
 		VERSION,
 		tostring(n_go),
@@ -175,6 +177,19 @@ local function print_miss_summary()
 	for key in pairs(traced_printe) do
 		printf("%s   printe_pattern=%s", LOG_TAG, key)
 	end
+end
+
+local function reset_session_state()
+	traced_go = {}
+	traced_release = {}
+	traced_printe = {}
+	miss_counts = {}
+	release_miss_count = 0
+	state.traced_go = traced_go
+	state.traced_release = traced_release
+	state.traced_printe = traced_printe
+	state.miss_counts = miss_counts
+	state.release_miss_count = release_miss_count
 end
 
 local function install_wrappers()
@@ -212,11 +227,16 @@ end
 
 function on_game_start()
 	install_wrappers()
+	reset_session_state()
 	printf("%s loaded v%s (wrappers active)", LOG_TAG, VERSION)
 end
 
 function on_game_end()
-	print_miss_summary()
+	printf("%s on_game_end", LOG_TAG)
+	local ok, err = pcall(print_miss_summary)
+	if not ok then
+		printe("%s summary failed: %s", LOG_TAG, tostring(err))
+	end
 	uninstall_wrappers()
 end
 

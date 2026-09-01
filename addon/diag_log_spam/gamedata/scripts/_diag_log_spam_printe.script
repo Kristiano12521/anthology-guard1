@@ -44,8 +44,10 @@ if not state.early_printe_hook then
 		if key and not state.traced_printe[key] then
 			state.traced_printe[key] = true
 			printf("%s TRACE printe:%s | %s", LOG_TAG, key, msg)
-			printf("%s STACK TRACEBACK:", LOG_TAG)
-			debug.traceback("", 2)
+			local cs = _G.callstack
+			if type(cs) == "function" then
+				cs()
+			end
 		end
 		return state.orig_printe(fmt, ...)
 	end
