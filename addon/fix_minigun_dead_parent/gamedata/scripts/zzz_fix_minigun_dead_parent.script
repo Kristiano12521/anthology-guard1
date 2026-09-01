@@ -1,0 +1,223 @@
+-- load-order: после weapon_minigun_npc_fire_bullet_driven_V3_lite.script
+-- Minigun Dead Parent Guard
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- R.A.K minigun mod calls parent_obj:alive() without pcall on destroyed
+-- userdata (register_npc_minigun_bullet, maintain_parent_audio). Wrap the
+-- exported callbacks on the module table before the mod registers them.
+
+local LOG_TAG = "[fix_minigun_dead_parent]"
+local VERSION = "1.0.0"
+local MODULE_CANDIDATES = {
+	"weapon_minigun_npc_fire_bullet_driven_V3_lite",
+	"weapon_minigun_npc_fire_bullet_driven_v3_lite",
+}
+local DEAD_SKIP_REPORT_EVERY = 10
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local orig = {}
+local installed = false
+local callbacks_registered = false
+local patched_module = nil
+local patched_module_name = nil
+local dead_skip_count = 0
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function resolve_module()
+	for _, name in ipairs(MODULE_CANDIDATES) do
+		local mod = rawget(_G, name)
+		if type(mod) == "table" then
+			return mod, name
+		end
+	end
+	return nil, nil
+end
+
+local function object_alive(obj)
+	if not obj then
+		return false
+	end
+	local ok, alive = pcall(function()
+		return obj:alive()
+	end)
+	return ok and alive and true or false
+end
+
+local function level_object_by_id(id)
+	if not id then
+		return nil
+	end
+	local ok, obj = pcall(function()
+		return level.object_by_id(id)
+	end)
+	if ok then
+		return obj
+	end
+	return nil
+end
+
+local function is_actor_parent_id(parent_id)
+	return parent_id == 0 or parent_id == AC_ID
+end
+
+local function note_dead_skip(source)
+	dead_skip_count = dead_skip_count + 1
+	if dead_skip_count % DEAD_SKIP_REPORT_EVERY == 0 then
+		log(
+			"dead_parent_skip total=%s last=%s",
+			tostring(dead_skip_count),
+			tostring(source)
+		)
+	end
+end
+
+local function bullet_parent_alive(bullet)
+	if not bullet then
+		return true
+	end
+
+	local parent_id = bullet.parent_id
+	if not parent_id or is_actor_parent_id(parent_id) then
+		return true
+	end
+
+	local parent_obj = level_object_by_id(parent_id)
+	if not parent_obj then
+		return true
+	end
+
+	if not object_alive(parent_obj) then
+		return false
+	end
+
+	return true
+end
+
+function patched_bullet_on_init(bullet)
+	if not bullet_parent_alive(bullet) then
+		note_dead_skip("bullet_on_init")
+		return
+	end
+	return orig.bullet_on_init(bullet)
+end
+
+function patched_npc_on_update(npc, delta)
+	if not object_alive(npc) then
+		note_dead_skip("npc_on_update")
+		return
+	end
+	return orig.npc_on_update(npc, delta)
+end
+
+function patched_monster_on_update(monster, delta)
+	if not object_alive(monster) then
+		note_dead_skip("monster_on_update")
+		return
+	end
+	return orig.monster_on_update(monster, delta)
+end
+
+local function wrap(slot, mod, name, patched)
+	if not (mod and type(mod[name]) == "function") then
+		return false
+	end
+	if mod[name] == patched then
+		return true
+	end
+	orig[slot] = orig[slot] or mod[name]
+	mod[name] = patched
+	return true
+end
+
+local function install()
+	if installed then
+		return true
+	end
+
+	local mod, name = resolve_module()
+	if not mod then
+		printf(
+			"%s weapon_minigun_npc_fire_bullet_driven_V3_lite not found - guard NOT installed",
+			LOG_TAG
+		)
+		return false
+	end
+
+	local ok_bullet = wrap("bullet_on_init", mod, "bullet_on_init", patched_bullet_on_init)
+	local ok_npc = wrap("npc_on_update", mod, "npc_on_update", patched_npc_on_update)
+	local ok_monster = wrap(
+		"monster_on_update",
+		mod,
+		"monster_on_update",
+		patched_monster_on_update
+	)
+	if not (ok_bullet and ok_npc and ok_monster) then
+		log(
+			"missing callbacks bullet_on_init=%s npc_on_update=%s monster_on_update=%s - guard NOT installed",
+			tostring(ok_bullet),
+			tostring(ok_npc),
+			tostring(ok_monster)
+		)
+		return false
+	end
+
+	patched_module = mod
+	patched_module_name = name
+	installed = true
+	log("loaded v%s wrapped bullet_on_init/npc_on_update/monster_on_update (%s)", VERSION, name)
+	return true
+end
+
+local function uninstall()
+	local mod = patched_module or resolve_module()
+	if mod then
+		if orig.bullet_on_init then
+			mod.bullet_on_init = orig.bullet_on_init
+		end
+		if orig.npc_on_update then
+			mod.npc_on_update = orig.npc_on_update
+		end
+		if orig.monster_on_update then
+			mod.monster_on_update = orig.monster_on_update
+		end
+	end
+	orig = {}
+	installed = false
+	patched_module = nil
+	patched_module_name = nil
+	dead_skip_count = 0
+end
+
+function actor_on_first_update()
+	if not installed then
+		install()
+	end
+end
+
+-- Top-level: patch after the minigun module file loaded (zzz_ sorts later).
+install()
+
+function on_game_start()
+	if not installed then
+		install()
+	end
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
+	if dead_skip_count > 0 then
+		log("dead_parent_skip session_total=%s module=%s", tostring(dead_skip_count), tostring(patched_module_name))
+	end
+	uninstall()
+end
