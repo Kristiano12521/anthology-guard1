@@ -1,0 +1,202 @@
+-- Log Spam Diagnostic (aaa_ load order: after _g.script)
+-- Trace first miss per id for get_object_by_id / alife_release; optional printe pattern trace.
+-- Anomaly 1.5.3 / Anthology 2.1
+
+local VERSION = "1.1.0"
+local LOG_TAG = "[diag_log_spam]"
+
+local traced_go = {}
+local traced_release = {}
+local traced_printe = {}
+local miss_counts = {}
+local release_miss_count = 0
+
+local orig_get_object_by_id = get_object_by_id
+local orig_alife_release = alife_release
+local orig_alife_release_id = alife_release_id
+local orig_printe = printe
+
+local PRINTE_PATTERNS = {
+	"item_combination",
+	"wrong section names",
+	"callback doesn't exist",
+	"no game object",
+	"no server object",
+}
+
+local function opt(name, default)
+	if ui_mcm and ui_mcm.get then
+		local v = ui_mcm.get("diag_log_spam/" .. name)
+		if v ~= nil then
+			return v
+		end
+	end
+	return default
+end
+
+local function enabled()
+	return opt("enable", true)
+end
+
+local function log_trace(kind, detail)
+	printf("%s TRACE %s | %s", LOG_TAG, kind, tostring(detail))
+	printf("%s STACK TRACEBACK:", LOG_TAG)
+	debug.traceback("", 2)
+end
+
+local function printe_pattern_key(msg)
+	for _, pat in ipairs(PRINTE_PATTERNS) do
+		if string.find(msg, pat, 1, true) then
+			return pat
+		end
+	end
+	return nil
+end
+
+local function maybe_trace_printe(msg)
+	if not enabled() or not opt("trace_printe_patterns", true) then
+		return
+	end
+	local key = printe_pattern_key(msg)
+	if not key or traced_printe[key] then
+		return
+	end
+	traced_printe[key] = true
+	log_trace("printe:" .. key, msg)
+end
+
+local function wrapped_printe(fmt, ...)
+	local msg
+	if select("#", ...) > 0 then
+		msg = string.format(tostring(fmt), ...)
+	else
+		msg = tostring(fmt)
+	end
+	maybe_trace_printe(msg)
+	return orig_printe(fmt, ...)
+end
+
+local function wrapped_get_object_by_id(id)
+	if not enabled() then
+		return orig_get_object_by_id(id)
+	end
+
+	local obj = orig_get_object_by_id(id)
+	if obj then
+		return obj
+	end
+
+	local sid = tostring(id)
+	miss_counts[sid] = (miss_counts[sid] or 0) + 1
+
+	if opt("trace_get_object_by_id", true) and not traced_go[sid] then
+		traced_go[sid] = true
+		log_trace("get_object_by_id id=" .. sid, "first miss")
+	end
+
+	if opt("suppress_get_object_by_id_noise", true) then
+		return nil
+	end
+
+	return obj
+end
+
+local function wrapped_alife_release(sobj, force)
+	if not enabled() then
+		return orig_alife_release(sobj, force)
+	end
+
+	if sobj == nil then
+		release_miss_count = release_miss_count + 1
+		if opt("trace_alife_release_nil", true) and not traced_release.nil_obj then
+			traced_release.nil_obj = true
+			log_trace("alife_release", "server object is nil")
+		end
+		if opt("fix_alife_release_nil", true) then
+			return
+		end
+	end
+
+	return orig_alife_release(sobj, force)
+end
+
+local function wrapped_alife_release_id(id, force)
+	if not enabled() then
+		return orig_alife_release_id(id, force)
+	end
+
+	if id == nil then
+		release_miss_count = release_miss_count + 1
+		if opt("trace_alife_release_nil", true) and not traced_release.nil_id then
+			traced_release.nil_id = true
+			log_trace("alife_release_id", "id is nil")
+		end
+		if opt("fix_alife_release_nil", true) then
+			return
+		end
+	end
+
+	return orig_alife_release_id(id, force)
+end
+
+local function print_miss_summary()
+	local n_go = 0
+	for _ in pairs(traced_go) do
+		n_go = n_go + 1
+	end
+	local n_pe = 0
+	for _ in pairs(traced_printe) do
+		n_pe = n_pe + 1
+	end
+	printf(
+		"%s summary v%s: traced_go_ids=%s traced_printe_patterns=%s release_misses=%s",
+		LOG_TAG,
+		VERSION,
+		tostring(n_go),
+		tostring(n_pe),
+		tostring(release_miss_count)
+	)
+	for sid, cnt in pairs(miss_counts) do
+		printf("%s   id=%s misses=%s traced=%s", LOG_TAG, sid, tostring(cnt), tostring(traced_go[sid] and "yes" or "no"))
+	end
+	for key in pairs(traced_printe) do
+		printf("%s   printe_pattern=%s", LOG_TAG, key)
+	end
+end
+
+local function install_wrappers()
+	if get_object_by_id ~= wrapped_get_object_by_id then
+		get_object_by_id = wrapped_get_object_by_id
+	end
+	if alife_release ~= wrapped_alife_release then
+		alife_release = wrapped_alife_release
+	end
+	if alife_release_id ~= wrapped_alife_release_id then
+		alife_release_id = wrapped_alife_release_id
+	end
+	if printe ~= wrapped_printe and type(orig_printe) == "function" then
+		printe = wrapped_printe
+	end
+end
+
+local function uninstall_wrappers()
+	get_object_by_id = orig_get_object_by_id
+	alife_release = orig_alife_release
+	alife_release_id = orig_alife_release_id
+	if type(orig_printe) == "function" then
+		printe = orig_printe
+	end
+end
+
+function on_game_start()
+	install_wrappers()
+	printf("%s loaded v%s (wrappers active)", LOG_TAG, VERSION)
+end
+
+function on_game_end()
+	print_miss_summary()
+	uninstall_wrappers()
+end
+
+install_wrappers()
+printf("%s init v%s", LOG_TAG, VERSION)

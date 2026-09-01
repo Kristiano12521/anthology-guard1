@@ -1,0 +1,29 @@
+-- Log Spam Diagnostic - MCM
+
+function on_mcm_load()
+	return {
+		id = "diag_log_spam",
+		sh = true,
+		gr = {
+			{id = "title", type = "title", text = "ui_mcm_diag_log_spam_title"},
+
+			{id = "enable", type = "check", val = 1, def = true,
+			 text = "ui_mcm_diag_log_spam_enable"},
+
+			{id = "trace_get_object_by_id", type = "check", val = 1, def = true,
+			 text = "ui_mcm_diag_log_spam_trace_go"},
+
+			{id = "suppress_get_object_by_id_noise", type = "check", val = 1, def = true,
+			 text = "ui_mcm_diag_log_spam_suppress_go"},
+
+			{id = "trace_alife_release_nil", type = "check", val = 1, def = true,
+			 text = "ui_mcm_diag_log_spam_trace_release"},
+
+			{id = "fix_alife_release_nil", type = "check", val = 1, def = true,
+			 text = "ui_mcm_diag_log_spam_fix_release"},
+
+			{id = "trace_printe_patterns", type = "check", val = 1, def = true,
+			 text = "ui_mcm_diag_log_spam_trace_printe"},
+		}
+	}
+end

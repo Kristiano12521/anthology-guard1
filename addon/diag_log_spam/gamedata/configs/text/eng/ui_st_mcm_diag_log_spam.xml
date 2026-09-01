@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="ui_mcm_diag_log_spam">
+		<text>Log Spam Diagnostic</text>
+	</string>
+	<string id="ui_mcm_diag_log_spam_title">
+		<text>Log spam trace and guards</text>
+	</string>
+	<string id="ui_mcm_diag_log_spam_enable">
+		<text>Enable wrappers</text>
+	</string>
+	<string id="ui_mcm_diag_log_spam_trace_go">
+		<text>Trace first get_object_by_id miss per id (callstack)</text>
+	</string>
+	<string id="ui_mcm_diag_log_spam_suppress_go">
+		<text>Suppress repeated get_object_by_id ERROR lines</text>
+	</string>
+	<string id="ui_mcm_diag_log_spam_trace_release">
+		<text>Trace first alife_release with no server object</text>
+	</string>
+	<string id="ui_mcm_diag_log_spam_fix_release">
+		<text>Skip alife_release when server object is gone (no ERROR spam)</text>
+	</string>
+	<string id="ui_mcm_diag_log_spam_trace_printe">
+		<text>Trace first printe hit for known spam patterns (item_combination, etc.)</text>
+	</string>
+</string_table>

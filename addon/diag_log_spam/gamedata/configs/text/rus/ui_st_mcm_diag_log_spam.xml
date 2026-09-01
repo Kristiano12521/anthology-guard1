@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="ui_mcm_diag_log_spam">
+		<text>Диагностика спама в лог</text>
+	</string>
+	<string id="ui_mcm_diag_log_spam_title">
+		<text>Трассировка и гашение log spam</text>
+	</string>
+	<string id="ui_mcm_diag_log_spam_enable">
+		<text>Включить обёртки</text>
+	</string>
+	<string id="ui_mcm_diag_log_spam_trace_go">
+		<text>Трасс первый промах get_object_by_id по id</text>
+	</string>
+	<string id="ui_mcm_diag_log_spam_suppress_go">
+		<text>Глушить повторяющиеся ERROR get_object_by_id</text>
+	</string>
+	<string id="ui_mcm_diag_log_spam_trace_release">
+		<text>Трасс первый alife_release без server object</text>
+	</string>
+	<string id="ui_mcm_diag_log_spam_fix_release">
+		<text>Не вызывать alife_release, если объекта уже нет в онлайне</text>
+	</string>
+	<string id="ui_mcm_diag_log_spam_trace_printe">
+		<text>Трассировать первый printe по известным паттернам (item_combination и т.д.)</text>
+	</string>
+</string_table>
