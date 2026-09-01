@@ -34,6 +34,7 @@ from _common import (  # noqa: E402
     GAME_TEXT_SUFFIXES,
     REPO_ROOT,
     decode_bytes,
+    has_bad_line_endings,
     iter_files,
     looks_like_utf8_cyrillic,
     path_tail,
@@ -740,9 +741,17 @@ class AddonLinter:
         data = path.read_bytes()
         if data.startswith(b"\xef\xbb\xbf"):
             self.add("ENC-001", "error", "BOM в игровом файле: движок читает такой файл неправильно.", path)
-        elif looks_like_utf8_cyrillic(data):
+        elif has_bad_line_endings(data):
             self.add(
                 "ENC-002",
+                "error",
+                "Порча окончаний строк: \\r\\r\\n или одиночный \\r (не CRLF). "
+                "Часто от двойной конвертации; .script в .gitattributes как -text.",
+                path,
+            )
+        elif looks_like_utf8_cyrillic(data):
+            self.add(
+                "ENC-003",
                 "warn",
                 "Похоже на UTF-8 с кириллицей. Игровые файлы — Windows-1251, иначе в игре будет мусор.",
                 path,

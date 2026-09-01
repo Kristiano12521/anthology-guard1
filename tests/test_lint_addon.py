@@ -110,7 +110,7 @@ class EncodingTests(unittest.TestCase):
                 '-- комментарий на русском\nfunction on_game_start() end\n', encoding="utf-8"
             )
             findings = lint_addon.lint(addon, lint_addon.ReferenceView())
-            self.assertIn("ENC-002", {f.code for f in findings})
+            self.assertIn("ENC-003", {f.code for f in findings})
 
     def test_bom_is_error(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -122,6 +122,37 @@ class EncodingTests(unittest.TestCase):
             )
             findings = lint_addon.lint(addon, lint_addon.ReferenceView())
             self.assertIn("ENC-001", {f.code for f in findings})
+
+    def test_cr_cr_lf_is_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = Path(tmp) / "eol_mod"
+            scripts = addon / "gamedata" / "scripts"
+            scripts.mkdir(parents=True)
+            (scripts / "eol_mod.script").write_bytes(b"line one\r\r\nline two\r\r\n")
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView())
+            enc = [f for f in findings if f.code == "ENC-002"]
+            self.assertEqual(len(enc), 1)
+            self.assertEqual(enc[0].severity, "error")
+
+    def test_standalone_cr_is_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = Path(tmp) / "cr_mod"
+            scripts = addon / "gamedata" / "scripts"
+            scripts.mkdir(parents=True)
+            (scripts / "cr_mod.script").write_bytes(b"line one\rline two\n")
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView())
+            enc = [f for f in findings if f.code == "ENC-002"]
+            self.assertEqual(len(enc), 1)
+            self.assertEqual(enc[0].severity, "error")
+
+    def test_crlf_is_ok(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = Path(tmp) / "crlf_mod"
+            scripts = addon / "gamedata" / "scripts"
+            scripts.mkdir(parents=True)
+            (scripts / "crlf_mod.script").write_bytes(b"line one\r\nline two\r\n")
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView())
+            self.assertNotIn("ENC-002", {f.code for f in findings})
 
 
 class EmptyReferenceTests(unittest.TestCase):

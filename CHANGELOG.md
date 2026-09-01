@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.46] — ENC-002: порча окончаний строк
+
+`tools/lint_addon.py`: ошибка ENC-002 на `\r\r\n` и одиночный `\r` (не CRLF) в игровых файлах мода. Бывший ENC-002 (UTF-8 с кириллицей) переименован в ENC-003. Детектор в `tools/_common.py::has_bad_line_endings`. Тесты на обе формы порчи и корректный CRLF.
+
 ## [0.1.45] — test_build_prune без reference/
 
 `tests/test_build_prune.py::test_pack_bhs_cleans_old_versions` переведён на временные фикстуры (как `test_pack_bhs.py`): свой `reference/addons` с вендором BusyHands и MAG Redux. Больше не копирует реальный `reference/` — тест проходит на чистом клоне и в CI.

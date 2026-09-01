@@ -59,6 +59,16 @@ def decode_bytes(data: bytes) -> str:
     return data.decode("cp1251", errors="replace")
 
 
+def has_bad_line_endings(data: bytes) -> bool:
+    """True, если в файле \\r\\r\\n или одиночный \\r (не часть CRLF)."""
+    if b"\r\r\n" in data:
+        return True
+    for i, byte in enumerate(data):
+        if byte == 0x0D and (i + 1 >= len(data) or data[i + 1] != 0x0A):
+            return True
+    return False
+
+
 def looks_like_utf8_cyrillic(data: bytes) -> bool:
     """True, если файл похож на UTF-8 с кириллицей (для игровых файлов это ошибка)."""
     if data.startswith(b"\xef\xbb\xbf"):
