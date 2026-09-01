@@ -1,5 +1,28 @@
 # WTF / PDA Taskboard Macro Guard
 
+## [1.0.2] — 2026-09-01
+
+**Изменено**
+
+- `fix_wtf_taskboard_guard.script` — патч `igi_actions.is_low_condition`, `set_condition`, `change_faction`: вместо `get_object_by_id` (ERROR в лог на offline id) — тихий `level.object_by_id` / `db.storage`.
+
+**Причина**
+
+`diag_log_spam` trace: 382× `get_object_by_id (2119)` из `igi_actions.script:51` (`is_low_condition`) на каждом `igi_generic_task.quest_status` — WTF-макрос ссылается на уничтоженный предмет.
+
+**Как исправлено**
+
+Обёртки на таблице `igi_actions`: offline/destroyed id → `false` / no-op без спама в xraylog. Семантика «предмет не онлайн = не low condition» сохранена.
+
+**Не затронуто**
+
+- Остальные WTF/PDA патчи 1.0.0, `igi_actions.is_online` / `update_mark`.
+
+**Проверено**
+
+- lint: см. прогон после правки
+- В игре: не прогонялось (ожидается: 0 ERROR id=2119 при активном WTF-квесте с `is_low_condition`)
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**

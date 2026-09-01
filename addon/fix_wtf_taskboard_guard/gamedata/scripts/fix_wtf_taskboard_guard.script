@@ -11,7 +11,7 @@
 -- entry points with the engine pcall and rejects only the broken candidate.
 
 local LOG_TAG = "[fix_wtf_taskboard_guard]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -90,6 +90,64 @@ local function dup_deep(value, seen)
 		copy[k] = dup_deep(v, seen)
 	end
 	return copy
+end
+
+-- igi_actions.is_low_condition / set_condition call get_object_by_id, which
+-- prints ERROR for offline/destroyed ids on every quest_status tick.
+-- diag_log_spam trace (2026-09-01): id=2119 from WTF action macro via
+-- igi_generic_task.quest_status -> igi_actions.update_actions.
+local function safe_online_object(id)
+	if type(id) ~= "number" then
+		return nil
+	end
+	if db and db.storage and db.storage[id] and db.storage[id].object then
+		return db.storage[id].object
+	end
+	if level and level.object_by_id then
+		return level.object_by_id(id)
+	end
+	return nil
+end
+
+local function patched_is_low_condition(id, max_condition)
+	local item = safe_online_object(id)
+	if not item then
+		return false
+	end
+	local ok, cond = pcall(function()
+		return item:condition()
+	end)
+	if not ok or type(cond) ~= "number" then
+		return false
+	end
+	local threshold = (tonumber(max_condition) or 100) / 100
+	return cond < threshold
+end
+
+local function patched_set_condition(id, condition)
+	local item = safe_online_object(id)
+	if not item or not item.set_condition then
+		return false
+	end
+	local ok = pcall(function()
+		item:set_condition(condition)
+	end)
+	return ok
+end
+
+local function patched_change_faction(id, faction)
+	local se_squad = alife_object(id)
+	if not se_squad or not se_squad.squad_members then
+		return
+	end
+	for npc in se_squad:squad_members() do
+		local member = safe_online_object(npc.id)
+		if member then
+			pcall(function()
+				member:set_character_community(faction, 0, 0)
+			end)
+		end
+	end
 end
 
 local function patched_macro_resolve(self, link_context)
@@ -211,6 +269,15 @@ local function install()
 		log("missing igi_generic_task")
 	end
 
+	if type(igi_actions) == "table" then
+		need(wrap("is_low_condition", igi_actions, "is_low_condition", patched_is_low_condition), "igi_actions.is_low_condition")
+		need(wrap("set_condition", igi_actions, "set_condition", patched_set_condition), "igi_actions.set_condition")
+		need(wrap("change_faction", igi_actions, "change_faction", patched_change_faction), "igi_actions.change_faction")
+	else
+		missing = missing + 1
+		log("missing igi_actions")
+	end
+
 	if type(igi_task_manager) == "table" then
 		need(wrap("is_valid_quest", igi_task_manager, "is_valid_quest", patched_is_valid_quest), "igi_task_manager.is_valid_quest")
 	else
@@ -245,6 +312,17 @@ local function uninstall()
 	end
 	if type(igi_generic_task) == "table" and orig.try_prepare_quest then
 		igi_generic_task.try_prepare_quest = orig.try_prepare_quest
+	end
+	if type(igi_actions) == "table" then
+		if orig.is_low_condition then
+			igi_actions.is_low_condition = orig.is_low_condition
+		end
+		if orig.set_condition then
+			igi_actions.set_condition = orig.set_condition
+		end
+		if orig.change_faction then
+			igi_actions.change_faction = orig.change_faction
+		end
 	end
 	if type(igi_task_manager) == "table" and orig.is_valid_quest then
 		igi_task_manager.is_valid_quest = orig.is_valid_quest
