@@ -62,6 +62,12 @@ def stage_minimal_bhs_repo(root: Path) -> None:
     vendor = root / "reference" / "addons" / "BusyHands_vendor"
     write(vendor / "scripts" / "vendor_bhs.script")
     write(vendor / "scripts" / "fix_bhs_fdda_loot.script", "-- loot sidecar\n")
+    write(vendor / "scripts" / "mon_sleep.script", "-- mon_sleep\n")
+    write(vendor / "scripts" / "guaranteed_loot.script", "-- guaranteed_loot\n")
+    write(
+        vendor / "configs" / "scripts" / "stancia_1" / "aes_crow_spawner.ltx",
+        "[aes_crow_spawner]\n",
+    )
     write(
         root / "reference" / "addons" / "mags_redux" / "scripts" / "sequential_load_magazine.script",
         SEQLOAD_SOURCE,
@@ -70,7 +76,7 @@ def stage_minimal_bhs_repo(root: Path) -> None:
     scripts = overlay / "gamedata" / "scripts"
     write(scripts / pack_bhs.MAIN_OVERLAY)
     write(overlay / "CHANGELOG.md", "## [0.9.9]\n")
-    write(overlay / "meta.ini", "version=0.0.0\n")
+    write(overlay / "meta.ini", "vendor_source=BusyHands_vendor\nversion=0.0.0\n")
     (root / "build").mkdir(exist_ok=True)
 
 

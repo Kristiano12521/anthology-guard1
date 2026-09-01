@@ -181,7 +181,7 @@ def pack_aio(
         total += n
         rows.append(f"{addon_dir.name:<42} v{version:<10} {n:>3} files")
 
-    bhs_version, bhs_files, _, _ = pack_bhs.stage_gamedata(repo, gamedata)
+    bhs_version, bhs_files, _, _, _ = pack_bhs.stage_gamedata(repo, gamedata)
     total += bhs_files
     rows.append(f"{BHS_MOD_ID:<42} v{bhs_version:<10} {bhs_files:>3} files (pack_bhs)")
 

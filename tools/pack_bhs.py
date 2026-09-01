@@ -25,13 +25,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _common import detect_version  # noqa: E402
 from build_prune import BHS_MOD_ID, cleanup_before_build  # noqa: E402
+from lint_addon import read_vendor_source, vendor_source_folder  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 OUT_STEM = "Anthology_BusyHands_Stability_Fix"
+OVERLAY_MOD = BHS_MOD_ID
 
-# Папка вендорского BusyHands в reference/addons/. Это исходник, на который
-# кладётся overlay; номер не следует за версией фикса (та — в CHANGELOG/meta.ini).
-VENDOR_SOURCE_VERSION = "0.6.4"
+# Full-file из вендорской папки (не monkey-patch). Размеры в BUILD_INFO.txt —
+# быстрая сверка между машинами, если reference/addons/ разъехался.
+VENDOR_FULL_FILES = (
+    Path("scripts/mon_sleep.script"),
+    Path("scripts/guaranteed_loot.script"),
+    Path("configs/scripts/stancia_1/aes_crow_spawner.ltx"),
+)
 
 
 def packed_name(version: str) -> str:
@@ -59,22 +65,73 @@ def reject_own_bhs_source(path: Path) -> None:
 
 
 def bhs_source(repo: Path) -> Path:
-    root = repo / "reference" / "addons"
-    if not root.is_dir():
-        raise SystemExit("reference/addons/*BusyHands* not found")
-    preferred = root / packed_name(VENDOR_SOURCE_VERSION)
-    if preferred.is_dir():
-        reject_own_bhs_source(preferred)
-        return preferred
-    hits = [path for path in root.iterdir() if path.is_dir() and "BusyHands" in path.name]
-    if len(hits) == 1:
-        reject_own_bhs_source(hits[0])
-        return hits[0]
-    if not hits:
-        raise SystemExit("reference/addons/*BusyHands* not found")
-    raise SystemExit(
-        f"expected 1 BusyHands source or {preferred.name}, got {len(hits)}"
+    overlay = repo / "addon" / OVERLAY_MOD
+    source_name = read_vendor_source(overlay)
+    if not source_name:
+        raise SystemExit(
+            f"vendor_source missing in addon/{OVERLAY_MOD}/meta.ini (required for pack_bhs)"
+        )
+    addons_root = repo / "reference" / "addons"
+    if not addons_root.is_dir():
+        raise SystemExit("reference/addons/ not found")
+    src = vendor_source_folder(addons_root, source_name)
+    if src is None:
+        raise SystemExit(
+            f"vendor_source={source_name!r}: invalid folder name "
+            "(must be a single path component under reference/addons/)"
+        )
+    if not src.is_dir():
+        raise SystemExit(
+            f"vendor_source={source_name}: нет папки reference/addons/{source_name}"
+        )
+    reject_own_bhs_source(src)
+    return src
+
+
+def vendor_full_file_stats(src: Path) -> list[tuple[str, int]]:
+    """Размеры full-file вендора для BUILD_INFO.txt."""
+    rows: list[tuple[str, int]] = []
+    for rel in VENDOR_FULL_FILES:
+        path = src / rel
+        if not path.is_file():
+            raise SystemExit(
+                f"vendor_source={src.name}: missing full-file {rel.as_posix()}"
+            )
+        rows.append((rel.as_posix(), path.stat().st_size))
+    return rows
+
+
+def format_build_info(
+    *,
+    version: str,
+    vendor_name: str,
+    vendor_full_files: list[tuple[str, int]],
+    seq_src: Path,
+    seq_out_size: int,
+) -> str:
+    seq_folder = seq_src.parent.parent.name
+    seq_rel = seq_src.relative_to(seq_src.parent.parent).as_posix()
+    lines = [
+        "mod_id: Anthology_BusyHands_Stability_Fix",
+        f"version: {version}",
+        f"built: {datetime.now().isoformat(timespec='seconds')}",
+        f"vendor_source: {vendor_name}",
+        "vendor_full_files:",
+    ]
+    for rel, size in vendor_full_files:
+        lines.append(f"  {rel}: {size} bytes")
+    lines.extend(
+        [
+            f"seqload_source: {seq_folder}",
+            f"seqload_file: {seq_rel}: {seq_src.stat().st_size} bytes",
+            (
+                "seqload_output: scripts/sequential_load_magazine.script: "
+                f"{seq_out_size} bytes (patched)"
+            ),
+            f"overlay: addon/{OVERLAY_MOD}",
+        ]
     )
+    return "\n".join(lines) + "\n"
 
 
 def mag_seqload_source(repo: Path) -> Path:
@@ -228,14 +285,18 @@ def validate_gamedata(gamedata: Path) -> None:
         raise SystemExit("seqload overlay missing from gamedata")
 
 
-def stage_gamedata(repo: Path, dest_gamedata: Path) -> tuple[str, int, str, Path]:
+def stage_gamedata(
+    repo: Path, dest_gamedata: Path
+) -> tuple[str, int, str, Path, list[tuple[str, int]]]:
     """Merge vendor BHS + overlay into dest_gamedata.
 
-    Returns (version, gamedata_file_count, vendor_folder_name, seqload_source).
+    Returns (version, gamedata_file_count, vendor_folder_name, seqload_source,
+    vendor_full_file_stats).
     """
-    overlay = repo / "addon" / "anthology_busyhands_stability_fix"
+    overlay = repo / "addon" / OVERLAY_MOD
     version = detect_version(overlay)
     src = bhs_source(repo)
+    full_files = vendor_full_file_stats(src)
     scripts = overlay / "gamedata" / "scripts"
     if not (scripts / MAIN_OVERLAY).is_file():
         raise SystemExit(f"missing overlay {MAIN_OVERLAY}")
@@ -269,12 +330,12 @@ def stage_gamedata(repo: Path, dest_gamedata: Path) -> tuple[str, int, str, Path
 
     validate_gamedata(dest_gamedata)
     after = sum(1 for path in dest_gamedata.rglob("*") if path.is_file())
-    return version, after - before, src.name, seq_src
+    return version, after - before, src.name, seq_src, full_files
 
 
 def pack(repo: Path | None = None, *, keep_old: bool = False) -> Path:
     repo = repo or REPO
-    overlay = repo / "addon" / "anthology_busyhands_stability_fix"
+    overlay = repo / "addon" / OVERLAY_MOD
     version = detect_version(overlay)
     out_name = packed_name(version)
     build_dir = repo / "build"
@@ -285,21 +346,19 @@ def pack(repo: Path | None = None, *, keep_old: bool = False) -> Path:
     if out_dir.exists():
         shutil.rmtree(out_dir)
     gamedata = out_dir / "gamedata"
-    version, _, vendor_name, seq_src = stage_gamedata(repo, gamedata)
+    version, _, vendor_name, seq_src, full_files = stage_gamedata(repo, gamedata)
+    seq_out = gamedata / "scripts" / "sequential_load_magazine.script"
 
     shutil.copy2(overlay / "CHANGELOG.md", out_dir / "CHANGELOG.md")
     shutil.copy2(overlay / "meta.ini", out_dir / "meta.ini")
     (out_dir / "BUILD_INFO.txt").write_text(
-        "\n".join(
-            [
-                "mod_id: Anthology_BusyHands_Stability_Fix",
-                f"version: {version}",
-                f"built: {datetime.now().isoformat(timespec='seconds')}",
-                f"source: {vendor_name} + addon/anthology_busyhands_stability_fix",
-                f"seqload: {seq_src.parent.parent.name}",
-            ]
-        )
-        + "\n",
+        format_build_info(
+            version=version,
+            vendor_name=vendor_name,
+            vendor_full_files=full_files,
+            seq_src=seq_src,
+            seq_out_size=seq_out.stat().st_size,
+        ),
         encoding="utf-8",
     )
 
@@ -314,7 +373,9 @@ def pack(repo: Path | None = None, *, keep_old: bool = False) -> Path:
     names = zipfile.ZipFile(archive).namelist()
     validate_gamedata(out_dir / "gamedata")
 
-    print(f"source: {vendor_name}")
+    print(f"vendor_source: {vendor_name}")
+    for rel, size in full_files:
+        print(f"  vendor_full_file: {rel} ({size} bytes)")
     print(f"seqload: {seq_src}")
     print(f"dir: {out_dir}")
     print(f"zip: {archive} ({archive.stat().st_size} bytes)")
