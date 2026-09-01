@@ -1,5 +1,15 @@
 # Anthology Busy Hands Stability Fix
 
+## [0.6.9] — 2026-09-01
+
+**Изменено**
+
+- `zzzzzz_anthology_bhs_trader_autoinject_patch.script` — первая строка `-- load-order: после trader_autoinject (вендорский, [FIX] Campfires Anthology Compat)` (cp1251); снимает ORDER-002.
+
+**Не затронуто**
+
+- Логика патча `trader_autoinject`, `verified_*`.
+
 ## [0.6.8] — 2026-09-01
 
 **Изменено**

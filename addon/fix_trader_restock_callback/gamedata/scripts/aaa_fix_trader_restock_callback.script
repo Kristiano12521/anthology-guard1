@@ -1,10 +1,6 @@
+-- load-order: после axr_main.script; префикс aaa_ - trader_on_restock до on_game_start barter_core и exo_loot
 -- Trader Restock Callback Fix
 -- Anomaly 1.5.3 / Anthology 2.1
---
--- load-order:  axr_main.script
--- aaa_* file-load runs before barter_core / exo_loot on_game_start
--- Register. axr_main file_list_open_ex has no extra sort, so
--- on_game_start order is not a safe place to first-Add.
 --
 -- Declares trader_on_restock at file load. Chain-wraps
 -- trader_autoinject.timed_update in on_game_start and Sends if the

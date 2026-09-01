@@ -1,5 +1,15 @@
 # Log Spam Diagnostic
 
+## [1.2.3] — 2026-09-01
+
+**Изменено**
+
+- `aaa_diag_log_spam.script` — первая строка `-- load-order: после _g.script; префикс aaa_ — обёртки printe и get_object_by_id до item_combination (до init мода)` (cp1251); снимает ORDER-002.
+
+**Не затронуто**
+
+- Early hook `_diag_log_spam_printe.script`, обёртки, MCM, `verified_*`.
+
 ## [1.2.2] — 2026-09-01
 
 **Изменено**
