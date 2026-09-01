@@ -11,6 +11,16 @@ local PRINTE_PATTERNS = {
 	"no server object",
 }
 
+local function format_printe_msg(fmt, ...)
+	if select("#", ...) > 0 then
+		local ok, msg = pcall(string.format, tostring(fmt), ...)
+		if ok then
+			return msg
+		end
+	end
+	return tostring(fmt)
+end
+
 local function printe_pattern_key(msg)
 	for _, pat in ipairs(PRINTE_PATTERNS) do
 		if string.find(msg, pat, 1, true) then
@@ -26,15 +36,10 @@ local state = _G.__diag_log_spam
 if not state.early_printe_hook then
 	state.early_printe_hook = true
 	state.traced_printe = state.traced_printe or {}
-	state.orig_printe = printe
+	state.orig_printe = _G.printe
 
 	local function early_printe(fmt, ...)
-		local msg
-		if select("#", ...) > 0 then
-			msg = string.format(tostring(fmt), ...)
-		else
-			msg = tostring(fmt)
-		end
+		local msg = format_printe_msg(fmt, ...)
 		local key = printe_pattern_key(msg)
 		if key and not state.traced_printe[key] then
 			state.traced_printe[key] = true
@@ -45,7 +50,7 @@ if not state.early_printe_hook then
 		return state.orig_printe(fmt, ...)
 	end
 
-	printe = early_printe
+	_G.printe = early_printe
 	state.wrapped_printe = early_printe
 	printf("%s early printe hook", LOG_TAG)
 end

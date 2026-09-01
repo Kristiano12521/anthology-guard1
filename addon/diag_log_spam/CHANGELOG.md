@@ -1,5 +1,26 @@
 # Log Spam Diagnostic
 
+## [1.2.1] — 2026-09-01
+
+**Изменено**
+
+- `install_wrappers` / `uninstall_wrappers`: явная запись в `_G` (`_G.printe`, `_G.get_object_by_id`, …). Голое `printe = …` попадало в env файла и не перехватывало вызовы из других скриптов.
+- `_diag_log_spam_printe.script`: тот же фикс для раннего хука.
+- `wrapped_printe` / `early_printe`: `string.format` в `pcall`; при ошибке форматирования трассируется сырой `fmt`.
+- `uninstall_wrappers`: восстановление только если текущее значение `_G` — наша обёртка.
+- Убрана MCM-опция `suppress_get_object_by_id_noise`: `printe("!ERROR get_object_by_id …")` вызывается внутри оригинала `_g.script:2497/2507` до возврата в обёртку — подавить повторы из wrapper невозможно.
+
+**Не затронуто**
+
+- Трасс первого промаха `get_object_by_id` по id (MCM `trace_get_object_by_id`).
+- `fix_alife_release_nil`, `trace_printe_patterns`.
+- `verified_*` не ставились.
+
+**Проверено**
+
+- lint: см. прогон после правки
+- В игре: не прогонялось
+
 ## [1.2.0] — 2026-09-01
 
 **Изменено**
@@ -29,7 +50,7 @@
 
 - `aaa_diag_log_spam.script` — обёртки `get_object_by_id`, `alife_release`, `alife_release_id`.
 - Первый промах `get_object_by_id` на каждый id: `callstack` в лог (`[diag_log_spam] TRACE`).
-- Повторные промахи: без `!ERROR get_object_by_id` (MCM `suppress_get_object_by_id_noise`, по умолчанию вкл).
+- ~~Повторные промахи: без `!ERROR get_object_by_id`~~ — с v1.2.1 опция снята: ERROR печатает оригинал до возврата в обёртку.
 - `alife_release` без server object: один стек + тихий выход (MCM `fix_alife_release_nil`).
 - Сводка по id при `on_game_end`.
 - MCM: `diag_log_spam_mcm.script`, строки eng/rus.

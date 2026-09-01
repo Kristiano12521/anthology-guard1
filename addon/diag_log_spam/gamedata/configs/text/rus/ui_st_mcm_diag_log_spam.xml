@@ -12,9 +12,6 @@
 	<string id="ui_mcm_diag_log_spam_trace_go">
 		<text>Трасс первый промах get_object_by_id по id</text>
 	</string>
-	<string id="ui_mcm_diag_log_spam_suppress_go">
-		<text>Глушить повторяющиеся ERROR get_object_by_id</text>
-	</string>
 	<string id="ui_mcm_diag_log_spam_trace_release">
 		<text>Трасс первый alife_release без server object</text>
 	</string>

@@ -12,9 +12,6 @@
 	<string id="ui_mcm_diag_log_spam_trace_go">
 		<text>Trace first get_object_by_id miss per id (callstack)</text>
 	</string>
-	<string id="ui_mcm_diag_log_spam_suppress_go">
-		<text>Suppress repeated get_object_by_id ERROR lines</text>
-	</string>
 	<string id="ui_mcm_diag_log_spam_trace_release">
 		<text>Trace first alife_release with no server object</text>
 	</string>
