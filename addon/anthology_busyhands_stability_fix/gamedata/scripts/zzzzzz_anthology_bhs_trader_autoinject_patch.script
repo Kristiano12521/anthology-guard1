@@ -1,54 +1,53 @@
 -- Anthology Busy Hands Stability Fix v0.6.0 - trader_autoinject patch
--- load-order: ����� trader_autoinject
+-- load-order: ïîñëå trader_autoinject
 --
--- ИСПРАВЛЯЕТ ОШИБКУ v0.5.0: тогда trader_autoinject.script был полностью
--- удалён из пака как якобы избыточный по сравнению с install_trader_guards()
--- в главном скрипте. Это было неверно - реальный (присланный пользователем)
--- вендорский файл содержит баг, который install_trader_guards() НЕ
--- покрывает (см. п.1 ниже), плюс полезную доработку диспетчеризации
--- отложенного колбэка (п.2) и регистрацию кастомного callback'а restock'а
--- (п.3), которые при полном удалении файла были бы потеряны молча.
+-- ÐÐ¡ÐÐ ÐÐÐÐ¯ÐÐ¢ ÐÐ¨ÐÐÐÐ£ v0.5.0: ÑÐ¾Ð³Ð´Ð° trader_autoinject.script Ð±ÑÐ» Ð¿Ð¾Ð»Ð½Ð¾ÑÑÑÑ
+-- ÑÐ´Ð°Ð»ÑÐ½ Ð¸Ð· Ð¿Ð°ÐºÐ° ÐºÐ°Ðº ÑÐºÐ¾Ð±Ñ Ð¸Ð·Ð±ÑÑÐ¾ÑÐ½ÑÐ¹ Ð¿Ð¾ ÑÑÐ°Ð²Ð½ÐµÐ½Ð¸Ñ Ñ install_trader_guards()
+-- Ð² Ð³Ð»Ð°Ð²Ð½Ð¾Ð¼ ÑÐºÑÐ¸Ð¿ÑÐµ. Ð­ÑÐ¾ Ð±ÑÐ»Ð¾ Ð½ÐµÐ²ÐµÑÐ½Ð¾ - ÑÐµÐ°Ð»ÑÐ½ÑÐ¹ (Ð¿ÑÐ¸ÑÐ»Ð°Ð½Ð½ÑÐ¹ Ð¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»ÐµÐ¼)
+-- Ð²ÐµÐ½Ð´Ð¾ÑÑÐºÐ¸Ð¹ ÑÐ°Ð¹Ð» ÑÐ¾Ð´ÐµÑÐ¶Ð¸Ñ Ð±Ð°Ð³, ÐºÐ¾ÑÐ¾ÑÑÐ¹ install_trader_guards() ÐÐ
+-- Ð¿Ð¾ÐºÑÑÐ²Ð°ÐµÑ (ÑÐ¼. Ð¿.1 Ð½Ð¸Ð¶Ðµ), Ð¿Ð»ÑÑ Ð¿Ð¾Ð»ÐµÐ·Ð½ÑÑ Ð´Ð¾ÑÐ°Ð±Ð¾ÑÐºÑ Ð´Ð¸ÑÐ¿ÐµÑÑÐµÑÐ¸Ð·Ð°ÑÐ¸Ð¸
+-- Ð¾ÑÐ»Ð¾Ð¶ÐµÐ½Ð½Ð¾Ð³Ð¾ ÐºÐ¾Ð»Ð±ÑÐºÐ° (Ð¿.2) Ð¸ ÑÐµÐ³Ð¸ÑÑÑÐ°ÑÐ¸Ñ ÐºÐ°ÑÑÐ¾Ð¼Ð½Ð¾Ð³Ð¾ callback'Ð° restock'Ð°
+-- (Ð¿.3), ÐºÐ¾ÑÐ¾ÑÑÐµ Ð¿ÑÐ¸ Ð¿Ð¾Ð»Ð½Ð¾Ð¼ ÑÐ´Ð°Ð»ÐµÐ½Ð¸Ð¸ ÑÐ°Ð¹Ð»Ð° Ð±ÑÐ»Ð¸ Ð±Ñ Ð¿Ð¾ÑÐµÑÑÐ½Ñ Ð¼Ð¾Ð»ÑÐ°.
 --
--- ВАЖНО: пользователь подтвердил, что его реальный trader_autoinject.script
--- взят не из чистого Anthology 2.1, а из стороннего аддона "[FIX] Campfires
--- Anthology Compat v2". Это НЕ имеет значения для этого патча - мы
--- оборачиваем ТЕКУЩИЕ значения trade_manager.update/timed_update/... на
--- момент своей загрузки (последний по z-префиксу), какой бы файл их ни
--- установил последним в VFS. Если сторонний аддон когда-то сменится или
--- обновится - патч продолжит работать поверх него, пока публичные имена
--- функций не изменятся.
+-- ÐÐÐÐÐ: Ð¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ Ð¿Ð¾Ð´ÑÐ²ÐµÑÐ´Ð¸Ð», ÑÑÐ¾ ÐµÐ³Ð¾ ÑÐµÐ°Ð»ÑÐ½ÑÐ¹ trader_autoinject.script
+-- Ð²Ð·ÑÑ Ð½Ðµ Ð¸Ð· ÑÐ¸ÑÑÐ¾Ð³Ð¾ Anthology 2.1, Ð° Ð¸Ð· ÑÑÐ¾ÑÐ¾Ð½Ð½ÐµÐ³Ð¾ Ð°Ð´Ð´Ð¾Ð½Ð° "[FIX] Campfires
+-- Anthology Compat v2". Ð­ÑÐ¾ ÐÐ Ð¸Ð¼ÐµÐµÑ Ð·Ð½Ð°ÑÐµÐ½Ð¸Ñ Ð´Ð»Ñ ÑÑÐ¾Ð³Ð¾ Ð¿Ð°ÑÑÐ° - Ð¼Ñ
+-- Ð¾Ð±Ð¾ÑÐ°ÑÐ¸Ð²Ð°ÐµÐ¼ Ð¢ÐÐÐ£Ð©ÐÐ Ð·Ð½Ð°ÑÐµÐ½Ð¸Ñ trade_manager.update/timed_update/... Ð½Ð°
+-- Ð¼Ð¾Ð¼ÐµÐ½Ñ ÑÐ²Ð¾ÐµÐ¹ Ð·Ð°Ð³ÑÑÐ·ÐºÐ¸ (Ð¿Ð¾ÑÐ»ÐµÐ´Ð½Ð¸Ð¹ Ð¿Ð¾ z-Ð¿ÑÐµÑÐ¸ÐºÑÑ), ÐºÐ°ÐºÐ¾Ð¹ Ð±Ñ ÑÐ°Ð¹Ð» Ð¸Ñ Ð½Ð¸
+-- ÑÑÑÐ°Ð½Ð¾Ð²Ð¸Ð» Ð¿Ð¾ÑÐ»ÐµÐ´Ð½Ð¸Ð¼ Ð² VFS. ÐÑÐ»Ð¸ ÑÑÐ¾ÑÐ¾Ð½Ð½Ð¸Ð¹ Ð°Ð´Ð´Ð¾Ð½ ÐºÐ¾Ð³Ð´Ð°-ÑÐ¾ ÑÐ¼ÐµÐ½Ð¸ÑÑÑ Ð¸Ð»Ð¸
+-- Ð¾Ð±Ð½Ð¾Ð²Ð¸ÑÑÑ - Ð¿Ð°ÑÑ Ð¿ÑÐ¾Ð´Ð¾Ð»Ð¶Ð¸Ñ ÑÐ°Ð±Ð¾ÑÐ°ÑÑ Ð¿Ð¾Ð²ÐµÑÑ Ð½ÐµÐ³Ð¾, Ð¿Ð¾ÐºÐ° Ð¿ÑÐ±Ð»Ð¸ÑÐ½ÑÐµ Ð¸Ð¼ÐµÐ½Ð°
+-- ÑÑÐ½ÐºÑÐ¸Ð¹ Ð½Ðµ Ð¸Ð·Ð¼ÐµÐ½ÑÑÑÑ.
 --
--- ПРАВИЛО 2/3: trader_autoinject.script (в любой его версии) остаётся
--- нетронутым - НЕ подменяется. Патчатся только 6 публичных функций.
+-- ÐÐ ÐÐÐÐÐ 2/3: trader_autoinject.script (Ð² Ð»ÑÐ±Ð¾Ð¹ ÐµÐ³Ð¾ Ð²ÐµÑÑÐ¸Ð¸) Ð¾ÑÑÐ°ÑÑÑÑ
+-- Ð½ÐµÑÑÐ¾Ð½ÑÑÑÐ¼ - ÐÐ Ð¿Ð¾Ð´Ð¼ÐµÐ½ÑÐµÑÑÑ. ÐÐ°ÑÑÐ°ÑÑÑ ÑÐ¾Ð»ÑÐºÐ¾ 6 Ð¿ÑÐ±Ð»Ð¸ÑÐ½ÑÑ ÑÑÐ½ÐºÑÐ¸Ð¹.
 --
--- 1) get_real_community(npc, default): get_object_squad(npc) может вернуть
---    nil (объект без отряда), а оригинал безусловно вызывает
---    :get_squad_community() на результате - краш на объектах без squad.
---    Фикс: nil-проверка перед вызовом.
+-- 1) get_real_community(npc, default): get_object_squad(npc) Ð¼Ð¾Ð¶ÐµÑ Ð²ÐµÑÐ½ÑÑÑ
+--    nil (Ð¾Ð±ÑÐµÐºÑ Ð±ÐµÐ· Ð¾ÑÑÑÐ´Ð°), Ð° Ð¾ÑÐ¸Ð³Ð¸Ð½Ð°Ð» Ð±ÐµÐ·ÑÑÐ»Ð¾Ð²Ð½Ð¾ Ð²ÑÐ·ÑÐ²Ð°ÐµÑ
+--    :get_squad_community() Ð½Ð° ÑÐµÐ·ÑÐ»ÑÑÐ°ÑÐµ - ÐºÑÐ°Ñ Ð½Ð° Ð¾Ð±ÑÐµÐºÑÐ°Ñ Ð±ÐµÐ· squad.
+--    Ð¤Ð¸ÐºÑ: nil-Ð¿ÑÐ¾Ð²ÐµÑÐºÐ° Ð¿ÐµÑÐµÐ´ Ð²ÑÐ·Ð¾Ð²Ð¾Ð¼.
 --
--- 2) trade_manager.update -> timed_update: оригинал передаёт в
---    CreateTimeEvent сырую userdata npc, которая может протухнуть к моменту
---    срабатывания отложенного колбэка (например, story-трейдер пересоздан
---    при переходе между уровнями). Фикс: передаём ID, timed_update заново
---    резолвит объект через level.object_by_id перед использованием.
+-- 2) trade_manager.update -> timed_update: Ð¾ÑÐ¸Ð³Ð¸Ð½Ð°Ð» Ð¿ÐµÑÐµÐ´Ð°ÑÑ Ð²
+--    CreateTimeEvent ÑÑÑÑÑ userdata npc, ÐºÐ¾ÑÐ¾ÑÐ°Ñ Ð¼Ð¾Ð¶ÐµÑ Ð¿ÑÐ¾ÑÑÑÐ½ÑÑÑ Ðº Ð¼Ð¾Ð¼ÐµÐ½ÑÑ
+--    ÑÑÐ°Ð±Ð°ÑÑÐ²Ð°Ð½Ð¸Ñ Ð¾ÑÐ»Ð¾Ð¶ÐµÐ½Ð½Ð¾Ð³Ð¾ ÐºÐ¾Ð»Ð±ÑÐºÐ° (Ð½Ð°Ð¿ÑÐ¸Ð¼ÐµÑ, story-ÑÑÐµÐ¹Ð´ÐµÑ Ð¿ÐµÑÐµÑÐ¾Ð·Ð´Ð°Ð½
+--    Ð¿ÑÐ¸ Ð¿ÐµÑÐµÑÐ¾Ð´Ðµ Ð¼ÐµÐ¶Ð´Ñ ÑÑÐ¾Ð²Ð½ÑÐ¼Ð¸). Ð¤Ð¸ÐºÑ: Ð¿ÐµÑÐµÐ´Ð°ÑÐ¼ ID, timed_update Ð·Ð°Ð½Ð¾Ð²Ð¾
+--    ÑÐµÐ·Ð¾Ð»Ð²Ð¸Ñ Ð¾Ð±ÑÐµÐºÑ ÑÐµÑÐµÐ· level.object_by_id Ð¿ÐµÑÐµÐ´ Ð¸ÑÐ¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°Ð½Ð¸ÐµÐ¼.
 --
--- 3) AddScriptCallback("trader_on_restock") + SendScriptCallback(...) в
---    timed_update - сохранено как есть, чтобы не сломать другие аддоны,
---    которые могут подписываться на это событие.
+-- 3) AddScriptCallback("trader_on_restock") + SendScriptCallback(...) Ð²
+--    timed_update - ÑÐ¾ÑÑÐ°Ð½ÐµÐ½Ð¾ ÐºÐ°Ðº ÐµÑÑÑ, ÑÑÐ¾Ð±Ñ Ð½Ðµ ÑÐ»Ð¾Ð¼Ð°ÑÑ Ð´ÑÑÐ³Ð¸Ðµ Ð°Ð´Ð´Ð¾Ð½Ñ,
+--    ÐºÐ¾ÑÐ¾ÑÑÐµ Ð¼Ð¾Ð³ÑÑ Ð¿Ð¾Ð´Ð¿Ð¸ÑÑÐ²Ð°ÑÑÑÑ Ð½Ð° ÑÑÐ¾ ÑÐ¾Ð±ÑÑÐ¸Ðµ.
 --
--- ЧТО НЕ ВКЛЮЧЕНО - ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ: в предыдущей версии архива (от
--- v0.4.2) в trade_manager.update была добавлена проверка дистанции до
--- "мебельных" NPC (esc_m_trader/red_m_lesnik): "sid/forester fix - check if
--- close by and then run". Это НЕ фикс краша, а изменение игрового
--- поведения (когда именно трейдер обновляет ассортимент) - в исходном
--- вендорском файле (в т.ч. в версии из Campfires Anthology Compat v2) её
--- нет вообще. Я НЕ стал переносить эту логику сюда, т.к. это выходит за
--- рамки "фикса вылетов" и меняет геймплей без явного запроса. Если это
--- было намеренное и нужное поведение - скажите, добавлю отдельным,
--- explicitly помеченным патчем.
+-- Ð§Ð¢Ð ÐÐ ÐÐÐÐ®Ð§ÐÐÐ - Ð¢Ð ÐÐÐ£ÐÐ¢ ÐÐÐÐ¢ÐÐÐ ÐÐÐÐÐÐ¯: Ð² Ð¿ÑÐµÐ´ÑÐ´ÑÑÐµÐ¹ Ð²ÐµÑÑÐ¸Ð¸ Ð°ÑÑÐ¸Ð²Ð° (Ð¾Ñ
+-- v0.4.2) Ð² trade_manager.update Ð±ÑÐ»Ð° Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð° Ð¿ÑÐ¾Ð²ÐµÑÐºÐ° Ð´Ð¸ÑÑÐ°Ð½ÑÐ¸Ð¸ Ð´Ð¾
+-- "Ð¼ÐµÐ±ÐµÐ»ÑÐ½ÑÑ" NPC (esc_m_trader/red_m_lesnik): "sid/forester fix - check if
+-- close by and then run". Ð­ÑÐ¾ ÐÐ ÑÐ¸ÐºÑ ÐºÑÐ°ÑÐ°, Ð° Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ðµ Ð¸Ð³ÑÐ¾Ð²Ð¾Ð³Ð¾
+-- Ð¿Ð¾Ð²ÐµÐ´ÐµÐ½Ð¸Ñ (ÐºÐ¾Ð³Ð´Ð° Ð¸Ð¼ÐµÐ½Ð½Ð¾ ÑÑÐµÐ¹Ð´ÐµÑ Ð¾Ð±Ð½Ð¾Ð²Ð»ÑÐµÑ Ð°ÑÑÐ¾ÑÑÐ¸Ð¼ÐµÐ½Ñ) - Ð² Ð¸ÑÑÐ¾Ð´Ð½Ð¾Ð¼
+-- Ð²ÐµÐ½Ð´Ð¾ÑÑÐºÐ¾Ð¼ ÑÐ°Ð¹Ð»Ðµ (Ð² Ñ.Ñ. Ð² Ð²ÐµÑÑÐ¸Ð¸ Ð¸Ð· Campfires Anthology Compat v2) ÐµÑ
+-- Ð½ÐµÑ Ð²Ð¾Ð¾Ð±ÑÐµ. Ð¯ ÐÐ ÑÑÐ°Ð» Ð¿ÐµÑÐµÐ½Ð¾ÑÐ¸ÑÑ ÑÑÑ Ð»Ð¾Ð³Ð¸ÐºÑ ÑÑÐ´Ð°, Ñ.Ðº. ÑÑÐ¾ Ð²ÑÑÐ¾Ð´Ð¸Ñ Ð·Ð°
+-- ÑÐ°Ð¼ÐºÐ¸ "ÑÐ¸ÐºÑÐ° Ð²ÑÐ»ÐµÑÐ¾Ð²" Ð¸ Ð¼ÐµÐ½ÑÐµÑ Ð³ÐµÐ¹Ð¼Ð¿Ð»ÐµÐ¹ Ð±ÐµÐ· ÑÐ²Ð½Ð¾Ð³Ð¾ Ð·Ð°Ð¿ÑÐ¾ÑÐ°. ÐÑÐ»Ð¸ ÑÑÐ¾
+-- Ð±ÑÐ»Ð¾ Ð½Ð°Ð¼ÐµÑÐµÐ½Ð½Ð¾Ðµ Ð¸ Ð½ÑÐ¶Ð½Ð¾Ðµ Ð¿Ð¾Ð²ÐµÐ´ÐµÐ½Ð¸Ðµ - ÑÐºÐ°Ð¶Ð¸ÑÐµ, Ð´Ð¾Ð±Ð°Ð²Ð»Ñ Ð¾ÑÐ´ÐµÐ»ÑÐ½ÑÐ¼,
+-- explicitly Ð¿Ð¾Ð¼ÐµÑÐµÐ½Ð½ÑÐ¼ Ð¿Ð°ÑÑÐµÐ¼.
 
-local VERSION = "0.6.0"
-ANTHOLOGY_BHS_TRADER_AUTOINJECT_PATCH_VERSION = VERSION
+local VERSION = "0.6.8"
 
 local function busyhands_object_id(value)
 	if type(value) == "number" then
@@ -94,9 +93,9 @@ local function t2c(t)
 	return ct
 end
 
--- Те же статические таблицы, что в вендорском файле (не логика, данные -
--- безопасно дублировать, аналогично snd_open/ini_custom_repair в других
--- патчах этого набора).
+-- Ð¢Ðµ Ð¶Ðµ ÑÑÐ°ÑÐ¸ÑÐµÑÐºÐ¸Ðµ ÑÐ°Ð±Ð»Ð¸ÑÑ, ÑÑÐ¾ Ð² Ð²ÐµÐ½Ð´Ð¾ÑÑÐºÐ¾Ð¼ ÑÐ°Ð¹Ð»Ðµ (Ð½Ðµ Ð»Ð¾Ð³Ð¸ÐºÐ°, Ð´Ð°Ð½Ð½ÑÐµ -
+-- Ð±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ð¾ Ð´ÑÐ±Ð»Ð¸ÑÐ¾Ð²Ð°ÑÑ, Ð°Ð½Ð°Ð»Ð¾Ð³Ð¸ÑÐ½Ð¾ snd_open/ini_custom_repair Ð² Ð´ÑÑÐ³Ð¸Ñ
+-- Ð¿Ð°ÑÑÐ°Ñ ÑÑÐ¾Ð³Ð¾ Ð½Ð°Ð±Ð¾ÑÐ°).
 local furniture = {
 	["esc_m_trader"] = true,
 	["red_m_lesnik"] = true
@@ -107,6 +106,37 @@ local blacklisted_comms = {
 	["monster"] = true
 }
 
+-- timed_update/update/... are locals inside trader_autoinject.script (module env),
+-- not bare _G. Resolve before wrapping trade_manager.update so CreateTimeEvent
+-- never captures nil (see docs/pitfalls.md).
+local function trader_autoinject_module()
+	if type(trader_autoinject) == "table" then
+		return trader_autoinject
+	end
+	return nil
+end
+
+local function resolve_trader_fn(name)
+	local mod = trader_autoinject_module()
+
+	if type(name) == "string" and type(_G[name]) == "function" then
+		return _G[name], "bare " .. name
+	end
+	if mod and type(mod[name]) == "function" then
+		return mod[name], "trader_autoinject." .. name
+	end
+
+	return nil, nil
+end
+
+local function publish_trader_fn(name, fn)
+	local mod = trader_autoinject_module()
+	if mod then
+		mod[name] = fn
+	end
+	_G[name] = fn
+end
+
 local function install()
 	if type(trade_manager) ~= "table" or type(trade_manager.update) ~= "function" then
 		printf("[BusyHandsFix v%s] trade_manager.update was not found - trader_autoinject guards NOT installed", VERSION)
@@ -115,10 +145,56 @@ local function install()
 
 	local installed_count = 0
 
-	-- --- trade_manager.update: chain-wrap, добавляем только ID-based
-	-- --- диспетчеризацию отложенного колбэка. Локальная переменная
-	-- --- (НЕ глобальная "TraderUpdate", как в вендорском файле) - чтобы не
-	-- --- повторить баг с коллизией общего имени, как в OnItemSelect.
+	local original_get_real_community = resolve_trader_fn("get_real_community")
+	if original_get_real_community then
+		local patched_get_real_community = function(npc, default)
+			local live_npc = busyhands_resolve_trader(npc)
+			if not live_npc then
+				return default
+			end
+			npc = live_npc
+
+			if furniture[npc:name()] then
+				return "stalker"
+			end
+			local community = character_community(npc)
+			if not blacklisted_comms[community] then
+				return community
+			end
+			local squad = get_object_squad(npc)
+			local squad_community = squad and squad:get_squad_community()
+			if squad_community and not blacklisted_comms[squad_community] then
+				return squad_community
+			end
+			return default
+		end
+		publish_trader_fn("get_real_community", patched_get_real_community)
+		installed_count = installed_count + 1
+	end
+
+	local original_update = resolve_trader_fn("update")
+
+	local original_timed_update = resolve_trader_fn("timed_update")
+	local patched_timed_update = nil
+	if original_timed_update then
+		patched_timed_update = function(npc_or_id)
+			local npc, id = busyhands_resolve_trader(npc_or_id)
+			if not npc then
+				printf("[BusyHandsFix v%s] Trader restock cancelled: object %s is no longer online", VERSION, tostring(id or npc_or_id))
+				return true
+			end
+			if original_update then
+				original_update(npc)
+			end
+			SendScriptCallback("trader_on_restock", npc)
+			return true
+		end
+		publish_trader_fn("timed_update", patched_timed_update)
+		installed_count = installed_count + 1
+	else
+		printf("[BusyHandsFix v%s] timed_update was not found via bare/_G/trader_autoinject - ID-based CreateTimeEvent will be skipped", VERSION)
+	end
+
 	local original_trade_manager_update = trade_manager.update
 	trade_manager.update = function(npc, force_refresh)
 		local live_npc, id = busyhands_resolve_trader(npc)
@@ -141,90 +217,50 @@ local function install()
 		end
 		disable_info("sleep_active")
 
-		-- Передаём ID, а не npc - к моменту срабатывания через 0.1с объект
-		-- может быть уже недействителен (переход уровня, story-замена).
-		CreateTimeEvent("custom_update" .. id, "custom_resupply" .. id, 0.1, timed_update, id)
+		if patched_timed_update then
+			CreateTimeEvent("custom_update" .. id, "custom_resupply" .. id, 0.1, patched_timed_update, id)
+		else
+			printf("[BusyHandsFix v%s] trade_manager.update: CreateTimeEvent skipped for trader %s - timed_update not resolved", VERSION, tostring(id))
+		end
 	end
 	installed_count = installed_count + 1
 
-	-- --- timed_update: явная резолюция ID/userdata перед использованием.
-	if type(timed_update) == "function" then
-		timed_update = function(npc_or_id)
-			local npc, id = busyhands_resolve_trader(npc_or_id)
-			if not npc then
-				printf("[BusyHandsFix v%s] Trader restock cancelled: object %s is no longer online", VERSION, tostring(id or npc_or_id))
-				return true
-			end
-			update(npc)
-			SendScriptCallback("trader_on_restock", npc)
-			return true
-		end
-		installed_count = installed_count + 1
-	end
-
-	-- --- get_trader_type: entry guard.
-	if type(get_trader_type) == "function" then
-		local original_get_trader_type = get_trader_type
-		get_trader_type = function(npc)
+	local original_get_trader_type = resolve_trader_fn("get_trader_type")
+	if original_get_trader_type then
+		local patched = function(npc)
 			local live_npc = busyhands_resolve_trader(npc)
 			if not live_npc then
 				return -1
 			end
 			return original_get_trader_type(live_npc)
 		end
+		publish_trader_fn("get_trader_type", patched)
 		installed_count = installed_count + 1
 	end
 
-	-- --- supply_level: entry guard.
-	if type(supply_level) == "function" then
-		local original_supply_level = supply_level
-		supply_level = function(npc, as_number)
+	local original_supply_level = resolve_trader_fn("supply_level")
+	if original_supply_level then
+		local patched = function(npc, as_number)
 			local live_npc = busyhands_resolve_trader(npc)
 			if not live_npc then
 				return nil
 			end
 			return original_supply_level(live_npc, as_number)
 		end
+		publish_trader_fn("supply_level", patched)
 		installed_count = installed_count + 1
 	end
 
-	-- --- get_real_community: entry guard + фикс реального краша на
-	-- --- get_object_squad(npc):get_squad_community() при отсутствии squad.
-	if type(get_real_community) == "function" then
-		get_real_community = function(npc, default)
-			local live_npc = busyhands_resolve_trader(npc)
-			if not live_npc then
-				return default
-			end
-			npc = live_npc
-
-			if furniture[npc:name()] then
-				return "stalker"
-			end
-			local community = character_community(npc)
-			if not blacklisted_comms[community] then
-				return community
-			end
-			local squad = get_object_squad(npc)
-			local squad_community = squad and squad:get_squad_community()
-			if squad_community and not blacklisted_comms[squad_community] then
-				return squad_community
-			end
-			return default
-		end
-		installed_count = installed_count + 1
-	end
-
-	-- --- spawn_items: entry guard.
-	if type(spawn_items) == "function" then
-		local original_spawn_items = spawn_items
-		spawn_items = function(npc, to_spawn, check_existing)
+	local original_spawn_items = resolve_trader_fn("spawn_items")
+	if original_spawn_items then
+		local patched = function(npc, to_spawn, check_existing)
 			local live_npc = busyhands_resolve_trader(npc)
 			if not live_npc or type(to_spawn) ~= "table" then
 				return
 			end
 			return original_spawn_items(live_npc, to_spawn, check_existing)
 		end
+		publish_trader_fn("spawn_items", patched)
 		installed_count = installed_count + 1
 	end
 
@@ -237,5 +273,7 @@ end
 
 local installed_count = install()
 if installed_count > 0 then
+	ANTHOLOGY_BHS_TRADER_AUTOINJECT_PATCH_VERSION = VERSION
+	_G.ANTHOLOGY_BHS_TRADER_AUTOINJECT_PATCH_VERSION = VERSION
 	printf("[BusyHandsFix v%s] trader_autoinject patched: %s functions (function-level, vendor file untouched)", VERSION, installed_count)
 end

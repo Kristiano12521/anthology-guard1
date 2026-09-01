@@ -1,5 +1,33 @@
 # Anthology Busy Hands Stability Fix
 
+## [0.6.8] — 2026-09-01
+
+**Изменено**
+
+- `zzzzzz_anthology_bhs_trader_autoinject_patch.script` — `timed_update` резолвится через bare `_G` и `trader_autoinject.*` до обёртки `trade_manager.update`; `CreateTimeEvent` вызывается только с локальной `patched_timed_update`, иначе — лог и пропуск.
+
+**Причина**
+
+Голое `timed_update` в env патча было `nil` (функция локальна в `trader_autoinject.script` Campfires). Патч передавал `nil` в `CreateTimeEvent` до проверки `type(timed_update) == "function"` — 71× `attempt to push nil instead of function` в логе.
+
+**Как исправлено**
+
+Восстановлена логика v0.6.5: резолв и патч `timed_update` на таблице модуля, затем обёртка `trade_manager.update` с `patched_timed_update` в замыкании. Без резолва — `CreateTimeEvent` не вызывается.
+
+**Не затронуто**
+
+- Вендорский `trader_autoinject.script`, `verified_*`, остальные патчи BHS.
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+
+**Проверено**
+
+- `lint_addon.py` и `--cross`: 0 ошибок
+- В игре: не прогонялось (ожидается: 0 CTE nil, `trader_autoinject guards installed` ненулевой)
+
 ## [0.6.7] — 2026-08-31
 
 **Изменено**
