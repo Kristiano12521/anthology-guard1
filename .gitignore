@@ -27,3 +27,8 @@ __pycache__/
 .DS_Store
 Thumbs.db
 *.swp
+
+# Временные выводы команд
+/mine.txt
+/out.txt
+*.tmp.txt
