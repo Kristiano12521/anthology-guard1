@@ -1,0 +1,51 @@
+-- load-order: после _g.script
+-- Early printe hook: startup errors (itms_manager) run before aaa_diag_log_spam.script.
+
+local LOG_TAG = "[diag_log_spam]"
+
+local PRINTE_PATTERNS = {
+	"item_combination",
+	"wrong section names",
+	"callback doesn't exist",
+	"no game object",
+	"no server object",
+}
+
+local function printe_pattern_key(msg)
+	for _, pat in ipairs(PRINTE_PATTERNS) do
+		if string.find(msg, pat, 1, true) then
+			return pat
+		end
+	end
+	return nil
+end
+
+_G.__diag_log_spam = _G.__diag_log_spam or {}
+local state = _G.__diag_log_spam
+
+if not state.early_printe_hook then
+	state.early_printe_hook = true
+	state.traced_printe = state.traced_printe or {}
+	state.orig_printe = printe
+
+	local function early_printe(fmt, ...)
+		local msg
+		if select("#", ...) > 0 then
+			msg = string.format(tostring(fmt), ...)
+		else
+			msg = tostring(fmt)
+		end
+		local key = printe_pattern_key(msg)
+		if key and not state.traced_printe[key] then
+			state.traced_printe[key] = true
+			printf("%s TRACE printe:%s | %s", LOG_TAG, key, msg)
+			printf("%s STACK TRACEBACK:", LOG_TAG)
+			debug.traceback("", 2)
+		end
+		return state.orig_printe(fmt, ...)
+	end
+
+	printe = early_printe
+	state.wrapped_printe = early_printe
+	printf("%s early printe hook", LOG_TAG)
+end

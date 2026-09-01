@@ -1,20 +1,30 @@
 -- Log Spam Diagnostic (aaa_ load order: after _g.script)
--- Trace first miss per id for get_object_by_id / alife_release; optional printe pattern trace.
+-- load-order: после _diag_log_spam_printe.script
+-- Trace first miss per id for get_object_by_id / alife_release; printe via _diag_log_spam_printe.script.
 -- Anomaly 1.5.3 / Anthology 2.1
 
-local VERSION = "1.1.0"
+local VERSION = "1.2.0"
 local LOG_TAG = "[diag_log_spam]"
 
-local traced_go = {}
-local traced_release = {}
-local traced_printe = {}
-local miss_counts = {}
-local release_miss_count = 0
+_G.__diag_log_spam = _G.__diag_log_spam or {}
+local state = _G.__diag_log_spam
+
+local traced_go = state.traced_go or {}
+local traced_release = state.traced_release or {}
+local traced_printe = state.traced_printe or {}
+local miss_counts = state.miss_counts or {}
+local release_miss_count = state.release_miss_count or 0
+
+state.traced_go = traced_go
+state.traced_release = traced_release
+state.traced_printe = traced_printe
+state.miss_counts = miss_counts
+state.release_miss_count = release_miss_count
 
 local orig_get_object_by_id = get_object_by_id
 local orig_alife_release = alife_release
 local orig_alife_release_id = alife_release_id
-local orig_printe = printe
+local orig_printe = state.orig_printe or printe
 
 local PRINTE_PATTERNS = {
 	"item_combination",
@@ -108,6 +118,7 @@ local function wrapped_alife_release(sobj, force)
 
 	if sobj == nil then
 		release_miss_count = release_miss_count + 1
+		state.release_miss_count = release_miss_count
 		if opt("trace_alife_release_nil", true) and not traced_release.nil_obj then
 			traced_release.nil_obj = true
 			log_trace("alife_release", "server object is nil")
@@ -127,6 +138,7 @@ local function wrapped_alife_release_id(id, force)
 
 	if id == nil then
 		release_miss_count = release_miss_count + 1
+		state.release_miss_count = release_miss_count
 		if opt("trace_alife_release_nil", true) and not traced_release.nil_id then
 			traced_release.nil_id = true
 			log_trace("alife_release_id", "id is nil")
@@ -174,8 +186,10 @@ local function install_wrappers()
 	if alife_release_id ~= wrapped_alife_release_id then
 		alife_release_id = wrapped_alife_release_id
 	end
-	if printe ~= wrapped_printe and type(orig_printe) == "function" then
+	if printe ~= wrapped_printe then
+		orig_printe = state.wrapped_printe or state.orig_printe or printe
 		printe = wrapped_printe
+		state.wrapped_printe = wrapped_printe
 	end
 end
 
@@ -183,8 +197,8 @@ local function uninstall_wrappers()
 	get_object_by_id = orig_get_object_by_id
 	alife_release = orig_alife_release
 	alife_release_id = orig_alife_release_id
-	if type(orig_printe) == "function" then
-		printe = orig_printe
+	if type(state.orig_printe) == "function" then
+		printe = state.orig_printe
 	end
 end
 

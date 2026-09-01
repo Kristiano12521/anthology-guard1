@@ -1,5 +1,16 @@
 # Log Spam Diagnostic
 
+## [1.2.0] — 2026-09-01
+
+**Изменено**
+
+- `_diag_log_spam_printe.script`: ранний хук `printe` сразу после `_g.script` — ловит `item_combination` при инициализации `itms_manager` (до `aaa_diag_log_spam`).
+- Общее состояние трассировки в `_G.__diag_log_spam` (early + main wrappers).
+
+**Проверено**
+
+- lint: см. прогон после правки
+
 ## [1.1.0] — 2026-09-01
 
 **Изменено**
