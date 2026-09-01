@@ -1,5 +1,5 @@
 -- Log Spam Diagnostic (aaa_ load order: after _diag_log_spam_printe.script)
--- load-order: РїРѕСЃР»Рµ _diag_log_spam_printe.script
+-- load-order: после _diag_log_spam_printe.script
 -- Trace first miss per id for get_object_by_id / alife_release; printe via _diag_log_spam_printe.script.
 -- Anomaly 1.5.3 / Anthology 2.1
 

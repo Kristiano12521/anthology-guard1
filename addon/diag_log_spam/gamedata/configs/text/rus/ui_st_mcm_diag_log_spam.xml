@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="windows-1251"?>
 <string_table>
 	<string id="ui_mcm_diag_log_spam">
-		<text>Р”РёР°РіРЅРѕСЃС‚РёРєР° СЃРїР°РјР° РІ Р»РѕРі</text>
+		<text>Диагностика спама в лог</text>
 	</string>
 	<string id="ui_mcm_diag_log_spam_title">
-		<text>РўСЂР°СЃСЃРёСЂРѕРІРєР° Рё РіР°С€РµРЅРёРµ log spam</text>
+		<text>Трассировка и гашение log spam</text>
 	</string>
 	<string id="ui_mcm_diag_log_spam_enable">
-		<text>Р’РєР»СЋС‡РёС‚СЊ РѕР±С‘СЂС‚РєРё</text>
+		<text>Включить обёртки</text>
 	</string>
 	<string id="ui_mcm_diag_log_spam_trace_go">
-		<text>РўСЂР°СЃСЃ РїРµСЂРІС‹Р№ РїСЂРѕРјР°С… get_object_by_id РїРѕ id</text>
+		<text>Трасс первый промах get_object_by_id по id</text>
 	</string>
 	<string id="ui_mcm_diag_log_spam_trace_release">
-		<text>РўСЂР°СЃСЃ РїРµСЂРІС‹Р№ alife_release Р±РµР· server object</text>
+		<text>Трасс первый alife_release без server object</text>
 	</string>
 	<string id="ui_mcm_diag_log_spam_fix_release">
-		<text>РќРµ РІС‹Р·С‹РІР°С‚СЊ alife_release, РµСЃР»Рё РѕР±СЉРµРєС‚Р° СѓР¶Рµ РЅРµС‚ РІ РѕРЅР»Р°Р№РЅРµ</text>
+		<text>Не вызывать alife_release, если объекта уже нет в онлайне</text>
 	</string>
 	<string id="ui_mcm_diag_log_spam_trace_printe">
-		<text>РўСЂР°СЃСЃРёСЂРѕРІР°С‚СЊ РїРµСЂРІС‹Р№ printe РїРѕ РёР·РІРµСЃС‚РЅС‹Рј РїР°С‚С‚РµСЂРЅР°Рј (item_combination Рё С‚.Рґ.)</text>
+		<text>Трассировать первый printe по известным паттернам (item_combination и т.д.)</text>
 	</string>
 </string_table>

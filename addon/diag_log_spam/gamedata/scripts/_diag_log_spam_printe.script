@@ -1,4 +1,4 @@
--- load-order: РїРѕСЃР»Рµ _g.script
+-- load-order: после _g.script
 -- Early printe hook: startup errors (itms_manager) run before aaa_diag_log_spam.script.
 
 local LOG_TAG = "[diag_log_spam]"
