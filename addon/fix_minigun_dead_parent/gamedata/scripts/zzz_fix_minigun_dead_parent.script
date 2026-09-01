@@ -1,174 +1,33 @@
 -- load-order: после weapon_minigun_npc_fire_bullet_driven_V3_lite.script
--- Minigun Dead Parent Guard
+-- Minigun Dead Parent Guard (WITHDRAWN)
 -- Anomaly 1.5.3 / Anthology 2.1
 --
--- R.A.K minigun calls parent_obj:alive() on stale level.object_by_id userdata.
--- bullet.parent_id is a plain numeric field (callbacks_gameobject.script:115).
--- Skip bullet_on_init when parent/weapon id is absent from gameobjects_registry.
+-- v1.0.0: pcall(obj:alive()) Ч engine still prints Alive! (~320 vs ~80 baseline).
+-- v1.1.0: skip bullet_on_init when parent_id absent from gameobjects_registry Ч
+-- parent_id still in registry while level.object_by_id returns stale userdata (~80, unchanged).
+-- Fix requires upstream change in R.A.K minigun (register_npc_minigun_bullet / maintain_parent_audio).
 
 local LOG_TAG = "[fix_minigun_dead_parent]"
-local VERSION = "1.1.0"
-local MODULE_CANDIDATES = {
-	"weapon_minigun_npc_fire_bullet_driven_V3_lite",
-	"weapon_minigun_npc_fire_bullet_driven_v3_lite",
-}
+local VERSION = "1.1.1"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
-local orig = {}
 local installed = false
-local callbacks_registered = false
-local patched_module = nil
-local patched_module_name = nil
-local dead_skip_count = 0
-
-local function log(fmt, ...)
-	printf(LOG_TAG .. " " .. fmt, ...)
-end
-
-local function resolve_module()
-	for _, name in ipairs(MODULE_CANDIDATES) do
-		local mod = rawget(_G, name)
-		if type(mod) == "table" then
-			return mod, name
-		end
-	end
-	return nil, nil
-end
-
-local function registry_table()
-	local reg = rawget(_G, "gameobjects_registry")
-	if type(reg) == "table" then
-		return reg
-	end
-	return nil
-end
-
-local function is_actor_parent_id(parent_id)
-	return parent_id == 0 or parent_id == AC_ID
-end
-
-local function registry_has_id(reg, id)
-	if not reg or not id or id == 0 then
-		return false
-	end
-	return reg[id] ~= nil
-end
-
-local function bullet_parent_online(bullet)
-	if type(bullet) ~= "table" then
-		return true
-	end
-
-	local parent_id = bullet.parent_id
-	if not parent_id or is_actor_parent_id(parent_id) then
-		return true
-	end
-
-	local reg = registry_table()
-	if not reg then
-		return true
-	end
-
-	if not registry_has_id(reg, parent_id) then
-		return false
-	end
-
-	local weapon_id = bullet.weapon_id
-	if weapon_id and weapon_id ~= 0 and not registry_has_id(reg, weapon_id) then
-		return false
-	end
-
-	return true
-end
-
-function patched_bullet_on_init(bullet)
-	if not bullet_parent_online(bullet) then
-		dead_skip_count = dead_skip_count + 1
-		return
-	end
-	return orig.bullet_on_init(bullet)
-end
-
-local function wrap_bullet_on_init(mod)
-	if not (mod and type(mod.bullet_on_init) == "function") then
-		return false
-	end
-	if mod.bullet_on_init == patched_bullet_on_init then
-		return true
-	end
-	orig.bullet_on_init = mod.bullet_on_init
-	mod.bullet_on_init = patched_bullet_on_init
-	return true
-end
 
 local function install()
 	if installed then
-		return true
+		return
 	end
-
-	local mod, name = resolve_module()
-	if not mod then
-		printf(
-			"%s weapon_minigun_npc_fire_bullet_driven_V3_lite not found - guard NOT installed",
-			LOG_TAG
-		)
-		return false
-	end
-
-	if not wrap_bullet_on_init(mod) then
-		log("missing bullet_on_init - guard NOT installed")
-		return false
-	end
-
-	patched_module = mod
-	patched_module_name = name
 	installed = true
-	log("installed v%s wrapped bullet_on_init (%s)", VERSION, name)
-	return true
+	printf(
+		"%s guard NOT installed v%s (WITHDRAWN): registry id check does not block stale parent_obj:alive() in R.A.K minigun; Alive! count unchanged (~80/session vs no mod); upstream fix required",
+		LOG_TAG,
+		VERSION
+	)
 end
 
-local function uninstall()
-	local mod = patched_module or resolve_module()
-	if mod and orig.bullet_on_init then
-		mod.bullet_on_init = orig.bullet_on_init
-	end
-	orig = {}
-	installed = false
-	patched_module = nil
-	patched_module_name = nil
-	dead_skip_count = 0
-end
-
-function actor_on_first_update()
-	if not installed then
-		install()
-	end
+function on_game_start()
+	install()
 end
 
 install()
-
-function on_game_start()
-	if not installed then
-		install()
-	end
-	if not callbacks_registered then
-		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
-		callbacks_registered = true
-	end
-end
-
-function on_game_end()
-	if callbacks_registered then
-		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
-		callbacks_registered = false
-	end
-	if dead_skip_count > 0 then
-		log(
-			"dead_parent_skip session_total=%s module=%s",
-			tostring(dead_skip_count),
-			tostring(patched_module_name)
-		)
-	end
-	uninstall()
-end

@@ -1,5 +1,33 @@
 # Minigun Dead Parent Guard
 
+## [1.1.1] — 2026-09-01
+
+**Изменено**
+
+- `gamedata/scripts/zzz_fix_minigun_dead_parent.script` — мод отключён (`WITHDRAWN`): `install()` только пишет причину, патч не ставится.
+- `tools/_pack_kristiano_aio.py` — `fix_minigun_dead_parent` в `SKIP` (не попадает в новые сборки AIO).
+
+**Причина**
+
+Три попытки не снизили `cannot access class member Alive!` ниже базовой линии (~80 за сессию, объекты `grenade_rgn_impact_explosion` / `grenade_rgo_impact_explosion`):
+
+| Версия | Подход | `Alive!` за сессию | Строк от мода |
+| --- | --- | ---: | ---: |
+| без мода | — | ~80 | 0 |
+| 1.0.0 | `pcall(obj:alive())` в трёх callback'ах | ~320 | ~1402 |
+| 1.1.0 | отсев по `gameobjects_registry[parent_id]` в `bullet_on_init` | ~80 | 4 |
+
+Сессия 01.09.2026 23:33–23:55 (v1.1.0): `parent_id` есть в `gameobjects_registry`, обёртка пропускает вызов, но `level.object_by_id` внутри оригинала возвращает протухший userdata; в стеке оставшихся ошибок нашей обёртки нет (кадр: `alive` → `register_npc_minigun_bullet` :615 → `axr_main` :290). Исправление возможно только в upstream R.A.K minigun (`register_npc_minigun_bullet`, `maintain_parent_audio`).
+
+**Не затронуто**
+
+- оригинальный `weapon_minigun_npc_fire_bullet_driven_V3_lite.script`
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_minigun_dead_parent`
+- В игре: 01.09.2026, Anthology 2.1 / Modded Exes MT — v1.1.0 не улучшила метрику; v1.1.1 даёт `guard NOT installed v1.1.1 (WITHDRAWN)`.
+
 ## [1.1.0] — 2026-09-01
 
 **Изменено**
