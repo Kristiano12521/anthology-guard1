@@ -14,6 +14,11 @@ logs/*
 !logs/samples/
 !logs/cards/
 !logs/.gitkeep
+logs/card.md
+
+# Одноразовые артефакты инструментов (/mine, refindex и т.п.)
+mine.txt
+out.txt
 
 # Распакованные чужие моды для ревью — не в git.
 _tmp_*/
