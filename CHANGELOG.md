@@ -2,6 +2,14 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.48] — BHS vendor_source → v0_6_1
+
+`addon/anthology_busyhands_stability_fix/meta.ini`: `vendor_source=Anthology_BusyHands_Stability_Fix_v0_6_1` вместо `…_v0_6_4`. Папки `v0_6_3`/`v0_6_4`/`v0_6_5` удалены из `reference/addons/` 31.08 (`[0.1.33]`); единственный внешний BusyHands в эталоне — `v0_6_1`. Запись в CHANGELOG мода — не откат версии фикса, а привязка packer'а к фактическому источнику full-file.
+
+## [0.1.47] — pack_bhs: vendor_source из meta.ini
+
+`tools/pack_bhs.py` берёт вендорскую папку только из `vendor_source` в `addon/anthology_busyhands_stability_fix/meta.ini`; без ключа или без папки в `reference/addons/` — явный `SystemExit`. Убран fallback по `*BusyHands*` и константа `VENDOR_SOURCE_VERSION`. `BUILD_INFO.txt` фиксирует `vendor_source`, размеры full-file (`mon_sleep`, `guaranteed_loot`, `aes_crow_spawner.ltx`) и источник `sequential_load_magazine`. Тесты в `tests/test_pack_bhs.py`.
+
 ## [0.1.46] — ENC-002: порча окончаний строк
 
 `tools/lint_addon.py`: ошибка ENC-002 на `\r\r\n` и одиночный `\r` (не CRLF) в игровых файлах мода. Бывший ENC-002 (UTF-8 с кириллицей) переименован в ENC-003. Детектор в `tools/_common.py::has_bad_line_endings`. Тесты на обе формы порчи и корректный CRLF.
@@ -48,7 +56,7 @@
 
 ## [0.1.35] — verified_build с номером; версия упаковки из мода
 
-`verified_build` у пяти проверенных модов — `Anthology 2.1 / Modded Exes MT 10063` (номер из карточек `logs/cards/`, `xrCore build 10063`). Формат в `docs/mo2.md`: номер обязателен, берётся из лога или карточки. `tools/pack_bhs.py` читает версию overlay из CHANGELOG/meta.ini (`_common.detect_version`); вендорская папка в `reference/addons/` — отдельная `VENDOR_SOURCE_VERSION` (0.6.4, исходник BusyHands, не версия фикса). Тот же `detect_version` в `_pack_kristiano_aio.py` и `build_addon.py`. Тесты на чтение версии из мода.
+`verified_build` у пяти проверенных модов — `Anthology 2.1 / Modded Exes MT 10063` (номер из карточек `logs/cards/`, `xrCore build 10063`). Формат в `docs/mo2.md`: номер обязателен, берётся из лога или карточки. `tools/pack_bhs.py` читает версию overlay из CHANGELOG/meta.ini (`_common.detect_version`); вендорская папка — только `vendor_source` в `meta.ini` (не версия фикса). Тот же `detect_version` в `_pack_kristiano_aio.py` и `build_addon.py`. Тесты на чтение версии из мода.
 
 ## [0.1.34] — pack_bhs 0.6.7: лог find_close_cover и verified_*
 

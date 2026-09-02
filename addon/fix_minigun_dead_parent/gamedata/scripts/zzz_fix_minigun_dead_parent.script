@@ -1,0 +1,33 @@
+-- load-order: после weapon_minigun_npc_fire_bullet_driven_V3_lite.script
+-- Minigun Dead Parent Guard (WITHDRAWN)
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- v1.0.0: pcall(obj:alive()) Ч engine still prints Alive! (~320 vs ~80 baseline).
+-- v1.1.0: skip bullet_on_init when parent_id absent from gameobjects_registry Ч
+-- parent_id still in registry while level.object_by_id returns stale userdata (~80, unchanged).
+-- Fix requires upstream change in R.A.K minigun (register_npc_minigun_bullet / maintain_parent_audio).
+
+local LOG_TAG = "[fix_minigun_dead_parent]"
+local VERSION = "1.1.1"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local installed = false
+
+local function install()
+	if installed then
+		return
+	end
+	installed = true
+	printf(
+		"%s guard NOT installed v%s (WITHDRAWN): registry id check does not block stale parent_obj:alive() in R.A.K minigun; Alive! count unchanged (~80/session vs no mod); upstream fix required",
+		LOG_TAG,
+		VERSION
+	)
+end
+
+function on_game_start()
+	install()
+end
+
+install()

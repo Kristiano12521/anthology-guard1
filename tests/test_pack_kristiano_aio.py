@@ -105,10 +105,20 @@ class PackKristianoTests(unittest.TestCase):
             "-- bhs overlay\n",
         )
         write(self.addon_root / "anthology_busyhands_stability_fix" / "CHANGELOG.md", "## [0.6.7]\n")
+        write(
+            self.addon_root / "anthology_busyhands_stability_fix" / "meta.ini",
+            "vendor_source=BusyHands_vendor\nversion=0.0.0\n",
+        )
 
         vendor = self.addon_root.parent / "reference" / "addons" / "BusyHands_vendor"
         write(vendor / "scripts" / "vendor_bhs.script")
         write(vendor / "scripts" / "fix_bhs_fdda_loot.script", "-- loot sidecar\n")
+        write(vendor / "scripts" / "mon_sleep.script", "-- mon_sleep\n")
+        write(vendor / "scripts" / "guaranteed_loot.script", "-- guaranteed_loot\n")
+        write(
+            vendor / "configs" / "scripts" / "stancia_1" / "aes_crow_spawner.ltx",
+            "[aes_crow_spawner]\n",
+        )
         write(
             self.addon_root.parent
             / "reference"

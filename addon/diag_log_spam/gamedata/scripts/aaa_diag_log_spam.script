@@ -1,9 +1,9 @@
--- Log Spam Diagnostic (aaa_ load order: after _diag_log_spam_printe.script)
--- load-order: после _diag_log_spam_printe.script
+-- load-order: после _g.script; префикс aaa_ — обёртки printe и get_object_by_id до item_combination (до init мода)
+-- Log Spam Diagnostic
 -- Trace first miss per id for get_object_by_id / alife_release; printe via _diag_log_spam_printe.script.
 -- Anomaly 1.5.3 / Anthology 2.1
 
-local VERSION = "1.2.1"
+local VERSION = "1.2.3"
 local LOG_TAG = "[diag_log_spam]"
 
 _G.__diag_log_spam = _G.__diag_log_spam or {}
@@ -48,10 +48,12 @@ local function enabled()
 	return opt("enable", true)
 end
 
-local function log_trace(kind, detail)
+local function log_trace(kind, detail, trace_level)
 	printf("%s TRACE %s | %s", LOG_TAG, kind, tostring(detail))
-	printf("%s STACK TRACEBACK:", LOG_TAG)
-	debug.traceback("", 2)
+	local print_tb = state.printf_traceback
+	if type(print_tb) == "function" then
+		print_tb(trace_level)
+	end
 end
 
 local function format_printe_msg(fmt, ...)
@@ -82,7 +84,9 @@ local function maybe_trace_printe(msg)
 		return
 	end
 	traced_printe[key] = true
-	log_trace("printe:" .. key, msg)
+	-- level 5: (1) debug.traceback, (2) log_trace, (3) maybe_trace_printe@87,
+	-- (4) wrapped_printe@96, (5) printe caller
+	log_trace("printe:" .. key, msg, 5)
 end
 
 local function wrapped_printe(fmt, ...)
@@ -106,7 +110,8 @@ local function wrapped_get_object_by_id(id)
 
 	if opt("trace_get_object_by_id", true) and not traced_go[sid] then
 		traced_go[sid] = true
-		log_trace("get_object_by_id id=" .. sid, "first miss")
+		-- level 4: (1) debug.traceback, (2) log_trace, (3) wrapped_get_object_by_id@113, (4) caller
+		log_trace("get_object_by_id id=" .. sid, "first miss", 4)
 	end
 
 	return obj
@@ -122,7 +127,8 @@ local function wrapped_alife_release(sobj, force)
 		state.release_miss_count = release_miss_count
 		if opt("trace_alife_release_nil", true) and not traced_release.nil_obj then
 			traced_release.nil_obj = true
-			log_trace("alife_release", "server object is nil")
+			-- level 4: (1) debug.traceback, (2) log_trace, (3) wrapped_alife_release@130, (4) caller
+			log_trace("alife_release", "server object is nil", 4)
 		end
 		if opt("fix_alife_release_nil", true) then
 			return
@@ -142,7 +148,7 @@ local function wrapped_alife_release_id(id, force)
 		state.release_miss_count = release_miss_count
 		if opt("trace_alife_release_nil", true) and not traced_release.nil_id then
 			traced_release.nil_id = true
-			log_trace("alife_release_id", "id is nil")
+			log_trace("alife_release_id", "id is nil", 4)
 		end
 		if opt("fix_alife_release_nil", true) then
 			return
@@ -162,7 +168,7 @@ local function print_miss_summary()
 		n_pe = n_pe + 1
 	end
 	printf(
-		"%s summary v%s: traced_go_ids=%s traced_printe_patterns=%s release_misses=%s",
+		"%s summary session v%s: traced_go_ids=%s traced_printe_patterns=%s release_misses=%s",
 		LOG_TAG,
 		VERSION,
 		tostring(n_go),
@@ -175,6 +181,19 @@ local function print_miss_summary()
 	for key in pairs(traced_printe) do
 		printf("%s   printe_pattern=%s", LOG_TAG, key)
 	end
+end
+
+local function reset_session_state()
+	traced_go = {}
+	traced_release = {}
+	traced_printe = {}
+	miss_counts = {}
+	release_miss_count = 0
+	state.traced_go = traced_go
+	state.traced_release = traced_release
+	state.traced_printe = traced_printe
+	state.miss_counts = miss_counts
+	state.release_miss_count = release_miss_count
 end
 
 local function install_wrappers()
@@ -212,11 +231,16 @@ end
 
 function on_game_start()
 	install_wrappers()
+	reset_session_state()
 	printf("%s loaded v%s (wrappers active)", LOG_TAG, VERSION)
 end
 
 function on_game_end()
-	print_miss_summary()
+	printf("%s on_game_end", LOG_TAG)
+	local ok, err = pcall(print_miss_summary)
+	if not ok then
+		printe("%s summary failed: %s", LOG_TAG, tostring(err))
+	end
 	uninstall_wrappers()
 end
 

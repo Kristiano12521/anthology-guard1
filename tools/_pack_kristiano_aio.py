@@ -32,7 +32,11 @@ SEPARATE = {
 
 # Raw addon/ copy is wrong for BHS — merged via pack_bhs.stage_gamedata in pack_aio.
 # fix_bhs_fdda_loot withdrawn: logic lives in BusyHands 0.6.4+.
-SKIP = {"anthology_busyhands_stability_fix", "fix_bhs_fdda_loot"}
+SKIP = {
+    "anthology_busyhands_stability_fix",
+    "fix_bhs_fdda_loot",
+    "fix_minigun_dead_parent",  # withdrawn 1.1.1: registry guard ineffective
+}
 BHS_MOD_ID = "anthology_busyhands_stability_fix"
 
 AIO_NAME = "[DBG] Kristiano Fixes ALL IN ONE"
@@ -181,7 +185,7 @@ def pack_aio(
         total += n
         rows.append(f"{addon_dir.name:<42} v{version:<10} {n:>3} files")
 
-    bhs_version, bhs_files, _, _ = pack_bhs.stage_gamedata(repo, gamedata)
+    bhs_version, bhs_files, _, _, _ = pack_bhs.stage_gamedata(repo, gamedata)
     total += bhs_files
     rows.append(f"{BHS_MOD_ID:<42} v{bhs_version:<10} {bhs_files:>3} files (pack_bhs)")
 

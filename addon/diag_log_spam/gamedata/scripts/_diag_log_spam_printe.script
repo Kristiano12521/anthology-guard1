@@ -1,4 +1,4 @@
--- load-order: после _g.script
+-- load-order: posle _g.script
 -- Early printe hook: startup errors (itms_manager) run before aaa_diag_log_spam.script.
 
 local LOG_TAG = "[diag_log_spam]"
@@ -30,8 +30,34 @@ local function printe_pattern_key(msg)
 	return nil
 end
 
+-- callstack(c1, to_str) in _g.script: always starts debug.traceback('', 2); c1 trims to first frame only.
+-- No skip parameter. Use debug.traceback with a higher level to skip our wrappers.
+local function format_traceback(str)
+	str = string.gsub(str, "%.%.%.(.-)\\scripts\\", "... ")
+	for ss in string.gmatch(str, ":(%d*):") do
+		local num = string.gsub(ss, ":", "")
+		str = string.gsub(str, ":" .. num .. ":", " (line: " .. num .. ")")
+	end
+	str = string.gsub(str, "^(.-):", "")
+	return str
+end
+
+local function printf_traceback(trace_level)
+	if type(debug) ~= "table" or type(debug.traceback) ~= "function" then
+		return
+	end
+	local str = format_traceback(debug.traceback("", trace_level))
+	for line in string.gmatch(str, "[^\r\n]+") do
+		line = string.gsub(line, "^%s+", "")
+		if line ~= "" and not string.find(line, "^stack traceback", 1, true) then
+			printf("%s   %s", LOG_TAG, line)
+		end
+	end
+end
+
 _G.__diag_log_spam = _G.__diag_log_spam or {}
 local state = _G.__diag_log_spam
+state.printf_traceback = printf_traceback
 
 if not state.early_printe_hook then
 	state.early_printe_hook = true
@@ -44,8 +70,8 @@ if not state.early_printe_hook then
 		if key and not state.traced_printe[key] then
 			state.traced_printe[key] = true
 			printf("%s TRACE printe:%s | %s", LOG_TAG, key, msg)
-			printf("%s STACK TRACEBACK:", LOG_TAG)
-			debug.traceback("", 2)
+			-- level 3: (1) debug.traceback, (2) early_printe@74, (3) printe caller
+			printf_traceback(3)
 		end
 		return state.orig_printe(fmt, ...)
 	end

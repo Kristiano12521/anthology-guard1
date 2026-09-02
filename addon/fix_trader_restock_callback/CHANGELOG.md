@@ -1,5 +1,15 @@
 # Trader Restock Callback Fix
 
+## [1.0.4] — 2026-09-01
+
+**Изменено**
+
+- `aaa_fix_trader_restock_callback.script` — первая строка `-- load-order: после axr_main.script; префикс aaa_ - trader_on_restock до on_game_start barter_core и exo_loot` (cp1251); снимает ORDER-002. Дублирующий блок load-order в шапке убран.
+
+**Не затронуто**
+
+- `declare()` на загрузке модуля, wrap `timed_update`, `callback_add` no-op.
+
 ## [1.0.3] — 2026-08-31
 
 **Изменено**

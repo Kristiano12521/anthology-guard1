@@ -1,22 +1,33 @@
 # Anthology Busy Hands Stability Fix
 
+## [0.6.9] — 2026-09-01
+
+**Изменено**
+
+- `zzzzzz_anthology_bhs_trader_autoinject_patch.script` — первая строка `-- load-order: после trader_autoinject (вендорский, [FIX] Campfires Anthology Compat)` (cp1251); снимает ORDER-002.
+
+**Не затронуто**
+
+- Логика патча `trader_autoinject`, `verified_*`.
+
 ## [0.6.8] — 2026-09-01
 
 **Изменено**
 
+- `meta.ini`: `vendor_source=Anthology_BusyHands_Stability_Fix_v0_6_1` (было `…_v0_6_4`). `pack_bhs.py` берёт full-file (`mon_sleep`, `guaranteed_loot`, `aes_crow_spawner.ltx`) только из этой папки; размеры фиксируются в `BUILD_INFO.txt`.
 - `zzzzzz_anthology_bhs_trader_autoinject_patch.script` — `timed_update` резолвится через bare `_G` и `trader_autoinject.*` до обёртки `trade_manager.update`; `CreateTimeEvent` вызывается только с локальной `patched_timed_update`, иначе — лог и пропуск.
 
 **Причина**
 
-Голое `timed_update` в env патча было `nil` (функция локальна в `trader_autoinject.script` Campfires). Патч передавал `nil` в `CreateTimeEvent` до проверки `type(timed_update) == "function"` — 71× `attempt to push nil instead of function` в логе.
+31.08.2026 из `reference/addons/` удалены наши сборки `v0_6_3`, `v0_6_4`, `v0_6_5` (см. корневой CHANGELOG `[0.1.33]` — `fill_reference_addons` больше не держит пакеты с `BUILD_INFO.txt` в эталоне). Единственный внешний BusyHands в эталоне — `v0_6_1`; им же пользовались сборки фикса 0.6.2 и 0.6.3. Ключ `vendor_source=…_v0_6_4` указывал на несуществующую папку и выглядел как «откат версии», хотя full-file не менялись.
 
 **Как исправлено**
 
-Восстановлена логика v0.6.5: резолв и патч `timed_update` на таблице модуля, затем обёртка `trade_manager.update` с `patched_timed_update` в замыкании. Без резолва — `CreateTimeEvent` не вызывается.
+`vendor_source` приведён к фактическому эталону. Это не понижение версии фикса (0.6.8) и не смена патчей в `addon/` — только явная привязка packer'а к вендорскому источнику.
 
 **Не затронуто**
 
-- Вендорский `trader_autoinject.script`, `verified_*`, остальные патчи BHS.
+- Патчи в `addon/anthology_busyhands_stability_fix/gamedata/scripts/`, `verified_*`, логика гардов.
 
 **Совместимость**
 
@@ -26,7 +37,8 @@
 **Проверено**
 
 - `lint_addon.py` и `--cross`: 0 ошибок
-- В игре: не прогонялось (ожидается: 0 CTE nil, `trader_autoinject guards installed` ненулевой)
+- `pack_bhs.py`: сборка с `vendor_source=…_v0_6_1`, `BUILD_INFO.txt` с размерами full-file
+- В игре (trader_autoinject): не прогонялось (ожидается: 0 CTE nil, `trader_autoinject guards installed` ненулевой)
 
 ## [0.6.7] — 2026-08-31
 
