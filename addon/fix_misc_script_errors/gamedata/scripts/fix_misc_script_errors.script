@@ -13,7 +13,7 @@
 -- Detach still uses ActorMenu_on_item_drag_drop / ActorMenu_on_item_after_move.
 
 local LOG_TAG = "[fix_misc_script_errors]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 local MODULE_NAME = "mas_scope_detach"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -55,14 +55,16 @@ function patched_mas_on_game_start()
 	end
 end
 
-local function install_mas()
+local function install_mas(silent)
 	if installed then
 		return true
 	end
 
 	local mas = module_of(MODULE_NAME)
 	if not (mas and type(mas.on_game_start) == "function") then
-		printf("%s %s.on_game_start not found - guard NOT installed", LOG_TAG, MODULE_NAME)
+		if not silent then
+			printf("%s %s.on_game_start not found - guard NOT installed", LOG_TAG, MODULE_NAME)
+		end
 		return false
 	end
 	if mas.on_game_start == patched_mas_on_game_start then
@@ -88,15 +90,15 @@ end
 
 function actor_on_first_update()
 	if not installed then
-		install_mas()
+		install_mas(false)
 	end
 end
 
 -- Top-level: wrap if MAS already executed (this file loaded later).
-install_mas()
+install_mas(true)
 
 function on_game_start()
-	install_mas()
+	install_mas(true)
 	if not callbacks_registered then
 		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 		callbacks_registered = true

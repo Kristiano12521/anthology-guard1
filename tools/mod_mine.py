@@ -28,7 +28,7 @@ FAILURE_RES = [
 ]
 
 LOAD_HINT_RE = re.compile(
-    r"\b(loaded|installed|wrapped|registered|register\(\) wrapped|added|wrap installed)\b",
+    r"\b(loaded|installed|wrapped|registered|register\(\) wrapped|added|wrap installed|initialized)\b",
     re.I,
 )
 
