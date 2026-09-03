@@ -263,6 +263,37 @@ class ArchiveCardTests(unittest.TestCase):
             )
             self.assertEqual(third.name, "2026-08-31_xray_barkid-3.md")
 
+    def test_windows_copy_suffix_stripped_from_archive_name(self):
+        """Лог «xray_mg9000 (1).log» → stem без « (1)»; коллизия даёт -2, не скобки."""
+        self.assertEqual(
+            xraylog.archive_source_stem(Path(r"C:\tmp\xray_mg9000 (1).log")),
+            "xray_mg9000",
+        )
+        self.assertEqual(
+            xraylog.archive_source_stem(Path("xray_mg9000 (12).log")),
+            "xray_mg9000",
+        )
+        self.assertEqual(
+            xraylog.archive_source_stem(Path("xray_mg9000.log")),
+            "xray_mg9000",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            bare = xraylog.unique_archive_path(
+                dest,
+                Path("xray_mg9000 (1).log"),
+                analyzed_on=date(2026, 9, 3),
+            )
+            self.assertEqual(bare.name, "2026-09-03_xray_mg9000.md")
+            bare.write_text("first\n", encoding="utf-8")
+            second = xraylog.unique_archive_path(
+                dest,
+                Path("xray_mg9000 (2).log"),
+                analyzed_on=date(2026, 9, 3),
+            )
+            self.assertEqual(second.name, "2026-09-03_xray_mg9000-2.md")
+            self.assertNotIn(" (", second.name)
+
     def test_markdown_header_has_filename_not_absolute_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             fake = Path(tmp) / "Users" / "UniqueUserXYZ" / "AppData"

@@ -623,13 +623,24 @@ class LogReport:
         return "\n".join(out)
 
 
+# Windows при копировании в ту же папку даёт «name (1).log» — скобки ломают
+# PowerShell без -LiteralPath. В архиве карточек суффикс срезаем; коллизии — через -2, -3.
+_WINDOWS_COPY_SUFFIX = re.compile(r" \(\d+\)$")
+
+
+def archive_source_stem(log_path: Path) -> str:
+    """Имя источника для --archive: stem файла без Windows-суффикса « (N)»."""
+    source = Path(filename(log_path)).stem
+    return _WINDOWS_COPY_SUFFIX.sub("", source)
+
+
 def unique_archive_path(
     dest_dir: Path,
     log_path: Path,
     analyzed_on: date | None = None,
 ) -> Path:
     """Имя карточки: YYYY-MM-DD_<stem>.md, при занятом имени — суффикс -2, -3, …"""
-    source = Path(filename(log_path)).stem
+    source = archive_source_stem(log_path)
     stem = f"{(analyzed_on or date.today()).isoformat()}_{source}"
     candidate = dest_dir / f"{stem}.md"
     if not candidate.exists():
