@@ -1,27 +1,29 @@
--- Quest Stash Type Migration Fix
+-- Фикс миграции типов квестовых тайников
 -- Anomaly 1.5.3 / Anthology 2.1
 --
--- Anthology remapped shared DRX stash types 1-7 to unique 1001-1038 in
--- task LTX (on_job_descr). Old saves still store stash_type=6 etc.
--- tasks_stash.script concatenates that value onto drx_sl_quest_item_,
--- so the status functor looks for the wrong PDA, stage stays 0, the
--- marker stays on the stash, and the turn-in dialog never appears.
+-- Anthology развёл общие DRX-слоты тайников 1-7 на уникальные 1001-1038
+-- в LTX заданий (on_job_descr). Старые сейвы всё ещё хранят stash_type=6 и т.п.
+-- tasks_stash.script склеивает это значение с drx_sl_quest_item_,
+-- поэтому статус-функтор ищет не тот КПК, stage остаётся 0,
+-- метка висит на тайнике, диалог сдачи не появляется.
 --
--- ZIP v1.4 copied 38 item sections that already exist, wrapped
--- get_random_stash (blacklist already covers those names), polled
--- actor_on_update, used a zzzz filename, and destroyed shared items
--- 1-3 that vanilla tasks still use.
+-- ZIP v1.4 копировал 38 уже существующих секций предметов, оборачивал
+-- get_random_stash (имена и так в blacklist), крутил actor_on_update,
+-- ставил zzzz-имя файла и уничтожал общие предметы 1-3, которые
+-- ванильные задания всё ещё используют. Этот аддон не должен
+-- повторять это: конвертировать только stash_type_legacy активного remap-задания.
 --
--- This addon migrates save_var to the type from current task_ini,
--- rewrites a pending cache string, and wraps the status functor so
--- a leftover old PDA still counts. Missing 1001-1038 item sections
--- are restored via DLTX. Does not wrap treasure_manager.get_random_stash.
+-- Аддон мигрирует save_var на тип из текущего task_ini,
+-- переписывает pending-строку кэша и оборачивает статус-функтор,
+-- чтобы старый leftover-КПК всё ещё учитывался. Недостающие секции
+-- предметов 1001-1038 восстанавливаются через DLTX.
+-- treasure_manager.get_random_stash не оборачивается.
 
 local LOG_TAG = "[fix_quest_stash]"
-local VERSION = "1.0.3"
+local VERSION = "1.0.4"
 local EVENT_ID = "fix_quest_stash"
 
-printf("%s loaded v%s", LOG_TAG, VERSION)
+printf("%s загружен v%s", LOG_TAG, VERSION)
 local REPAIR_ACTION = "migrate"
 local REPAIR_DELAY = 1.0
 local REPAIR_MAX_ATTEMPTS = 10
@@ -172,7 +174,7 @@ local function rewrite_pending_cache(target_id, old_section, new_section)
 	local updated, changed = replace_plain(pending, old_section, new_section)
 	if changed then
 		caches[target_id] = updated
-		log("rewrote pending cache id=%s %s -> %s", tostring(target_id), old_section, new_section)
+		log("переписан pending-кэш id=%s %s -> %s", tostring(target_id), old_section, new_section)
 	end
 	return changed
 end
@@ -183,6 +185,24 @@ local function cache_pending(target_id)
 		return false
 	end
 	return type(caches[target_id]) == "string"
+end
+
+local function cache_opened(target_id)
+	-- try_spawn_treasure ставит caches[id]=true после спавна содержимого в ящик.
+	local caches = treasure_manager and treasure_manager.caches
+	if type(caches) ~= "table" or not target_id then
+		return false
+	end
+	return caches[target_id] == true
+end
+
+local function story_item_exists(section)
+	-- Секции квестовых КПК регистрируются как story_id == имя секции (цель tasks_stash).
+	if not section or type(get_story_se_item) ~= "function" then
+		return false
+	end
+	local ok, se_obj = pcall(get_story_se_item, section)
+	return ok and se_obj and true or false
 end
 
 local function give_info(name)
@@ -214,7 +234,7 @@ local function mark_ready(tsk, task_id, section, reason)
 		tsk.stage = 1
 		tsk.check_time = 0
 	end
-	log("task ready task=%s section=%s reason=%s", tostring(task_id), tostring(section), tostring(reason))
+	log("задание готово task=%s section=%s reason=%s", tostring(task_id), tostring(section), tostring(reason))
 end
 
 local function spawn_on_actor(section)
@@ -271,7 +291,7 @@ local function convert_or_give(task_id, tsk, old_type, new_type, info)
 
 	local spawned = spawn_on_actor(new_section)
 	if not spawned then
-		log("convert failed task=%s old=%s new=%s", tostring(task_id), old_section, new_section)
+		log("конвертация не удалась task=%s old=%s new=%s", tostring(task_id), old_section, new_section)
 		return false
 	end
 	release_actor_item(old_item)
@@ -290,8 +310,18 @@ local function recover_missing(task_id, tsk, var, new_section)
 	if cache_pending(var.target_id) then
 		return false
 	end
+	-- Тайник открыт: КПК/бонус уже в ящике. Не спавнить бесплатно на актёра
+	-- и не форсировать stage=1, пока предмет может лежать в invbox.
+	if cache_opened(var.target_id) then
+		log("пропуск recover task=%s: кэш открыт, ждать лут ящика section=%s", tostring(task_id), tostring(new_section))
+		return false
+	end
+	if story_item_exists(new_section) then
+		log("пропуск recover task=%s: story-предмет уже есть section=%s", tostring(task_id), tostring(new_section))
+		return false
+	end
 	if not section_exists(new_section) then
-		log("cannot recover task=%s: section %s missing", tostring(task_id), tostring(new_section))
+		log("нельзя recover task=%s: секция %s отсутствует", tostring(task_id), tostring(new_section))
 		return false
 	end
 	if spawn_on_actor(new_section) then
@@ -331,7 +361,7 @@ local function migrate_task(task_id, tsk, info)
 		rewrite_pending_cache(var.target_id, item_section(old_type), new_section)
 		changed = true
 		log(
-			"migrated task=%s stash_type=%s->%s section=%s",
+			"мигрировано task=%s stash_type=%s->%s section=%s",
 			tostring(task_id),
 			tostring(old_type),
 			tostring(new_type),
@@ -382,20 +412,12 @@ local function migrate_active_tasks()
 	return "done"
 end
 
-local SHARED_TYPES = {1, 2, 3, 4, 5, 6, 7}
-
-local function leftover_shared_type(task_id, new_type, info, var)
+local function leftover_legacy_type(new_type, var)
+	-- Только мигрированный тип ЭТОГО задания. Слепой обход общих 1-7
+	-- делал alife_release leftover-КПК от завершённого/чужого квеста (класс ZIP v1.4).
 	local legacy = var and tonumber(var.stash_type_legacy)
 	if legacy and legacy ~= new_type and actor_has(item_section(legacy)) then
 		return legacy
-	end
-	for i = 1, #SHARED_TYPES do
-		local typ = SHARED_TYPES[i]
-		if typ ~= new_type and actor_has(item_section(typ)) then
-			if not old_type_needed_by_other(typ, task_id, info) then
-				return typ
-			end
-		end
 	end
 	return nil
 end
@@ -409,7 +431,7 @@ local function accept_legacy_item(task_id, tsk, info)
 		return
 	end
 	local var = load_task_var(task_id)
-	local legacy = leftover_shared_type(task_id, new_type, info, var)
+	local legacy = leftover_legacy_type(new_type, var)
 	if legacy then
 		convert_or_give(task_id, tsk, legacy, new_type, info)
 	end
@@ -435,7 +457,7 @@ end
 
 local function install_status_wrap()
 	if not task_status_functor or type(task_status_functor.drx_sl_quest_item_task_status) ~= "function" then
-		printf("%s task_status_functor.drx_sl_quest_item_task_status not found - guard NOT installed", LOG_TAG)
+		printf("%s task_status_functor.drx_sl_quest_item_task_status не найден - guard НЕ установлен", LOG_TAG)
 		return false
 	end
 	if task_status_functor.drx_sl_quest_item_task_status == patched_status then
@@ -446,7 +468,7 @@ local function install_status_wrap()
 	end
 	orig_status = task_status_functor.drx_sl_quest_item_task_status
 	task_status_functor.drx_sl_quest_item_task_status = patched_status
-	log("v%s status functor wrapped", VERSION)
+	log("v%s status-функтор обёрнут", VERSION)
 	return true
 end
 
@@ -469,7 +491,7 @@ function repair_tick()
 		return true
 	end
 	if repair_attempts >= REPAIR_MAX_ATTEMPTS then
-		log("migration was not completed after %s attempts", repair_attempts)
+		log("миграция не завершена после %s попыток", repair_attempts)
 		return true
 	end
 	ResetTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY)
@@ -505,7 +527,7 @@ function on_game_start()
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	RegisterScriptCallback("on_game_load", on_game_load)
 	callbacks_registered = true
-	log("loaded v%s section %s exist=%s", VERSION, "drx_sl_quest_item_1014", section_exists("drx_sl_quest_item_1014") and "yes" or "no")
+	log("загружен v%s section %s exist=%s", VERSION, "drx_sl_quest_item_1014", section_exists("drx_sl_quest_item_1014") and "yes" or "no")
 end
 
 function on_game_end()
