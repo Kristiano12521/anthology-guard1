@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.49] — check_installed: сверка MO2 с addon/
+
+`tools/check_installed.py <MO2>`: находит в `mods/` пакеты с `BUILD_INFO.txt`, сравнивает `built` с mtime `addon/*/gamedata/`, печатает устарел / актуален / не установлен. SKIP и SEPARATE из `_pack_kristiano_aio` в «не установлен» не входят. В CI / при `--no-mtime` — как VERIFY-001: mtime после clone недостоверен, сравнение пропускается. Тесты `tests/test_check_installed.py`.
+
 ## [0.1.48] — BHS vendor_source → v0_6_1
 
 `addon/anthology_busyhands_stability_fix/meta.ini`: `vendor_source=Anthology_BusyHands_Stability_Fix_v0_6_1` вместо `…_v0_6_4`. Папки `v0_6_3`/`v0_6_4`/`v0_6_5` удалены из `reference/addons/` 31.08 (`[0.1.33]`); единственный внешний BusyHands в эталоне — `v0_6_1`. Запись в CHANGELOG мода — не откат версии фикса, а привязка packer'а к фактическому источнику full-file.
