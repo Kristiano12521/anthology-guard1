@@ -1,7 +1,7 @@
-# Bug-finding memories
+# Память bug-finding
 
-Tracked critical bugs with open or rejected PRs. Do not re-open a duplicate while status is `open` or `rejected` (unless code materially changed after rejection). Delete merged entries; delete rejected entries older than 30 days.
+Учёт критических багов с открытыми или отклонёнными PR. Не открывать дубликат, пока статус `open` или `rejected` (кроме случая, когда код заметно изменился после отклонения). Удалять записи после merge; удалять `rejected` старше 30 дней.
 
-| Bug (location + root cause) | PR | Status | Recorded |
+| Баг (место + причина) | PR | Статус | Записано |
 | --- | --- | --- | --- |
-| `fix_quest_stash`: blind SHARED_TYPES 1–7 `alife_release` steals leftover PDAs; `recover_missing` treats `caches[id]==true` as missing and duplicates PDA / skips loot | https://github.com/Kristiano12521/anthology-guard1/pull/2 | open | 2026-09-03 |
+| `fix_quest_stash`: слепой SHARED_TYPES 1–7 через `alife_release` забирает leftover-КПК; `recover_missing` считает `caches[id]==true` пропажей и дублирует КПК / пропускает лут | https://github.com/Kristiano12521/anthology-guard1/pull/2 | open | 2026-09-03 |
