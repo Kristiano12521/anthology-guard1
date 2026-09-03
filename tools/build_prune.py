@@ -16,6 +16,7 @@ SEPARATE_MO2_NAMES = (
     "[GFX] QuickQK Task Status Tool Anthology "
     "— Принудительное завершение заданий от Kristiano",
     "[SND] Anthology ST2 Mutant Footstep Sound",
+    "[FIX] Campfires Anthology Compat",
 )
 STAGING_DIR_NAME = "_staging"
 MOD_ZIP_RE = re.compile(r"^(?P<mod_id>.+)-(\d+\.\d+(?:\.\d+)?)\.zip$")

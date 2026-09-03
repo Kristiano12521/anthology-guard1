@@ -28,6 +28,7 @@ SEPARATE = {
         "— Принудительное завершение заданий от Kristiano"
     ),
     "fix_st2_footstep": "[SND] Anthology ST2 Mutant Footstep Sound",
+    "campfires_anthology_compat": "[FIX] Campfires Anthology Compat",
 }
 
 # Raw addon/ copy is wrong for BHS — merged via pack_bhs.stage_gamedata in pack_aio.

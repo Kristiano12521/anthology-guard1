@@ -1,0 +1,21 @@
+; ============================================================
+; Campfires Placeable — Anthology 2.1 DLTX-совместимость
+; ============================================================
+; Оригинальный Campfires_placeable_ANTHOLOGY_CreditsBVCX привозил
+; полную старую копию gamedata\configs\models\dynamic_objects.ltx.
+; Она перекрывала секции Anthology 2.1 и ломала квестовые объекты
+; (okr_a5_ph_pda, okr_a5_ph_case и т.п.):
+;   Cannot find item with section okr_a5_ph_pda
+;
+; Этот файл НЕ заменяет dynamic_objects.ltx. Добавляет только секцию
+; ph_campfiremod через mod_system_* (подхватывается DLTX рядом с
+; system.ltx, куда уже #include "models\dynamic_objects.ltx").
+;
+; @[...] — создать секцию, если её нет (Modded Exes); без ключа
+; override=false (это не директива DLTX).
+; ============================================================
+
+@[ph_campfiremod]:physic_destroyable_object
+visual                  = dynamics\equipments\campfiremod.ogf
+script_binding          = bind_physic_object.init
+custom_data             = scripts\ph_campfiremod.ltx
