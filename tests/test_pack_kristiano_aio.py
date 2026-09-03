@@ -84,6 +84,7 @@ class PackKristianoTests(unittest.TestCase):
             ("context_menu_overhaul_anthology", "cmo_only"),
             ("quickqk_task_complete", "quickqk_only"),
             ("fix_st2_footstep", "st2_only"),
+            ("campfires_anthology_compat", "campfires_only"),
         ):
             write(
                 self.addon_root / mod_id / "gamedata" / "scripts" / f"{marker}.script",
@@ -159,6 +160,7 @@ class PackKristianoTests(unittest.TestCase):
         self.assertNotIn("gamedata/scripts/cmo_only.script", names)
         self.assertNotIn("gamedata/scripts/quickqk_only.script", names)
         self.assertNotIn("gamedata/scripts/st2_only.script", names)
+        self.assertNotIn("gamedata/scripts/campfires_only.script", names)
         self.assertNotIn("gamedata/scripts/skip_loot.script", names)
         self.assertNotIn("gamedata/scripts/skip_bhs.script", names)
         self.assertIn(f"gamedata/scripts/{pack_bhs.MAIN_ZIP}", names)
@@ -196,6 +198,28 @@ class PackKristianoTests(unittest.TestCase):
             contents = zf.read("CONTENTS.txt").decode("utf-8")
         self.assertIn("keep_me", contents)
         self.assertIn("v7.7.7", contents)
+
+    def test_pack_separate_fails_without_gamedata(self):
+        with self.assertRaises(SystemExit) as ctx:
+            packer.pack_separate(
+                "no_such_mod",
+                "[FIX] Empty Separate",
+                addon_root=self.addon_root,
+                out_dir=self.out_dir,
+            )
+        msg = str(ctx.exception)
+        self.assertIn("gamedata", msg)
+        self.assertIn("no_such_mod", msg)
+        empty_id = "empty_gamedata_mod"
+        (self.addon_root / empty_id / "gamedata").mkdir(parents=True)
+        with self.assertRaises(SystemExit) as ctx_empty:
+            packer.pack_separate(
+                empty_id,
+                "[FIX] Empty Gamedata",
+                addon_root=self.addon_root,
+                out_dir=self.out_dir,
+            )
+        self.assertIn("пуста", str(ctx_empty.exception))
 
 
 if __name__ == "__main__":

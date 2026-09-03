@@ -123,12 +123,21 @@ def pack_separate(
     out_dir = out_dir or OUT_DIR
     cleanup_before_build(out_dir, f"pack:separate:{mo2_name}", keep_old=keep_old)
     addon_dir = addon_root / mod_id
+    gamedata_src = addon_dir / "gamedata"
+    if not gamedata_src.is_dir():
+        raise SystemExit(
+            f"pack_separate: у addon/{mod_id} нет gamedata/ — пустой архив не собираю"
+        )
     version = detect_version(addon_dir)
     staging = out_dir / "_staging" / mo2_name
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir(parents=True)
-    files = copy_gamedata(addon_dir / "gamedata", staging / "gamedata")
+    files = copy_gamedata(gamedata_src, staging / "gamedata")
+    if files == 0:
+        raise SystemExit(
+            f"pack_separate: addon/{mod_id}/gamedata/ пуста — пустой архив не собираю"
+        )
     copy_docs(addon_dir, staging)
     meta_src = addon_dir / "meta.ini"
     if meta_src.exists():

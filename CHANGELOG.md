@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.54] — pack_separate: отказ без gamedata/
+
+`pack_separate` больше не собирает zip из одного `BUILD_INFO.txt`: нет `gamedata/` или она пуста → `SystemExit` с именем мода. Фикстура `test_pack_kristiano_aio` создаёт `campfires_anthology_compat` (добавлен в `SEPARATE`, структура как у остальных separate). Тест на отказ без/с пустой `gamedata/`.
+
 ## [0.1.53] — карточки без « (N)», удаление MEMORIES.md
 
 `xraylog.py --archive`: из stem источника срезается Windows-суффикс ` (N)` (`xray_mg9000 (1).log` → `…_xray_mg9000.md`, коллизии по-прежнему `-2`, `-3`). Три сессии `logs/cards/2026-09-03_xray_mg9000*.md` переименованы с `(1)`/`(2)` на `-2`/`-3`. Тест на имя с таким суффиксом. Удалён пустой `MEMORIES.md` (шаблон учёта PR — у нас нет PR, учёт разборов уже в `docs/issues.md`).
