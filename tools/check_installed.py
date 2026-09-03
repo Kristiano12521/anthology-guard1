@@ -499,21 +499,29 @@ def _fmt_dt(value: datetime | None) -> str:
     return value.isoformat(timespec="seconds")
 
 
+def _fmt_archive_path(archive: Path | None) -> str:
+    """Путь к zip для вывода. Скобки в имени (напр. [DBG]) — в кавычках."""
+    if archive is None:
+        return "архив не найден в build/ — сначала собери"
+    text = rel(archive)
+    if any(ch in text for ch in "[]{}*?\"'"):
+        return f'"{text}"'
+    return text
+
+
 def format_reinstall(items: list[ReinstallItem]) -> str:
+    # ASCII "->" — не Unicode →: на Windows stdout часто cp1251.
     lines: list[str] = [
-        "переустановить в MO2 (Install mod from archive → заменить существующий, не создавать новый):",
+        "переустановить в MO2 (Install mod from archive -> заменить существующий, не создавать новый):",
     ]
     if not items:
         lines.append("  (нечего — всё актуально или сверка пропущена)")
         return "\n".join(lines) + "\n"
+    # Один блок на пакет: label / причина / архив. Не печать внутри обхода sources.
     for item in items:
-        if item.archive is not None:
-            archive = rel(item.archive)
-        else:
-            archive = "архив не найден в build/ — сначала собери"
         lines.append(f"  {item.label}")
         lines.append(f"    причина: {item.reason}")
-        lines.append(f"    архив: {archive}")
+        lines.append(f"    архив: {_fmt_archive_path(item.archive)}")
     lines.append(
         "После установки снова: python3 tools/check_installed.py "
         "(убедись, что built в BUILD_INFO свежий)."

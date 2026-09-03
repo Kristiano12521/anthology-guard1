@@ -362,6 +362,52 @@ class CheckInstalledTests(unittest.TestCase):
         self.assertEqual(items[0].label, k.AIO_NAME)
         self.assertEqual(items[0].archive, archive)
 
+    def test_reinstall_aio_once_despite_many_sources(self):
+        """AIO с несколькими sources — один блок в «переустановить», с причиной и архивом."""
+        import _pack_kristiano_aio as k
+        import re
+
+        built = datetime(2026, 9, 1, 12, 0, 0)
+        newer = int((built + timedelta(hours=2)).timestamp())
+        source_ids = [f"fix_aio_src_{i}" for i in range(8)]
+        for mod_id in source_ids:
+            self._addon(mod_id, mtime=newer)
+        mo2_name = f"{k.AIO_NAME} NEW"
+        self._package(mo2_name, mod_id=k.AIO_NAME, built=built)
+        build = self.root / "build"
+        build.mkdir()
+        archive = build / f"{k.AIO_NAME}.zip"
+        archive.write_bytes(b"PK")
+        with mock.patch(
+            "check_installed.source_mod_ids",
+            return_value=source_ids,
+        ):
+            with mock.patch.dict(os.environ, {"CI": "", "GITHUB_ACTIONS": ""}, clear=False):
+                report = check_installed.check_installed(self.mo2, addon_root=self.addon)
+        self.assertEqual(report.packages[0].status, "outdated")
+        self.assertEqual(len(report.packages[0].source_mods), 8)
+        items = check_installed.reinstall_items(
+            report, build_root=build, addon_root=self.addon
+        )
+        aio_items = [i for i in items if i.label == mo2_name]
+        self.assertEqual(len(aio_items), 1)
+        self.assertEqual(aio_items[0].reason, "устарел")
+        self.assertEqual(aio_items[0].archive, archive)
+        out = check_installed.format_report(
+            report, self.mo2, build_root=build, addon_root=self.addon
+        )
+        reinstall = out.split("переустановить", 1)[1]
+        label_lines = re.findall(
+            rf"^  {re.escape(mo2_name)}$", reinstall, flags=re.MULTILINE
+        )
+        self.assertEqual(len(label_lines), 1, reinstall)
+        self.assertIn("причина: устарел", reinstall)
+        self.assertIn("архив:", reinstall)
+        self.assertIn(k.AIO_NAME + ".zip", reinstall)
+        # блок «устарел» тоже один раз
+        outdated = out.split("устарел:", 1)[1].split("\n\n", 1)[0]
+        self.assertEqual(outdated.count(mo2_name), 1)
+
 
 class ResolveMo2Tests(unittest.TestCase):
     def test_cli_wins_over_env(self):
