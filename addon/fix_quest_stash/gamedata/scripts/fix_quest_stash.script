@@ -10,7 +10,8 @@
 -- ZIP v1.4 copied 38 item sections that already exist, wrapped
 -- get_random_stash (blacklist already covers those names), polled
 -- actor_on_update, used a zzzz filename, and destroyed shared items
--- 1-3 that vanilla tasks still use.
+-- 1-3 that vanilla tasks still use. This addon must not reintroduce
+-- that: convert only stash_type_legacy for the active remapped task.
 --
 -- This addon migrates save_var to the type from current task_ini,
 -- rewrites a pending cache string, and wraps the status functor so
@@ -18,7 +19,7 @@
 -- are restored via DLTX. Does not wrap treasure_manager.get_random_stash.
 
 local LOG_TAG = "[fix_quest_stash]"
-local VERSION = "1.0.3"
+local VERSION = "1.0.4"
 local EVENT_ID = "fix_quest_stash"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -185,6 +186,24 @@ local function cache_pending(target_id)
 	return type(caches[target_id]) == "string"
 end
 
+local function cache_opened(target_id)
+	-- try_spawn_treasure sets caches[id]=true after spawning into the box.
+	local caches = treasure_manager and treasure_manager.caches
+	if type(caches) ~= "table" or not target_id then
+		return false
+	end
+	return caches[target_id] == true
+end
+
+local function story_item_exists(section)
+	-- Quest PDA sections register as story_id == section name (tasks_stash target).
+	if not section or type(get_story_se_item) ~= "function" then
+		return false
+	end
+	local ok, se_obj = pcall(get_story_se_item, section)
+	return ok and se_obj and true or false
+end
+
 local function give_info(name)
 	if not (name and db.actor) then
 		return
@@ -290,6 +309,16 @@ local function recover_missing(task_id, tsk, var, new_section)
 	if cache_pending(var.target_id) then
 		return false
 	end
+	-- Opened stash: PDA/bonus already went into the box. Do not free-spawn on
+	-- actor or force stage=1 while the item may still sit in the invbox.
+	if cache_opened(var.target_id) then
+		log("skip recover task=%s: cache opened, wait for box loot section=%s", tostring(task_id), tostring(new_section))
+		return false
+	end
+	if story_item_exists(new_section) then
+		log("skip recover task=%s: story item already exists section=%s", tostring(task_id), tostring(new_section))
+		return false
+	end
 	if not section_exists(new_section) then
 		log("cannot recover task=%s: section %s missing", tostring(task_id), tostring(new_section))
 		return false
@@ -382,20 +411,12 @@ local function migrate_active_tasks()
 	return "done"
 end
 
-local SHARED_TYPES = {1, 2, 3, 4, 5, 6, 7}
-
-local function leftover_shared_type(task_id, new_type, info, var)
+local function leftover_legacy_type(new_type, var)
+	-- Only the migrated type for THIS task. Blind scan of shared 1-7 would
+	-- alife_release a leftover PDA from a finished/other quest (ZIP v1.4 class).
 	local legacy = var and tonumber(var.stash_type_legacy)
 	if legacy and legacy ~= new_type and actor_has(item_section(legacy)) then
 		return legacy
-	end
-	for i = 1, #SHARED_TYPES do
-		local typ = SHARED_TYPES[i]
-		if typ ~= new_type and actor_has(item_section(typ)) then
-			if not old_type_needed_by_other(typ, task_id, info) then
-				return typ
-			end
-		end
 	end
 	return nil
 end
@@ -409,7 +430,7 @@ local function accept_legacy_item(task_id, tsk, info)
 		return
 	end
 	local var = load_task_var(task_id)
-	local legacy = leftover_shared_type(task_id, new_type, info, var)
+	local legacy = leftover_legacy_type(new_type, var)
 	if legacy then
 		convert_or_give(task_id, tsk, legacy, new_type, info)
 	end

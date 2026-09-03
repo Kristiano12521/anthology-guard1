@@ -1,5 +1,31 @@
 # Quest Stash Type Migration Fix
 
+## [1.0.4] — 2026-09-03
+
+**Изменено**
+
+- `fix_quest_stash.script` — `accept_legacy_item` конвертирует только `stash_type_legacy` этого задания; слепой обход слотов 1–7 убран.
+- `recover_missing` не спавнит КПК на актёра и не ставит `stage=1`, если `treasure_manager.caches[id]==true` (тайник уже открыт, предмет мог остаться в ящике) или если story-объект секции уже существует.
+
+**Причина**
+
+1. Слепой scan 1–7 + `alife_release` забирал чужой leftover `drx_sl_quest_item_N` (завершённое/чужое задание не в `task_info`), подменяя его каноническим PDA активного remap-задания.
+2. После `try_spawn_treasure` кэш становится `true`, а не строкой: `cache_pending` пропускал, recover давал второй PDA на актёра и пропускал этап лута ящика.
+
+**Не затронуто**
+
+- Миграция `stash_type` / `stash_type_legacy`, rewrite pending-строки, DLTX секций 1001–1038 и blacklist.
+- Конвертация, когда у актёра реально лежит PDA с типом из `stash_type_legacy`.
+
+**Совместимость**
+
+- Сейвы: новая игра не нужна. Поля `save_var` не менялись.
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_quest_stash`
+- В игре: не прогонялось. Ожидание: нет `converted_legacy_item` без `stash_type_legacy`; нет `recovered_consumed_cache` при открытом кэше; в логе возможны `skip recover ... cache opened`.
+
 ## [1.0.3] — 2026-08-31
 
 **Изменено**
