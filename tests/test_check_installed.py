@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import os
 import sys
 import tempfile
@@ -18,7 +19,7 @@ import check_installed  # noqa: E402
 
 def run_main(argv: list[str], env: dict[str, str] | None = None) -> tuple[int, str]:
     buf = io.StringIO()
-    clean = {"CI": "", "GITHUB_ACTIONS": ""}
+    clean = {"CI": "", "GITHUB_ACTIONS": "", "ANTHOLOGY_MO2": ""}
     if env:
         clean.update(env)
     with mock.patch.dict(os.environ, clean, clear=False):
@@ -220,7 +221,7 @@ class CheckInstalledTests(unittest.TestCase):
     def test_missing_mods_dir(self):
         code, out = run_main(
             [str(self.root / "empty"), "--addon-root", str(self.addon)],
-            env={"CI": "", "GITHUB_ACTIONS": ""},
+            env={"CI": "", "GITHUB_ACTIONS": "", "ANTHOLOGY_MO2": ""},
         )
         self.assertEqual(code, 2)
         self.assertIn("Нет такой папки MO2", out)
@@ -239,6 +240,150 @@ class CheckInstalledTests(unittest.TestCase):
             report = check_installed.check_installed(self.mo2, addon_root=self.addon)
         self.assertEqual(report.packages[0].status, "current")
         self.assertEqual(report.packages[0].source_mods, [BHS_MOD_ID])
+
+    def test_mo2_from_env_when_no_arg(self):
+        self._addon("fix_env")
+        self._package(
+            "fix_env",
+            mod_id="fix_env",
+            built=datetime(2026, 9, 1, 13, 0, 0),
+        )
+        script = self.addon / "fix_env" / "gamedata" / "scripts" / "fix_env.script"
+        os.utime(script, (1_725_000_000, 1_725_000_000))
+        code, out = run_main(
+            ["--addon-root", str(self.addon)],
+            env={
+                "CI": "",
+                "GITHUB_ACTIONS": "",
+                "ANTHOLOGY_MO2": str(self.mo2),
+            },
+        )
+        self.assertEqual(code, 0)
+        self.assertIn(str(self.mo2), out)
+
+    def test_mo2_missing_message(self):
+        with mock.patch("check_installed.read_local_mo2", return_value=None):
+            code, out = run_main(
+                ["--addon-root", str(self.addon)],
+                env={"CI": "", "GITHUB_ACTIONS": "", "ANTHOLOGY_MO2": ""},
+            )
+        self.assertEqual(code, 2)
+        self.assertIn("Путь к MO2 не задан", out)
+        self.assertIn("local.json", out)
+
+    def test_mo2_from_local_json(self):
+        config = self.root / "local.json"
+        config.write_text(
+            json.dumps({"mo2": str(self.mo2)}),
+            encoding="utf-8",
+        )
+        self._addon("fix_cfg")
+        self._package(
+            "fix_cfg",
+            mod_id="fix_cfg",
+            built=datetime(2026, 9, 1, 13, 0, 0),
+        )
+        script = self.addon / "fix_cfg" / "gamedata" / "scripts" / "fix_cfg.script"
+        os.utime(script, (1_725_000_000, 1_725_000_000))
+        mo2, source = check_installed.resolve_mo2(
+            None,
+            env={"ANTHOLOGY_MO2": ""},
+            config_path=config,
+        )
+        self.assertEqual(mo2, self.mo2)
+        self.assertEqual(source, "local.json")
+
+    def test_clone_like_mtime_skips_comparison(self):
+        stamp = 1_725_100_000
+        # достаточно файлов с почти одинаковым mtime
+        for i in range(check_installed.CLONE_MTIME_MIN_FILES):
+            mod_id = f"fix_clone_{i}"
+            self._addon(mod_id, mtime=stamp + (i % 3))
+        self._package(
+            "fix_clone_0",
+            mod_id="fix_clone_0",
+            built=datetime(2020, 1, 1, 0, 0, 0),
+        )
+        with mock.patch.dict(os.environ, {"CI": "", "GITHUB_ACTIONS": ""}, clear=False):
+            report = check_installed.check_installed(self.mo2, addon_root=self.addon)
+        self.assertIsNotNone(report.mtime_untrusted)
+        self.assertIn("git clone", report.mtime_untrusted or "")
+        self.assertEqual(report.packages[0].status, "skipped")
+        self.assertEqual(report.missing, [])
+
+    def test_reinstall_lists_archive(self):
+        import _pack_kristiano_aio as k
+
+        built = datetime(2026, 9, 1, 12, 0, 0)
+        newer = int((built + timedelta(hours=2)).timestamp())
+        self._addon("fix_reinst", mtime=newer)
+        self._package("fix_reinst", mod_id="fix_reinst", built=built)
+        build = self.root / "build"
+        build.mkdir()
+        archive = build / "fix_reinst-1.0.0.zip"
+        archive.write_bytes(b"PK")
+        with mock.patch.dict(os.environ, {"CI": "", "GITHUB_ACTIONS": ""}, clear=False):
+            report = check_installed.check_installed(self.mo2, addon_root=self.addon)
+        items = check_installed.reinstall_items(
+            report, build_root=build, addon_root=self.addon
+        )
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].archive, archive)
+        code, out = run_main(
+            [
+                str(self.mo2),
+                "--addon-root",
+                str(self.addon),
+                "--build-root",
+                str(build),
+                "--reinstall",
+            ],
+            env={"CI": "", "GITHUB_ACTIONS": "", "ANTHOLOGY_MO2": ""},
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("заменить существующий", out)
+        self.assertIn("fix_reinst-1.0.0.zip", out)
+        self.assertNotIn(k.AIO_NAME, out)
+
+    def test_reinstall_groups_missing_into_aio(self):
+        import _pack_kristiano_aio as k
+
+        self._addon("fix_need_aio")
+        build = self.root / "build"
+        build.mkdir()
+        archive = build / f"{k.AIO_NAME}.zip"
+        archive.write_bytes(b"PK")
+        with mock.patch.dict(os.environ, {"CI": "", "GITHUB_ACTIONS": ""}, clear=False):
+            report = check_installed.check_installed(self.mo2, addon_root=self.addon)
+        items = check_installed.reinstall_items(
+            report, build_root=build, addon_root=self.addon
+        )
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].label, k.AIO_NAME)
+        self.assertEqual(items[0].archive, archive)
+
+
+class ResolveMo2Tests(unittest.TestCase):
+    def test_cli_wins_over_env(self):
+        mo2, source = check_installed.resolve_mo2(
+            Path("D:/from/cli"),
+            env={"ANTHOLOGY_MO2": "D:/from/env"},
+            config_path=Path("/nonexistent/local.json"),
+        )
+        self.assertEqual(mo2, Path("D:/from/cli"))
+        self.assertEqual(source, "cli")
+
+    def test_env_wins_over_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "local.json"
+            config.write_text('{"mo2": "D:/from/config"}', encoding="utf-8")
+            mo2, source = check_installed.resolve_mo2(
+                None,
+                env={"ANTHOLOGY_MO2": "D:/from/env"},
+                config_path=config,
+            )
+        self.assertEqual(mo2, Path("D:/from/env"))
+        self.assertEqual(source, "env")
 
 
 if __name__ == "__main__":

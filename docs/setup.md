@@ -117,6 +117,8 @@ D:\STALKER_DEV\Anthology\build\  результат сборки
 <MO2>\mods\                     сюда ставятся собранные моды
 ```
 
+Путь к MO2 для `check_installed` / `/deploy`: аргумент, переменная `ANTHOLOGY_MO2`, или `local.json` с ключом `mo2` (образец `local.json.example`; сам `local.json` в git не попадает).
+
 Копирование логов из MO2 в `logs/` удобно делать разово перед разбором: логи лежат в профиле MO2 (`<MO2>/profiles/<profile>/`) либо в `appdata/logs` внутри инстанса.
 
 ## Python

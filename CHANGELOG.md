@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.50] — /deploy: полный цикл сборка → сверка MO2
+
+`.cursor/commands/deploy.md`: сборка пакетов, `check_installed.py`, список переустановки с путями к zip, команда повторной проверки после установки. `check_installed`: путь MO2 из аргумента / `ANTHOLOGY_MO2` / `local.json`; `--reinstall`; эвристика clone (узкий разброс mtime в `addon/*/gamedata/` — «сравнивать не с чем», не «всё устарело»). Образец `local.json.example`, `local.json` в `.gitignore`. Тесты в `tests/test_check_installed.py`.
+
 ## [0.1.49] — check_installed: сверка MO2 с addon/
 
 `tools/check_installed.py <MO2>`: находит в `mods/` пакеты с `BUILD_INFO.txt`, сравнивает `built` с mtime `addon/*/gamedata/`, печатает устарел / актуален / не установлен. SKIP и SEPARATE из `_pack_kristiano_aio` в «не установлен» не входят. В CI / при `--no-mtime` — как VERIFY-001: mtime после clone недостоверен, сравнение пропускается. Тесты `tests/test_check_installed.py`.

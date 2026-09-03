@@ -3,20 +3,24 @@
 
 Находит в mods/ пакеты с BUILD_INFO.txt (наши сборки), сравнивает дату
 built с mtime файлов в addon/<mod_id>/gamedata/, сообщает: устарел /
-актуален / не установлен.
+актуален / не установлен. При устаревших/отсутствующих — пути к архивам
+в build/ для переустановки.
 
-Моды из SKIP и SEPARATE (_pack_kristiano_aio) ставятся отдельно — в списке
-«не установлен» не появляются.
+Путь MO2: аргумент, иначе ANTHOLOGY_MO2, иначе local.json {"mo2": "..."}.
 
-mtime после git clone недостоверен (как VERIFY-001): при CI /
-GITHUB_ACTIONS сравнение пропускается.
+mtime после git clone недостоверен (как VERIFY-001): CI / GITHUB_ACTIONS,
+--no-mtime, или эвристика «все mtime в addon/*/gamedata/ в узком окне».
 
+    python3 tools/check_installed.py
     python3 tools/check_installed.py "C:/Games/.../mo2"
+    python3 tools/check_installed.py --reinstall
 """
 
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -24,13 +28,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _common import REPO_ROOT, iter_files  # noqa: E402
+from _common import REPO_ROOT, iter_files, rel  # noqa: E402
 from lint_addon import VERIFY_SKIP_NAMES, mtime_untrusted_reason  # noqa: E402
 
 ADDON_ROOT = REPO_ROOT / "addon"
+BUILD_ROOT = REPO_ROOT / "build"
+LOCAL_CONFIG_NAME = "local.json"
+ENV_MO2 = "ANTHOLOGY_MO2"
 
 # pack_bhs пишет mod_id: Anthology_BusyHands_Stability_Fix
 BHS_BUILD_MOD_ID = "Anthology_BusyHands_Stability_Fix"
+
+# После clone все файлы получают время чекаута — разброс mtime крошечный.
+CLONE_MTIME_SPAN_SEC = 120.0
+CLONE_MTIME_MIN_FILES = 20
 
 
 @dataclass
@@ -51,10 +62,20 @@ class InstalledPackage:
 @dataclass
 class PackageStatus:
     package: InstalledPackage
-    status: str  # "current" | "outdated" | "no_source" | "no_built"
+    status: str  # "current" | "outdated" | "no_source" | "no_built" | "skipped"
     source_mtime: datetime | None = None
     source_mods: list[str] = field(default_factory=list)
     detail: str = ""
+
+
+@dataclass
+class ReinstallItem:
+    """Что поставить/обновить в MO2 и откуда взять архив."""
+
+    label: str
+    reason: str
+    archive: Path | None
+    mo2_name: str | None = None
 
 
 @dataclass
@@ -181,6 +202,57 @@ def newest_sources_mtime(mod_ids: list[str], addon_root: Path) -> tuple[datetime
     return newest, present
 
 
+def collect_gamedata_mtimes(addon_root: Path) -> list[float]:
+    """Все mtime файлов в addon/*/gamedata/ (без VERIFY_SKIP_NAMES)."""
+    stamps: list[float] = []
+    if not addon_root.is_dir():
+        return stamps
+    for child in sorted(addon_root.iterdir(), key=lambda p: p.name.lower()):
+        gamedata = child / "gamedata"
+        if not child.is_dir() or not gamedata.is_dir():
+            continue
+        for path in iter_files(gamedata):
+            if path.name.lower() in VERIFY_SKIP_NAMES:
+                continue
+            try:
+                stamps.append(path.stat().st_mtime)
+            except OSError:
+                continue
+    return stamps
+
+
+def addon_mtime_looks_like_clone(
+    addon_root: Path,
+    *,
+    max_span_sec: float = CLONE_MTIME_SPAN_SEC,
+    min_files: int = CLONE_MTIME_MIN_FILES,
+) -> bool:
+    """True, если разброс mtime похож на единый stamp после git clone."""
+    stamps = collect_gamedata_mtimes(addon_root)
+    if len(stamps) < min_files:
+        return False
+    return (max(stamps) - min(stamps)) <= max_span_sec
+
+
+def resolve_mtime_untrusted(
+    addon_root: Path,
+    *,
+    skip_mtime: bool = False,
+) -> str | None:
+    """Почему нельзя сравнивать mtime, или None."""
+    if skip_mtime:
+        return "--no-mtime"
+    env_reason = mtime_untrusted_reason()
+    if env_reason:
+        return env_reason
+    if addon_mtime_looks_like_clone(addon_root):
+        return (
+            f"mtime в addon/*/gamedata/ в окне {int(CLONE_MTIME_SPAN_SEC)}с "
+            f"(похоже на git clone)"
+        )
+    return None
+
+
 def expected_aio_mod_ids(addon_root: Path) -> list[str]:
     """Моды, ожидаемые в AIO: есть gamedata, не SKIP и не SEPARATE."""
     k = _kristiano()
@@ -206,9 +278,7 @@ def check_installed(
     packages = find_own_packages(mods_dir)
     report = CheckReport(own_count=len(packages))
 
-    untrusted = None if skip_mtime else mtime_untrusted_reason()
-    if skip_mtime:
-        untrusted = untrusted or "--no-mtime"
+    untrusted = resolve_mtime_untrusted(addon_root, skip_mtime=skip_mtime)
     report.mtime_untrusted = untrusted
 
     covered: set[str] = set()
@@ -273,13 +343,192 @@ def check_installed(
     return report
 
 
+def read_local_mo2(config_path: Path | None = None) -> Path | None:
+    """Читает mo2 из local.json; None если файла/ключа нет."""
+    path = config_path or (REPO_ROOT / LOCAL_CONFIG_NAME)
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    value = data.get("mo2")
+    if not value or not isinstance(value, str):
+        return None
+    return Path(value)
+
+
+def resolve_mo2(
+    cli_path: Path | None = None,
+    *,
+    env: dict[str, str] | None = None,
+    config_path: Path | None = None,
+) -> tuple[Path | None, str]:
+    """Путь MO2 и откуда взяли: cli | env | local.json | "".
+
+    Приоритет: аргумент > ANTHOLOGY_MO2 > local.json.
+    """
+    if cli_path is not None:
+        return cli_path, "cli"
+    environ = env if env is not None else os.environ
+    env_value = (environ.get(ENV_MO2) or "").strip()
+    if env_value:
+        return Path(env_value), "env"
+    from_config = read_local_mo2(config_path)
+    if from_config is not None:
+        return from_config, "local.json"
+    return None, ""
+
+
+def mo2_missing_message() -> str:
+    return (
+        "Путь к MO2 не задан. Укажи аргументом, переменной "
+        f"{ENV_MO2}, или ключом mo2 в {LOCAL_CONFIG_NAME} "
+        f"(образец: {LOCAL_CONFIG_NAME}.example)."
+    )
+
+
+def _newest_matching(build_root: Path, prefixes: tuple[str, ...], *, suffix: str = ".zip") -> Path | None:
+    if not build_root.is_dir():
+        return None
+    found: list[Path] = []
+    for path in build_root.iterdir():
+        if not path.is_file() or path.suffix.lower() != suffix:
+            continue
+        if any(path.name.startswith(prefix) for prefix in prefixes):
+            found.append(path)
+    if not found:
+        return None
+    return sorted(found, key=lambda p: (-p.stat().st_mtime, p.name))[0]
+
+
+def find_archive_for_mod_id(mod_id: str, build_root: Path) -> Path | None:
+    """Архив в build/ для mod_id из BUILD_INFO / addon/."""
+    k = _kristiano()
+    from build_prune import BHS_MOD_ID, BHS_PACK_STEM  # noqa: PLC0415
+
+    if mod_id == k.AIO_NAME:
+        exact = build_root / f"{k.AIO_NAME}.zip"
+        return exact if exact.is_file() else None
+    if mod_id in k.SEPARATE:
+        mo2_name = k.SEPARATE[mod_id]
+        exact = build_root / f"{mo2_name}.zip"
+        return exact if exact.is_file() else None
+    if mod_id == BHS_BUILD_MOD_ID or mod_id == BHS_MOD_ID:
+        return _newest_matching(build_root, (BHS_PACK_STEM,))
+    exact = build_root / f"{mod_id}-{_detect_version_safe(mod_id)}.zip"
+    if exact.is_file():
+        return exact
+    return _newest_matching(build_root, (f"{mod_id}-",))
+
+
+def _detect_version_safe(mod_id: str) -> str:
+    from _common import detect_version  # noqa: PLC0415
+
+    addon_dir = ADDON_ROOT / mod_id
+    if addon_dir.is_dir():
+        return detect_version(addon_dir)
+    return "1.0.0"
+
+
+def reinstall_items(
+    report: CheckReport,
+    *,
+    build_root: Path | None = None,
+    addon_root: Path | None = None,
+) -> list[ReinstallItem]:
+    """Список пакетов к переустановке с путями к zip в build/."""
+    build_root = build_root or BUILD_ROOT
+    addon_root = addon_root or ADDON_ROOT
+    k = _kristiano()
+    items: list[ReinstallItem] = []
+    seen_labels: set[str] = set()
+
+    def add(item: ReinstallItem) -> None:
+        if item.label in seen_labels:
+            return
+        seen_labels.add(item.label)
+        items.append(item)
+
+    for status in report.packages:
+        if status.status not in ("outdated", "no_built"):
+            continue
+        mod_id = status.package.info.mod_id
+        reason = "устарел" if status.status == "outdated" else "нет даты built"
+        add(
+            ReinstallItem(
+                label=status.package.mo2_name,
+                reason=reason,
+                archive=find_archive_for_mod_id(mod_id, build_root),
+                mo2_name=status.package.mo2_name,
+            )
+        )
+
+    if report.missing:
+        aio_members = set(expected_aio_mod_ids(addon_root))
+        missing_aio = [m for m in report.missing if m in aio_members]
+        missing_other = [m for m in report.missing if m not in aio_members]
+        if missing_aio:
+            add(
+                ReinstallItem(
+                    label=k.AIO_NAME,
+                    reason=f"не установлен (покрывает {len(missing_aio)} мод.)",
+                    archive=find_archive_for_mod_id(k.AIO_NAME, build_root),
+                    mo2_name=k.AIO_NAME,
+                )
+            )
+        for mod_id in missing_other:
+            mo2_name = k.SEPARATE.get(mod_id, mod_id)
+            add(
+                ReinstallItem(
+                    label=mo2_name,
+                    reason="не установлен",
+                    archive=find_archive_for_mod_id(mod_id, build_root),
+                    mo2_name=mo2_name,
+                )
+            )
+
+    return items
+
+
 def _fmt_dt(value: datetime | None) -> str:
     if value is None:
         return "?"
     return value.isoformat(timespec="seconds")
 
 
-def format_report(report: CheckReport, mo2: Path) -> str:
+def format_reinstall(items: list[ReinstallItem]) -> str:
+    lines: list[str] = [
+        "переустановить в MO2 (Install mod from archive → заменить существующий, не создавать новый):",
+    ]
+    if not items:
+        lines.append("  (нечего — всё актуально или сверка пропущена)")
+        return "\n".join(lines) + "\n"
+    for item in items:
+        if item.archive is not None:
+            archive = rel(item.archive)
+        else:
+            archive = "архив не найден в build/ — сначала собери"
+        lines.append(f"  {item.label}")
+        lines.append(f"    причина: {item.reason}")
+        lines.append(f"    архив: {archive}")
+    lines.append(
+        "После установки снова: python3 tools/check_installed.py "
+        "(убедись, что built в BUILD_INFO свежий)."
+    )
+    return "\n".join(lines) + "\n"
+
+
+def format_report(
+    report: CheckReport,
+    mo2: Path,
+    *,
+    build_root: Path | None = None,
+    addon_root: Path | None = None,
+    include_reinstall: bool = True,
+) -> str:
     lines: list[str] = [
         f"MO2: {mo2}",
         f"пакетов с BUILD_INFO.txt: {report.own_count}",
@@ -294,7 +543,9 @@ def format_report(report: CheckReport, mo2: Path) -> str:
             lines.append("найденные пакеты (без сверки):")
             for item in report.packages:
                 built = _fmt_dt(item.package.info.built)
-                lines.append(f"  {item.package.mo2_name}  mod_id={item.package.info.mod_id}  built={built}")
+                lines.append(
+                    f"  {item.package.mo2_name}  mod_id={item.package.info.mod_id}  built={built}"
+                )
         return "\n".join(lines) + "\n"
 
     by_status: dict[str, list[PackageStatus]] = {
@@ -331,7 +582,9 @@ def format_report(report: CheckReport, mo2: Path) -> str:
                 )
             else:
                 detail = f"  ({item.detail})" if item.detail else ""
-                lines.append(f"  {item.package.mo2_name}  mod_id={item.package.info.mod_id}{detail}")
+                lines.append(
+                    f"  {item.package.mo2_name}  mod_id={item.package.info.mod_id}{detail}"
+                )
 
     lines.append("")
     if report.missing:
@@ -343,7 +596,13 @@ def format_report(report: CheckReport, mo2: Path) -> str:
     lines.append(
         "(SKIP и SEPARATE из _pack_kristiano_aio в «не установлен» не входят.)"
     )
-    return "\n".join(lines) + "\n"
+
+    text = "\n".join(lines) + "\n"
+    if include_reinstall:
+        items = reinstall_items(report, build_root=build_root, addon_root=addon_root)
+        if items:
+            text += "\n" + format_reinstall(items)
+    return text
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -352,8 +611,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "mo2",
+        nargs="?",
         type=Path,
-        help="папка MO2 (внутри ожидается mods/), не папка профиля",
+        default=None,
+        help="папка MO2 (mods/ внутри); иначе ANTHOLOGY_MO2 или local.json",
     )
     parser.add_argument(
         "--addon-root",
@@ -362,15 +623,30 @@ def main(argv: list[str] | None = None) -> int:
         help="корень addon/ (по умолчанию репозиторий)",
     )
     parser.add_argument(
+        "--build-root",
+        type=Path,
+        default=BUILD_ROOT,
+        help="корень build/ для путей к архивам",
+    )
+    parser.add_argument(
         "--no-mtime",
         action="store_true",
         help="не сравнивать mtime (как --no-verify у lint; clone/CI)",
     )
+    parser.add_argument(
+        "--reinstall",
+        action="store_true",
+        help="только список переустановки с путями к zip",
+    )
     args = parser.parse_args(argv)
 
-    mo2 = args.mo2
+    mo2, source = resolve_mo2(args.mo2)
+    if mo2 is None:
+        print(mo2_missing_message(), file=sys.stderr)
+        return 2
     if not mo2.is_dir():
-        print(f"Нет такой папки MO2: {mo2}", file=sys.stderr)
+        where = f" ({source})" if source else ""
+        print(f"Нет такой папки MO2{where}: {mo2}", file=sys.stderr)
         return 2
     mods_dir = mo2 / "mods"
     if not mods_dir.is_dir():
@@ -382,7 +658,22 @@ def main(argv: list[str] | None = None) -> int:
         addon_root=args.addon_root,
         skip_mtime=bool(args.no_mtime),
     )
-    sys.stdout.write(format_report(report, mo2))
+    if args.reinstall:
+        items = reinstall_items(
+            report,
+            build_root=args.build_root,
+            addon_root=args.addon_root,
+        )
+        sys.stdout.write(format_reinstall(items))
+    else:
+        sys.stdout.write(
+            format_report(
+                report,
+                mo2,
+                build_root=args.build_root,
+                addon_root=args.addon_root,
+            )
+        )
 
     if report.mtime_untrusted:
         return 0

@@ -52,11 +52,12 @@ python3 tools/build_addon.py my_fix_weapon_jam --install "D:/MO2/mods"
 Сверка «что в MO2 устарело относительно `addon/`»:
 
 ```bash
+python3 tools/check_installed.py
 python3 tools/check_installed.py "D:/MO2"
+python3 tools/check_installed.py --reinstall
 ```
 
-Скрипт смотрит пакеты с `BUILD_INFO.txt`, сравнивает `built` с mtime файлов в `addon/*/gamedata/`. Моды из SKIP/SEPARATE (`_pack_kristiano_aio`) ставятся отдельно и в «не установлен» не попадают. В CI и при `--no-mtime` сравнение пропускается: после git clone mtime недостоверен (как VERIFY-001).
-
+Путь MO2: аргумент, иначе переменная `ANTHOLOGY_MO2`, иначе ключ `mo2` в `local.json` (образец `local.json.example`). Скрипт смотрит пакеты с `BUILD_INFO.txt`, сравнивает `built` с mtime файлов в `addon/*/gamedata/`. Моды из SKIP/SEPARATE (`_pack_kristiano_aio`) ставятся отдельно и в «не установлен» не попадают. В CI, при `--no-mtime` и когда mtime в `addon/` похожи на единый stamp после git clone — сравнение пропускается: сравнивать не с чем, а не «всё устарело». Устаревшие/отсутствующие — блок с путями к zip в `build/` и напоминанием заменить существующий мод в MO2.
 ## Конфликты файлов
 
 Вкладка Conflicts у мода в MO2 показывает, какие его файлы перекрыты и какие он перекрывает сам. Правило разбора: если твой `.ltx` перекрывает файл сборки целиком — это ошибка проектирования, нужен DLTX-патч (`tools/lint_addon.py` это ловит). Патчи `mod_*.ltx` не конфликтуют между собой на уровне файлов, но при override одной и той же секции выигрывает мод, который грузится позже. До установки в MO2: `python3 tools/lint_addon.py --cross` предупреждает (`CROSS-001`), если два мода в `addon/` патчат одну секцию в одном пути внутри gamedata.
