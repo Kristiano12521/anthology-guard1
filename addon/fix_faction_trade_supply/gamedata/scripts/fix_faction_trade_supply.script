@@ -1,0 +1,124 @@
+-- load-order: после faction_trade_ui / action_trade_ui (Faction Based HUD)
+-- Faction Trade UI supply_level crash fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- faction_trade_ui.UpdateHarukaTradeWindow concatenates bare global
+-- supply_level. For BARMAN that global is set to nil, which falls through
+-- to the engine function supply_level via __index and fatals on "..".
+-- Tikhonych / Pathogenych on Cordon hit this path on StartTrade.
+
+local LOG_TAG = "[fix_faction_trade_supply]"
+local VERSION = "1.0.0"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local orig_update = nil
+
+local function trader_shows_supply(npc)
+	if not (npc and trader_autoinject and type(trader_autoinject.get_trader_type) == "function") then
+		return false
+	end
+	local ok, trader_type = pcall(trader_autoinject.get_trader_type, npc)
+	if not ok then
+		return false
+	end
+	local SUPPLIER = trader_autoinject.SUPPLIER
+	local MEDIC = trader_autoinject.MEDIC
+	local MECHANIC = trader_autoinject.MECHANIC
+	local EXTRA = trader_autoinject.EXTRA
+	return trader_type == SUPPLIER
+		or trader_type == MEDIC
+		or trader_type == MECHANIC
+		or (EXTRA ~= nil and trader_type == EXTRA)
+end
+
+local function resolve_level(self)
+	local npc = nil
+	if mob_trade and type(mob_trade.GetTalkingNpc) == "function" then
+		local ok, talking = pcall(mob_trade.GetTalkingNpc)
+		if ok then
+			npc = talking
+		end
+	end
+	if not npc and self and type(self.GetPartner) == "function" then
+		local ok, partner = pcall(function()
+			return self:GetPartner()
+		end)
+		if ok then
+			npc = partner
+		end
+	end
+
+	if npc and trader_shows_supply(npc) and type(trader_autoinject.supply_level) == "function" then
+		local ok, level = pcall(trader_autoinject.supply_level, npc, true)
+		if ok and type(level) == "number" then
+			return level
+		end
+		if ok and level == nil then
+			return 1
+		end
+	end
+
+	-- Fallback only if ActorMenu_on_trade_started left a real number.
+	if type(supply_level) == "number" then
+		return supply_level
+	end
+	return nil
+end
+
+local function patched_update(self)
+	if not (self and self.haruka_trader_supply_level) then
+		return
+	end
+
+	self.haruka_trader_supply_level:Show(false)
+
+	local level = resolve_level(self)
+	if type(level) ~= "number" then
+		return
+	end
+
+	local label = "st_haruka_sulpplies_level"
+	if game and type(game.translate_string) == "function" then
+		local ok, translated = pcall(game.translate_string, label)
+		if ok and translated then
+			label = translated
+		end
+	end
+
+	self.haruka_trader_supply_level:SetText(label .. " " .. level)
+	self.haruka_trader_supply_level:Show(true)
+end
+
+local function install()
+	if not (ui_inventory and ui_inventory.UIInventory) then
+		printf("%s ui_inventory.UIInventory not found - guard NOT installed", LOG_TAG)
+		return false
+	end
+	local current = ui_inventory.UIInventory.UpdateHarukaTradeWindow
+	if type(current) ~= "function" then
+		printf("%s UpdateHarukaTradeWindow not found - Faction Based HUD absent? guard NOT installed", LOG_TAG)
+		return false
+	end
+	if current == patched_update then
+		return true
+	end
+	orig_update = orig_update or current
+	ui_inventory.UIInventory.UpdateHarukaTradeWindow = patched_update
+	printf("%s UpdateHarukaTradeWindow wrapped", LOG_TAG)
+	return true
+end
+
+local function uninstall()
+	if orig_update and ui_inventory and ui_inventory.UIInventory then
+		ui_inventory.UIInventory.UpdateHarukaTradeWindow = orig_update
+	end
+end
+
+function on_game_start()
+	install()
+end
+
+function on_game_end()
+	uninstall()
+end
