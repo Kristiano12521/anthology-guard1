@@ -127,6 +127,7 @@ Markdown в [`.cursor/commands/`](.cursor/commands/), вызов через `/` 
 - [`docs/mcm.md`](docs/mcm.md) — MCM: контракт `on_mcm_load`, чтение значений
 - [`docs/api-verification.md`](docs/api-verification.md) — протокол проверки движкового API
 - [`docs/pitfalls.md`](docs/pitfalls.md) — на чём агент чаще всего врёт про Anomaly
+- [`docs/issues.md`](docs/issues.md) — журнал разобранных проблем (указатель: сигнатура → итог → карточка / pitfalls)
 - [`docs/mo2.md`](docs/mo2.md) — цепочка исходники → build → MO2 → игра
 - [`docs/prompts.md`](docs/prompts.md) — готовые промпты
 - [`docs/references.md`](docs/references.md) — внешние источники

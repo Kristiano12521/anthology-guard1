@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.51] — журнал разобранных проблем
+
+[`docs/issues.md`](docs/issues.md) — указатель разобранных случаев (сигнатура в логе → чей мод → итог → карточка / pitfalls). Заполнен по CHANGELOG, pitfalls и `logs/cards/` (десять известных классов). Строка в README; в `.cursor/commands/crash.md` — сначала смотреть журнал, потом карточки.
+
 ## [0.1.50] — /deploy: полный цикл сборка → сверка MO2
 
 `.cursor/commands/deploy.md`: сборка пакетов, `check_installed.py`, список переустановки с путями к zip, команда повторной проверки после установки. `check_installed`: путь MO2 из аргумента / `ANTHOLOGY_MO2` / `local.json`; `--reinstall`; эвристика clone (узкий разброс mtime в `addon/*/gamedata/` — «сравнивать не с чем», не «всё устарело»). Образец `local.json.example`, `local.json` в `.gitignore`. Тесты в `tests/test_check_installed.py`.
