@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+
+	<string id="st_shovel_sharp">
+		<text>Заточенная лопата</text>
+	</string>
+	<string id="st_shovel_sharp_descr">
+		<text>Заточенная лопата из черного металла. Кажется не очень прочным, но он определенно острый. \n \n
+		%c[d_orange]СВОЙСТВА: \n
+		%c[d_blue] • %c[ui_gray_2] Холодное оружие\n
+		%c[pda_green] • %c[pda_green] подходит для разделки тонкокожих мутантов \n
+		%c[d_red] • %c[d_red] не подходит для разделки толстокожих мутантов \n \n</text>
+	</string>
+
+	<string id="st_sledge_hammer">
+		<text>Кувалда</text>
+	</string>
+	<string id="st_sledge_hammer_descr">
+		<text>Тупая, тяжелая промышленная кувалда. Когда-то этот инструмент использовался для возведения зданий вокруг нас, а теперь используется для того, чтобы разбивать головы тем, кто сидит на корточках внутри. \n \n
+		%c[d_orange]СВОЙСТВА: \n
+		%c[d_blue] • %c[ui_gray_2] Холодное оружие\n
+		%c[pda_green] • %c[pda_green] подходит для разделки тонкокожих мутантов \n
+		%c[d_red] • %c[d_red] не подходит для разделки толстокожих мутантов \n \n</text>
+	</string>
+
+	<string id="st_sharpen_shovel">
+		<text>Заточить лопату</text>
+	</string>
+
+</string_table>

@@ -1,0 +1,230 @@
+-- load-order: after ui_options, ui_item, ui_inventory
+-- Fix: language switch mid-session / in main menu leaves UI string caches stale
+-- and skips on_localization_change when level is not present.
+
+local VERSION = "1.0.0"
+local LOG_TAG = "[fix_localization_reload]"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local installed = false
+local orig_func_localization = nil
+local orig_get_sec_name = nil
+local orig_get_sec_short_name = nil
+local orig_get_sec_desc = nil
+local orig_item_name = nil
+local orig_item_description = nil
+
+-- Bump on every localization change; wrappers bust ui_item private caches.
+local loc_gen = 0
+local busted_gen = -1
+
+local function read_language()
+	local ok, ini = pcall(ini_file_ex, "localization.ltx", true)
+	if not ok or not ini then
+		return nil
+	end
+	local ok2, val = pcall(function()
+		return ini:r_value("string_table", "language")
+	end)
+	if ok2 then
+		return val
+	end
+	return nil
+end
+
+local function bust_ui_item_sec_caches()
+	if busted_gen == loc_gen then
+		return
+	end
+	busted_gen = loc_gen
+	local sentinel = "__fix_localization_reload_bust__"
+	if orig_get_sec_name then
+		pcall(orig_get_sec_name, sentinel)
+	end
+	if orig_get_sec_short_name then
+		pcall(orig_get_sec_short_name, sentinel)
+	end
+	if orig_get_sec_desc then
+		pcall(orig_get_sec_desc, sentinel)
+	end
+end
+
+local function refresh_inventory_module_strings()
+	if not (ui_inventory and game and game.translate_string) then
+		return
+	end
+	-- st_perc is a module global in ui_inventory.script (not local).
+	local ok, value = pcall(game.translate_string, "st_perc")
+	if ok and value then
+		ui_inventory.st_perc = value
+	end
+end
+
+local function on_localization_change()
+	loc_gen = loc_gen + 1
+	busted_gen = -1
+
+	if ui_item and type(ui_item.refresh_strings) == "function" then
+		pcall(ui_item.refresh_strings)
+	end
+
+	bust_ui_item_sec_caches()
+	refresh_inventory_module_strings()
+end
+
+local function patched_func_localization(...)
+	local lang_before = read_language()
+	if orig_func_localization then
+		orig_func_localization(...)
+	end
+	local lang_after = read_language()
+	if lang_before == lang_after then
+		return
+	end
+	-- Vanilla only SendScriptCallback when level.present(); fire in main menu too.
+	-- In-level vanilla already sent the callback — avoid a second blast.
+	if level and level.present and level.present() then
+		return
+	end
+	if SendScriptCallback then
+		pcall(SendScriptCallback, "on_localization_change")
+	end
+end
+
+local function patched_get_sec_name(sec)
+	bust_ui_item_sec_caches()
+	return orig_get_sec_name(sec)
+end
+
+local function patched_get_sec_short_name(sec)
+	bust_ui_item_sec_caches()
+	return orig_get_sec_short_name(sec)
+end
+
+local function patched_get_sec_desc(sec)
+	bust_ui_item_sec_caches()
+	return orig_get_sec_desc(sec)
+end
+
+-- Engine item_name/item_description keep last_*_id locals that refresh_strings
+-- does not clear. Rebuild live so a language switch cannot return the old tongue.
+local function patched_item_name(obj, str)
+	if not obj then
+		return ""
+	end
+	if ui_item and ui_item.build_name_first and ui_item.build_name_last then
+		local sec = obj:section()
+		str = ui_item.build_name_first(obj, sec, str)
+		str = ui_item.build_name_last(obj, sec, str)
+		return str or ""
+	end
+	if orig_item_name then
+		return orig_item_name(obj, str)
+	end
+	return str or ""
+end
+
+local function patched_item_description(obj, str)
+	if not obj then
+		return ""
+	end
+	if ui_item and ui_item.build_desc_header and ui_item.build_desc_footer then
+		local sec = obj:section()
+		str = ui_item.build_desc_header(obj, sec, str)
+		str = ui_item.build_desc_footer(obj, sec, str)
+		return str or ""
+	end
+	if orig_item_description then
+		return orig_item_description(obj, str)
+	end
+	return str or ""
+end
+
+local function install()
+	if installed then
+		return
+	end
+
+	if not (ui_options and type(ui_options.func_localization) == "function") then
+		printf("%s guard NOT installed: ui_options.func_localization not found", LOG_TAG)
+		return
+	end
+	if not (ui_item and type(ui_item.refresh_strings) == "function") then
+		printf("%s guard NOT installed: ui_item.refresh_strings not found", LOG_TAG)
+		return
+	end
+
+	orig_func_localization = ui_options.func_localization
+	ui_options.func_localization = patched_func_localization
+
+	orig_get_sec_name = ui_item.get_sec_name
+	orig_get_sec_short_name = ui_item.get_sec_short_name
+	orig_get_sec_desc = ui_item.get_sec_desc
+	orig_item_name = ui_item.item_name
+	orig_item_description = ui_item.item_description
+
+	if type(orig_get_sec_name) == "function" then
+		ui_item.get_sec_name = patched_get_sec_name
+	end
+	if type(orig_get_sec_short_name) == "function" then
+		ui_item.get_sec_short_name = patched_get_sec_short_name
+	end
+	if type(orig_get_sec_desc) == "function" then
+		ui_item.get_sec_desc = patched_get_sec_desc
+	end
+	if type(orig_item_name) == "function" then
+		ui_item.item_name = patched_item_name
+	end
+	if type(orig_item_description) == "function" then
+		ui_item.item_description = patched_item_description
+	end
+
+	RegisterScriptCallback("on_localization_change", on_localization_change)
+	installed = true
+	printf("%s installed", LOG_TAG)
+end
+
+local function uninstall()
+	if not installed then
+		return
+	end
+	UnregisterScriptCallback("on_localization_change", on_localization_change)
+
+	if ui_options and orig_func_localization then
+		ui_options.func_localization = orig_func_localization
+	end
+	if ui_item then
+		if orig_get_sec_name then
+			ui_item.get_sec_name = orig_get_sec_name
+		end
+		if orig_get_sec_short_name then
+			ui_item.get_sec_short_name = orig_get_sec_short_name
+		end
+		if orig_get_sec_desc then
+			ui_item.get_sec_desc = orig_get_sec_desc
+		end
+		if orig_item_name then
+			ui_item.item_name = orig_item_name
+		end
+		if orig_item_description then
+			ui_item.item_description = orig_item_description
+		end
+	end
+
+	orig_func_localization = nil
+	orig_get_sec_name = nil
+	orig_get_sec_short_name = nil
+	orig_get_sec_desc = nil
+	orig_item_name = nil
+	orig_item_description = nil
+	installed = false
+end
+
+function on_game_start()
+	install()
+end
+
+function on_game_end()
+	uninstall()
+end
