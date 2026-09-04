@@ -78,7 +78,7 @@ python3 tools/build_addon.py my_fix_weapon_jam --zip
 | `tools/check_encoding.ps1 <folder>` | отчёт по кодировке `.script`/`.ltx`/`.xml`/`.txt`/`.ini`/`.seq` в папке: ascii, cp1251 или utf-8, плюс BOM |
 | `tools/dds_tool.ps1 decode\|encode` | DDS ↔ PNG для UI-иконок: DXT1/DXT5 и несжатый A8R8G8B8; encode пишет DXT5 без мипов |
 | `tools/draw_cmo_unique_icons.ps1` | рисует уникальные 64×64 силуэты CMO и кодирует их в DXT5 DDS через `dds_tool.ps1` |
-| `tools/check_changelog_tools.py` | падает, если в диффе `CHANGELOG.md` есть путь `tools/`, а файлы в `tools/` не менялись |
+| `tools/check_changelog_tools.py` | падает, если в диффе `CHANGELOG.md` есть путь `tools/` без пометки `(tools-ref)` в конце строки, а файлы в `tools/` не менялись; `(tools-ref)` — ссылка на инструмент, не правка (как `-- load-order:` для ORDER-002) |
 | `tools/pack_bhs.py` | собирает zip Anthology Busy Hands Stability Fix из `reference/` + оверлеи `addon/anthology_busyhands_stability_fix` |
 | `tools/_pack_kristiano_aio.py` | одноразовый пакер: zip `[DBG] Kristiano Fixes ALL IN ONE` из всех модов в `addon/` с `gamedata/` (кроме трёх отдельных и снятого `fix_bhs_fdda_loot`) плюс три отдельных архива — Context Menu Overhaul, QuickQK Task Complete, ST2 Footstep — в `build/` |
 

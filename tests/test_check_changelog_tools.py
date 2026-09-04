@@ -39,6 +39,7 @@ class CheckLogicTests(unittest.TestCase):
         msg = guard.check(["CHANGELOG.md", "docs/plans/crash.md"], diff)
         self.assertIsNotNone(msg)
         self.assertIn("tools/", msg)
+        self.assertIn(guard.TOOLS_REF_MARK, msg)
 
     def test_ok_when_tools_also_changed(self):
         diff = unified(["`tools/xraylog.py`: заголовок группы не из abort()."])
@@ -54,6 +55,58 @@ class CheckLogicTests(unittest.TestCase):
         diff = unified(["`tools/foo.py` неважно: файл не в списке изменений."])
         msg = guard.check(["tools/foo.py"], diff)
         self.assertIsNone(msg)
+
+    def test_tools_ref_marker_allows_mention_without_tools_change(self):
+        """Ссылка на инструмент с (tools-ref) — не заявление о правке."""
+        diff = unified(
+            [
+                "поиск по эталону через `tools/refindex.py`, "
+                "не через семантический индекс Cursor. (tools-ref)"
+            ]
+        )
+        files = [
+            "CHANGELOG.md",
+            ".cursorignore",
+            "AGENTS.md",
+            ".cursor/rules/anomaly-core.mdc",
+        ]
+        self.assertIsNone(guard.check(files, diff))
+
+    def test_tools_claim_without_marker_still_fails(self):
+        """Правка tools/ в тексте без (tools-ref) и без изменений в tools/ — ошибка."""
+        diff = unified(["`tools/check_changelog_tools.py`: подавление ложных срабатываний."])
+        msg = guard.check(["CHANGELOG.md", "tests/test_check_changelog_tools.py"], diff)
+        self.assertIsNotNone(msg)
+        self.assertIn("tools/", msg)
+
+    def test_tools_ref_marker_must_be_at_line_end(self):
+        diff = unified(["(tools-ref) см. `tools/refindex.py` в середине."])
+        msg = guard.check(["CHANGELOG.md"], diff)
+        self.assertIsNotNone(msg)
+
+    def test_df81d5f_wording_with_marker_passes(self):
+        """Текст записи 0.1.55 (коммит df81d5f) + (tools-ref) — guard молчит."""
+        line = (
+            "`.cursorignore`: каталог `reference/` (~14k файлов) исключён целиком — "
+            "поиск по эталону через `tools/refindex.py`, не через семантический индекс "
+            "Cursor; `logs/cards/` тоже вне индекса (чтение адресно при `/crash`). "
+            "Убраны `!reference/**` и бинарные исключения внутри `reference/`. "
+            "Правила и команды: `anomaly-core`, `no-hallucinated-api`, "
+            "`workflow-fix`/`workflow-addon`, `/crash`, зеркало в `AGENTS.md` — явно "
+            "`refindex.py` / адресный Read, без семантического обхода `reference/`. "
+            "(tools-ref)"
+        )
+        files = [
+            ".cursor/commands/crash.md",
+            ".cursor/rules/anomaly-core.mdc",
+            ".cursor/rules/no-hallucinated-api.mdc",
+            ".cursor/rules/workflow-addon.mdc",
+            ".cursor/rules/workflow-fix.mdc",
+            ".cursorignore",
+            "AGENTS.md",
+            "CHANGELOG.md",
+        ]
+        self.assertIsNone(guard.check(files, unified([line])))
 
     def test_plus_plus_plus_header_is_not_an_added_line(self):
         diff = "+++ b/CHANGELOG.md\n--- a/CHANGELOG.md\n@@ -1 +1 @@\n правило XML\n"

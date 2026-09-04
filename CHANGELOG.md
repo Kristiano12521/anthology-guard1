@@ -2,9 +2,13 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.56] — check_changelog_tools: ссылка ≠ правка
+
+`tools/check_changelog_tools.py`: путь `tools/` в добавленной строке CHANGELOG без изменений под `tools/` больше не валит сборку, если в конце строки стоит `(tools-ref)` — явная пометка «ссылка на инструмент, не правка» (как `-- load-order:` для ORDER-002). Без пометки прежнее поведение. Ложное срабатывание на [0.1.55] (упоминание `tools/refindex.py` как маршрута поиска) — причина правки. Тесты на оба случая и на формулировку df81d5f; README.
+
 ## [0.1.55] — reference/ и logs/cards/ вне индекса Cursor
 
-`.cursorignore`: каталог `reference/` (~14k файлов) исключён целиком — поиск по эталону через `tools/refindex.py`, не через семантический индекс Cursor; `logs/cards/` тоже вне индекса (чтение адресно при `/crash`). Убраны `!reference/**` и бинарные исключения внутри `reference/`. Правила и команды: `anomaly-core`, `no-hallucinated-api`, `workflow-fix`/`workflow-addon`, `/crash`, зеркало в `AGENTS.md` — явно `refindex.py` / адресный Read, без семантического обхода `reference/`.
+`.cursorignore`: каталог `reference/` (~14k файлов) исключён целиком — поиск по эталону через `tools/refindex.py`, не через семантический индекс Cursor; `logs/cards/` тоже вне индекса (чтение адресно при `/crash`). Убраны `!reference/**` и бинарные исключения внутри `reference/`. Правила и команды: `anomaly-core`, `no-hallucinated-api`, `workflow-fix`/`workflow-addon`, `/crash`, зеркало в `AGENTS.md` — явно `refindex.py` / адресный Read, без семантического обхода `reference/`. (tools-ref)
 
 ## [0.1.54] — pack_separate: отказ без gamedata/
 

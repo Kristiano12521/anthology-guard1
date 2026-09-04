@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
-"""Падает, если CHANGELOG описывает tools/, а файлы в tools/ не менялись.
+"""Падает, если CHANGELOG описывает правку tools/, а файлы в tools/ не менялись.
 
     python tools/check_changelog_tools.py
     python tools/check_changelog_tools.py --base origin/main
 
 Смотрит добавленные строки диффа CHANGELOG.md (не весь файл: в истории
-tools/ упоминается часто). Нужен git.
+tools/ упоминается часто). Строка с пометкой (tools-ref) в конце — ссылка
+на инструмент, не заявление о правке (как -- load-order: для ORDER-002).
+Нужен git.
 """
 
 from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -24,6 +27,9 @@ NULL_SHA = "0" * 40
 CHANGELOG = "CHANGELOG.md"
 # Путь tools/... — не слово «инструменты» и не docs/tools.md без слэша.
 TOOLS_PATH = "tools/"
+# Явное подавление: путь tools/ в строке — ссылка, не правка.
+TOOLS_REF_MARK = "(tools-ref)"
+TOOLS_REF_RE = re.compile(r"\(tools-ref\)\s*$")
 
 
 def posix(path: str) -> str:
@@ -53,8 +59,20 @@ def tools_in(changed_files: list[str]) -> bool:
     return False
 
 
+def is_tools_ref_line(line: str) -> bool:
+    """Строка помечена как ссылка на tools/, не как правка."""
+    return bool(TOOLS_REF_RE.search(line.rstrip()))
+
+
 def mentions_tools(lines: list[str]) -> bool:
-    return any(TOOLS_PATH in line for line in lines)
+    """True, если есть путь tools/ без пометки (tools-ref)."""
+    for line in lines:
+        if TOOLS_PATH not in line:
+            continue
+        if is_tools_ref_line(line):
+            continue
+        return True
+    return False
 
 
 def check(changed_files: list[str], changelog_diff: str) -> str | None:
@@ -68,7 +86,8 @@ def check(changed_files: list[str], changelog_diff: str) -> str | None:
     return (
         "CHANGELOG.md в этом диапазоне описывает путь tools/, "
         "но ни один файл под tools/ не менялся. "
-        "Либо поправь tools/, либо не пиши в CHANGELOG про несделанное."
+        "Либо поправь tools/, либо не пиши в CHANGELOG про несделанное, "
+        f"либо пометь ссылку `{TOOLS_REF_MARK}` в конце строки."
     )
 
 
@@ -108,7 +127,10 @@ def changelog_diff(repo: Path, base: str, head: str) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="CHANGELOG.md не должен описывать tools/, если tools/ не менялся"
+        description=(
+            "CHANGELOG.md не должен описывать правку tools/, если tools/ не менялся "
+            f"(ссылка — `{TOOLS_REF_MARK}` в конце строки)"
+        )
     )
     parser.add_argument("--base", help="git ref левой стороны (иначе CHECK_CHANGELOG_BASE или HEAD~1)")
     parser.add_argument("--head", default="HEAD")
