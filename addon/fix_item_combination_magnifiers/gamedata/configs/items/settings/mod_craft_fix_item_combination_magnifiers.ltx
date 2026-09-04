@@ -1,8 +1,14 @@
-; R.A.K 3DSS mod_craft_magnifiers: magnifier/e0t2/uh2 are scope slots, not item sections.
-; itms_manager rejects all four lines at startup (!ERROR item_combination | wrong section names).
-
-![item_combination]
-!magnifier:e0t2
-!e0t2:magnifier
-!magnifier:uh2
-!uh2:magnifier
+; WITHDRAWN 1.1.0 — DLTX ! does not remove keys with ':' in the name.
+; Measured 04.09.2026 (Anthology 2.1 / Modded Exes MT):
+;   run_string printf("ic_keys=%s", tostring(itms_manager.ini_craft:line_count("item_combination")))
+;     -> ic_keys=10
+;   run_string printf("mag_e0t2=%s", tostring(itms_manager.ini_craft:line_exist("item_combination","magnifier:e0t2")))
+;     -> mag_e0t2=true
+; Inactive on purpose. Do not VFS-replace R.A.K mod_craft_magnifiers.ltx.
+;
+; Former (ineffective) patch kept for history:
+; ![item_combination]
+; !magnifier:e0t2
+; !e0t2:magnifier
+; !magnifier:uh2
+; !uh2:magnifier

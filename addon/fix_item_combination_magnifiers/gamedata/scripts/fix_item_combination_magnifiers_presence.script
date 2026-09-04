@@ -1,6 +1,32 @@
--- xraylog presence (dltx/data-only).
+-- fix_item_combination_magnifiers (WITHDRAWN)
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- v1.0.0: DLTX ![item_combination] + !magnifier:e0t2 (and mirrors).
+-- Measured 04.09.2026: ic_keys=10, mag_e0t2=true — DLTX ! does not remove
+-- keys that contain ':' in the name. VFS override of R.A.K mod_craft_magnifiers.ltx
+-- refused (would mask upstream updates). Upstream fix required.
 
 local LOG_TAG = "[fix_item_combination_magnifiers]"
-local VERSION = "1.0.0"
+local VERSION = "1.1.0"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local installed = false
+
+local function install()
+	if installed then
+		return
+	end
+	installed = true
+	printf(
+		"%s guard NOT installed v%s (WITHDRAWN): DLTX ! does not remove keys containing ':' (magnifier:e0t2 still in assembled item_combination after !magnifier:e0t2); no VFS override of R.A.K mod_craft_magnifiers.ltx; upstream fix required",
+		LOG_TAG,
+		VERSION
+	)
+end
+
+function on_game_start()
+	install()
+end
+
+install()
