@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.55] — reference/ и logs/cards/ вне индекса Cursor
+
+`.cursorignore`: каталог `reference/` (~14k файлов) исключён целиком — поиск по эталону через `tools/refindex.py`, не через семантический индекс Cursor; `logs/cards/` тоже вне индекса (чтение адресно при `/crash`). Убраны `!reference/**` и бинарные исключения внутри `reference/`. Правила и команды: `anomaly-core`, `no-hallucinated-api`, `workflow-fix`/`workflow-addon`, `/crash`, зеркало в `AGENTS.md` — явно `refindex.py` / адресный Read, без семантического обхода `reference/`.
+
 ## [0.1.54] — pack_separate: отказ без gamedata/
 
 `pack_separate` больше не собирает zip из одного `BUILD_INFO.txt`: нет `gamedata/` или она пуста → `SystemExit` с именем мода. Фикстура `test_pack_kristiano_aio` создаёт `campfires_anthology_compat` (добавлен в `SEPARATE`, структура как у остальных separate). Тест на отказ без/с пустой `gamedata/`.

@@ -1,10 +1,18 @@
 # Распакованные чужие моды для ревью: не индексировать, чтобы не конкурировать с addon/.
 _tmp_*/
 
+# Эталон сборки (~14k файлов). Поиск по API/секциям/callback — через
+# tools/refindex.py (индекс в .cache/), не через семантический индекс Cursor.
+# Файлы по пути из refindex читать адресно (Read / shell).
+reference/
+
 # Сырые логи игры и одноразовая карточка xraylog — не исходники, часто с локальными путями.
-# Архив logs/cards/ не исключаем: это поисковая база разборов.
 logs/*.log
 logs/card.md
+
+# Архив карточек разбора: нужны только при /crash, тогда читать адресно
+# (ссылка из docs/issues.md или путь от --archive), не через индекс.
+logs/cards/
 
 # Кэш инструментов (индекс reference/ и прочее).
 .cache/
@@ -12,19 +20,10 @@ logs/card.md
 # Собранные моды для MO2, руками не правятся.
 build/
 
-# reference/ в .gitignore, но агенту он нужен как эталон — не исключаем целиком.
-!reference/
-!reference/**
-
-# Бинарники в addon/ и reference/: текстуры, звуки, спавн, секвенции.
+# Бинарники в addon/: текстуры, звуки, спавн, секвенции.
 # Тексты (.script, .ltx, .xml) остаются в индексе.
 addon/**/*.dds
 addon/**/*.png
 addon/**/*.ogg
 addon/**/*.bin
 addon/**/*.seq
-reference/**/*.dds
-reference/**/*.png
-reference/**/*.ogg
-reference/**/*.bin
-reference/**/*.seq

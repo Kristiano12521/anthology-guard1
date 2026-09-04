@@ -24,7 +24,7 @@
 
 ## Порядок работы
 
-1. Исследование `reference/` → 2. план текстом → 3. правка → 4. проверка мест вызова → 5. `tools/lint_addon.py`.
+1. Исследование эталона через `tools/refindex.py` (не семантический поиск по `reference/`) → 2. план текстом → 3. правка → 4. проверка мест вызова → 5. `tools/lint_addon.py`.
 
 Подробные плейбуки: `docs/plans/fix.md`, `docs/plans/addon.md`, `docs/plans/crash.md`.
 
