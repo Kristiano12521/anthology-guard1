@@ -1,7 +1,21 @@
 ; Grifon visibility — patch ano_smart_terrain_6_2_smart_logic.ltx
-; Why: dedicated stay_wall cover can cull the rendered model on Anthology 2.1 / MT
-;      while the NPC stays interactive. xr_animpoint ignores cover associations when
-;      avail_animations is set (same override as [animpoint@resting] on the mechanic).
+; Why: stay_wall animpoint snaps the NPC into the cover facing the wall
+;      (and can cull the mesh). Leave the cover; stand via remark instead.
 
+![logic@merc_pri_grifon_mlr]
+active = remark@grifon_stand
+
+[remark@grifon_stand]
+anim = wait
+target = story | actor
+meet = meet
+combat_ignore_cond = {=is_warfare} false, {=actor_true_enemy =check_enemy_name(actor)} false, true
+combat_ignore_keep_when_attacked = {=is_warfare} false, true
+invulnerable = {=is_warfare} false, {!actor_true_enemy} true, false
+gather_items_enabled = false
+help_wounded_enabled = false
+corpse_detection_enabled = false
+
+; Old saves restore active_section = animpoint@base — leave that cover immediately.
 ![animpoint@base]
-avail_animations = wait
+on_info = remark@grifon_stand

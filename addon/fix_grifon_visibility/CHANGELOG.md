@@ -1,5 +1,33 @@
 # Grifon Visibility Fix
 
+## [1.1.0] — 2026-09-04
+
+**Изменено**
+
+- `mod_ano_smart_terrain_6_2_smart_logic_fix_grifon_visibility.ltx` — `logic@merc_pri_grifon_mlr.active` → `remark@grifon_stand` (`anim = wait`, `target = story | actor`); `animpoint@base` получает `on_info = remark@grifon_stand` для старых сейвов.
+- Presence-скрипт / `meta.ini` → v1.1.0.
+
+**Причина**
+
+`avail_animations = wait` (1.0.0) убирал lean `stay_wall`, но `action_animpoint:execute` по-прежнему snap’ил NPC в позицию/направление кавера — лицом в стену без lean. Нужно уйти с animpoint-кавера.
+
+**Не затронуто**
+
+- общий `[meet]`, механик, торговец, kamp_1..7
+- visual, story_id, сквад, диалоги
+- `pri_a_18_smart_mlr_logic.ltx`, `all.spawn`, `xr_animpoint.script`
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без отдельной миграции. Старый `active_section = animpoint@base` переключается на remark через `on_info`
+- В MO2 ниже сборки; полную подмену `ano_smart_terrain_6_2_smart_logic.ltx` (ZIP v1.0.4 / копия в `[DBG] Kristiano`) выключить
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_grifon_visibility` (0 ошибок; VERIFY-001 — ждать игры)
+- В игре: не прогонялось. На Аномальном лесу Грифон должен стоять с idle `wait`, смотреть на актора, без snap в стену
+
 ## [1.0.0] — 2026-08-29
 
 **Изменено**

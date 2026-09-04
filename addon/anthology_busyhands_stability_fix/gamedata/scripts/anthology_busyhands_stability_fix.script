@@ -1,4 +1,5 @@
--- Anthology Busy Hands Stability Fix v0.6.7
+-- Anthology Busy Hands Stability Fix v0.6.10
+-- v0.6.10: bind arti_outfits helpers in repair recursion reconstruct (has_parts nil CTD).
 --
 -- v0.6.7: find_close_cover logs one "patched via <path>" line (log only).
 -- v0.6.6: repair capture marker on env and _G; recursion-fix reads both.
@@ -17,7 +18,7 @@
 -- documented full-file exceptions (mon_sleep, guaranteed_loot,
 -- sequential_load_magazine).
 
-local VERSION = "0.6.7"
+local VERSION = "0.6.10"
 local installed = false
 
 local function safe_object_id(obj)

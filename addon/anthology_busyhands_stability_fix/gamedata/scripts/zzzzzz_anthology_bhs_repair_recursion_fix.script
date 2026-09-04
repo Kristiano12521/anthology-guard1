@@ -30,10 +30,55 @@
 -- ресурса по фиксированному пути, не логика - воспроизведена как есть.
 -- outfit_repair.script вообще не имеет ни одного top-level local (проверено).
 
-local VERSION = "0.6.6"
+local VERSION = "0.6.10"
 ANTHOLOGY_BHS_REPAIR_CHAIN_PATCH_VERSION = VERSION
 
 local ini_custom_repair = ini_file("repair\\importer.ltx")
+
+-- Outfit Parts helpers live in arti_outfits / zzzzz_arti_outfit_repair env,
+-- not on _G. Bare names here resolve to nil (CTD on knife sharpen etc.).
+local math_floor = math.floor
+local has_parts, tier_outfit, rank_component
+local get_max_condition, get_projected_max, average_cond
+local print_dbg, get_config, generate_readout
+
+local function resolve_outfit_helpers()
+	local ao = arti_outfits
+	if type(ao) ~= "table" then
+		return "arti_outfits"
+	end
+	has_parts = ao.has_parts
+	tier_outfit = ao.tier_outfit
+	rank_component = ao.rank_component
+	get_max_condition = ao.get_max_condition
+	get_projected_max = ao.get_projected_max
+	average_cond = ao.average_cond
+	print_dbg = ao.print_dbg
+	if type(has_parts) ~= "function"
+		or type(tier_outfit) ~= "function"
+		or type(rank_component) ~= "function"
+		or type(get_max_condition) ~= "function"
+		or type(get_projected_max) ~= "function"
+		or type(average_cond) ~= "function" then
+		return "arti_outfits helpers"
+	end
+	if type(print_dbg) ~= "function" then
+		print_dbg = function() end
+	end
+	local mcm = arti_outfits_mcm
+	if type(mcm) == "table" and type(mcm.get_config) == "function" then
+		get_config = mcm.get_config
+	else
+		get_config = function() return false end
+	end
+	local orp = zzzzz_arti_outfit_repair
+	if type(orp) == "table" and type(orp.generate_readout) == "function" then
+		generate_readout = orp.generate_readout
+	else
+		generate_readout = function() return "" end
+	end
+	return nil
+end
 
 -- Реконструкция jamming_repairs.script:OnItemSelect (J'), с явным
 -- параметром next_fn вместо чтения сломанного глобала.
@@ -165,6 +210,12 @@ local function read_vendor_base()
 end
 
 local function install()
+	local missing = resolve_outfit_helpers()
+	if missing then
+		printf("[BusyHandsFix v%s] outfit helpers missing (%s) - repair chain fix NOT installed", VERSION, missing)
+		return false
+	end
+
 	local vendor_base = read_vendor_base()
 	if type(vendor_base) ~= "function" then
 		printf("[BusyHandsFix v%s] vendor base OnItemSelect was not captured (load-order marker missing) - repair chain fix NOT installed, recursion bug remains", VERSION)

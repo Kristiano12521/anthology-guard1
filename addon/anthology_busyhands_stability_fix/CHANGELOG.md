@@ -1,5 +1,29 @@
 # Anthology Busy Hands Stability Fix
 
+## [0.6.10] — 2026-09-04
+
+**Изменено**
+
+- `zzzzzz_anthology_bhs_repair_recursion_fix.script` — хелперы Outfit Parts (`has_parts`, `tier_outfit`, `rank_component`, `get_max_condition`, `get_projected_max`, `average_cond`, `print_dbg`, `get_config`, `generate_readout`, `math_floor`) резолвятся из `arti_outfits` / `arti_outfits_mcm` / `zzzzz_arti_outfit_repair` перед установкой цепочки; при отсутствии — guard и `NOT installed`.
+
+**Причина**
+
+Реконструкт `OnItemSelect` вызывал голые имена, которые в `zzzzz_arti_outfit_repair` живут в env модуля (`has_parts = arti_outfits.has_parts`), а не в `_G`. При заточке ножа / швейки — `attempt to call global 'has_parts' (a nil value)` (лог `xray_aleks`).
+
+**Не затронуто**
+
+- Вендорские `zzzzz_arti_outfit_repair` / `zzzz_arti_jamming_repairs`, capture vendor base, сейвы, `verified_*`.
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+
+**Проверено**
+
+- `lint_addon.py` и `--cross`
+- В игре: не проверено (нужна заточка ножа / швейки / точильный камень и ремонт брони с частями)
+
 ## [0.6.9] — 2026-09-01
 
 **Изменено**

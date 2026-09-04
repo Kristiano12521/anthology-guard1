@@ -84,8 +84,12 @@ def latest_individual_zips(build_dir: Path) -> list[Path]:
         if prev is None or path.stat().st_mtime >= prev.stat().st_mtime:
             latest[mod_id] = path
 
-    bhs = build_dir / "Anthology_BusyHands_Stability_Fix_v0_6_9.zip"
-    if bhs.is_file():
+    bhs_candidates = sorted(
+        build_dir.glob("Anthology_BusyHands_Stability_Fix_v*.zip"),
+        key=lambda path: path.stat().st_mtime,
+    )
+    bhs = bhs_candidates[-1] if bhs_candidates else None
+    if bhs is not None and bhs.is_file():
         latest["anthology_busyhands_stability_fix"] = bhs
 
     return sorted(latest.values(), key=lambda p: p.name.lower())
@@ -136,7 +140,7 @@ def write_changelog(count: int) -> str:
         "- Корень: AIO + 3 отдельных MO2-мода (CMO, QuickQK, ST2)\n"
         f"- individual/: {count} отдельных zip — каждый со своим CHANGELOG.md\n"
         "- README_RU.txt, CHANGELOG.txt, individual/INDEX.txt\n\n"
-        "AIO: 54 аддона, 161 файл gamedata, BHS v0.6.9 внутри.\n"
+        "AIO: 54 аддона, 161 файл gamedata, BHS v0.6.10 внутри.\n"
     )
 
 
