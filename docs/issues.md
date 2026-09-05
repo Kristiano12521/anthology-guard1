@@ -27,3 +27,9 @@
 - **?** · `action_name CONTACTS/MAP` (ожидание **500 → 4**, раскладка) · **в репозитории данных нет**: ни в `logs/cards/`, ни в CHANGELOG, ни в pitfalls · итог из запроса («раскладка») здесь не подтверждён источниками
 
 - **2026-08-31** · `![axr_main callback_set] callback on_game_end doesn't exist!` · `RegisterScriptCallback("on_game_end")` — такого callback нет; `on_game_end` — точка входа скрипта · у **нашего** Seamless убрано в **1.5.6**; остаток в логах — **чужие** моды · [2026-08-31_xray_mg9000.md](../logs/cards/2026-08-31_xray_mg9000.md) (ещё наши скрипты до фикса) · [pitfalls §16](pitfalls.md) · подробности: `addon/seamless_inventory_sort_anthology/CHANGELOG.md` [1.5.6]
+
+- **2026-09-05** · `ItemProcessor | section [ammo_23_igi_eco] doesn't exist!` + `WTF ERROR: Task crashed` (`communitytracking_shot`) · WTF Community Task Pack ([Igigog/community-task-pack](https://github.com/Igigog/community-task-pack)), в Anthology влит кусками в `[QUE] wtf 4_2` · **нашего фикса нет** (вылет и так глотает WTF; `fix_wtf_taskboard_guard` только проясняет причину); обход: MCM `igi_tasks/community/tracking_shot/disabled` · [2026-09-05_xray_nikit.md](../logs/cards/2026-09-05_xray_nikit.md) · [pitfalls §18](pitfalls.md)
+
+- **2026-09-05** · `Failed to render dynamic wallmark` (×1047) · движок / пул вальмарок · **игнор / настройка**: снизить `r__wallmark_ttl` (в сессии было 250) · [2026-09-05_xray_nikit.md](../logs/cards/2026-09-05_xray_nikit.md) · pitfalls — нет
+
+- **2026-09-05** · `[player_hud::StopScriptAnim()] invalid script_anim_part 255, must be < 3` (×32) · `[TMA] FDDA Redone` `actor_effects` (`stop_hud_motion` на `actor_on_first_update`) · **к авторам FDDA** / игнор · [2026-09-05_xray_nikit.md](../logs/cards/2026-09-05_xray_nikit.md) · pitfalls — нет

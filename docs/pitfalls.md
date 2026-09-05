@@ -133,6 +133,19 @@ run_string for name,_ in pairs(db.actor_inside_zones or {}) do printf("inside_zo
 
 Контракт (`.cursor/rules/anomaly-lua.mdc`): безусловная presence-строка при загрузке файла; каждый ранний `return` из `install()` — `printf` с причиной. Образец: `aaa_fix_trader_restock_callback` (top-level), `fix_charon_red_forest_travel` (`guard NOT installed`).
 
+## 18. Неполный WTF task pack: квест на доске без секций предметов
+
+Симптом в логе при `accept_task`:
+
+```
+! ItemProcessor | section [<имя>] doesn't exist!
+WTF ERROR: Task crashed
+```
+
+JSON квеста лежит в `configs/igi_tasks/tasks/…`, задание появляется на PDA-доске, но LTX с секциями предметов не попал в `ini_sys` (нет файла, нет ассетов pack’а, или нет `#include` / `mod_system_*`-моста). Пример 05.09.2026: `ammo_23_igi_eco` / `communitytracking_shot` — Community Task Pack ([Igigog/community-task-pack](https://github.com/Igigog/community-task-pack)), в Anthology только куски внутри `[QUE] wtf 4_2`.
+
+Проверять не только JSON, но и секции в LTX плюс что они реально грузятся (`ini_sys:section_exist`). CTD от такой ошибки обычно нет: WTF глотает сбой квеста сам; `fix_wtf_taskboard_guard` лишь делает причину читаемой. Обход для tracking_shot: MCM `igi_tasks/community/tracking_shot/disabled`.
+
 ## Открытые вопросы
 
 Сюда пишем то, что пока не проверено на этой сборке, чтобы не выдавать за факт:
