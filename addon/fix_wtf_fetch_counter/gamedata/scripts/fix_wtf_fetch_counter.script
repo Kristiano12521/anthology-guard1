@@ -1,0 +1,123 @@
+-- WTF fetch item counter PDA fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- igi_description.get_description caches CACHE.description once. Fetch targets
+-- with MCM utjan_fetch_thing bake "(You have N)" into that cache on first draw,
+-- usually while N is still 0. ready_to_finish keeps recounting inventory, so
+-- turn-in works and the PDA counter stays frozen (and can survive save/load).
+--
+-- This addon does not replace WTF files. It wraps get_description and clears
+-- CACHE.description only for tasks that still need a live Fetch counter.
+
+local LOG_TAG = "[fix_wtf_fetch_counter]"
+local VERSION = "1.0.0"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local orig = {}
+local installed = false
+local callbacks_registered = false
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function desc_table()
+	local ns = rawget(_G, "igi_description")
+	if type(ns) == "table" and type(ns.get_description) == "function" then
+		return ns
+	end
+	return nil
+end
+
+local function entity_is_fetch(entity)
+	if type(entity) ~= "table" then
+		return false
+	end
+	local controller = entity.CONTROLLER
+	if type(controller) == "string" then
+		return string.find(controller, "igi_target_fetch.Fetch", 1, true) ~= nil
+	end
+	if type(controller) == "table" then
+		local fetch_ns = rawget(_G, "igi_target_fetch")
+		return fetch_ns ~= nil and controller == fetch_ns.Fetch
+	end
+	return false
+end
+
+local function needs_live_fetch_counter(CACHE)
+	if type(CACHE) ~= "table" or type(CACHE.entities) ~= "table" then
+		return false
+	end
+
+	local mcm = rawget(_G, "igi_mcm")
+	if not (mcm and type(mcm.get_options_value) == "function") then
+		return false
+	end
+	if not mcm.get_options_value("utjan_fetch_thing") then
+		return false
+	end
+
+	for _, entity in pairs(CACHE.entities) do
+		if type(entity) == "table" and entity.to_description and entity_is_fetch(entity) then
+			return true
+		end
+	end
+	return false
+end
+
+local function patched_get_description(CACHE)
+	if needs_live_fetch_counter(CACHE) then
+		CACHE.description = nil
+	end
+	return orig.get_description(CACHE)
+end
+
+local function install()
+	if installed then
+		return true
+	end
+
+	local desc = desc_table()
+	if not desc then
+		printf("%s igi_description.get_description not found - guard NOT installed", LOG_TAG)
+		return false
+	end
+
+	orig.get_description = desc.get_description
+	desc.get_description = patched_get_description
+	installed = true
+	log("installed v%s", VERSION)
+	return true
+end
+
+local function uninstall()
+	local desc = desc_table()
+	if desc and orig.get_description then
+		desc.get_description = orig.get_description
+	end
+	orig = {}
+	installed = false
+end
+
+function actor_on_first_update()
+	if not installed then
+		install()
+	end
+end
+
+function on_game_start()
+	install()
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
+	uninstall()
+end
