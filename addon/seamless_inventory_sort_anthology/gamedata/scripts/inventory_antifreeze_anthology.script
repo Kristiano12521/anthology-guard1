@@ -29,7 +29,7 @@ end
 
 local DEF = {
     af_enabled        = true,
-    af_trade_enabled  = false,
+    af_trade_enabled  = true,
     af_deferred_limit = 120,
     af_sort_step      = 80,
     af_icon_step      = 12,
@@ -40,6 +40,11 @@ local DEF = {
 
 local OPTS = {}
 local function refresh_opts()
+    -- Apply Comfort/Max FPS before reading, in case this callback runs first.
+    if seamless_inventory_sort_anthology
+            and seamless_inventory_sort_anthology.apply_ux_preset then
+        seamless_inventory_sort_anthology.apply_ux_preset()
+    end
     for id, def in pairs(DEF) do
         local value = ui_mcm and ui_mcm.get("seamless_sort/siss_antifreeze/" .. id)
         if value == nil then value = def end

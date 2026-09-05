@@ -39,7 +39,7 @@
 ----------------------------------------------------------------------
 
 local LOG_TAG = "[seamless_inventory_sort_anthology]"
-local VERSION = "1.5.6-hook-cleanup"
+local VERSION = "1.5.8-ux-presets"
 
 local DEF = {
     enable         = true,   -- master on/off
@@ -105,6 +105,79 @@ end
 
 local OPTS      = {}
 local sp_npcinv = nil  -- cached SortingPlus "sort npc inventories" toggle
+
+-- Comfort / Max FPS write recommended knobs when the player changes ux_preset.
+-- First call (game start) only remembers the current preset so existing tweaks
+-- are not wiped. Custom never writes. Exported for Antifreeze / trade profiler
+-- so their on_option_change can apply before refreshing their own caches.
+local UX_PRESET_PATH = "seamless_sort/siss_general/ux_preset"
+local PRESET_APPLIED = false -- false = not initialized yet
+
+local UX_PRESETS = {
+    comfort = {
+        ["seamless_sort/siss_perf/perf_mode"] = "balanced",
+        ["seamless_sort/siss_perf/trade_policy"] = "additions",
+        ["seamless_sort/siss_perf/trade_max_items"] = 300,
+        ["seamless_sort/siss_perf/trade_fast_unhighlight"] = true,
+        ["seamless_sort/siss_perf/osc_guard"] = true,
+        ["seamless_sort/siss_perf/osc_limit"] = 8,
+        ["seamless_sort/siss_perf/osc_cooldown"] = 1.5,
+        ["seamless_sort/siss_gaps/keep_gaps"] = true,
+        ["seamless_sort/siss_antifreeze/af_enabled"] = true,
+        ["seamless_sort/siss_antifreeze/af_trade_enabled"] = true,
+        ["seamless_sort/siss_antifreeze/af_deferred_limit"] = 120,
+        ["seamless_sort/siss_antifreeze/af_frame_budget"] = 2,
+        ["seamless_sort/siss_antifreeze/af_sort_step"] = 80,
+        ["seamless_sort/siss_antifreeze/af_icon_step"] = 12,
+        ["seamless_sort/siss_antifreeze/af_indicator"] = false,
+        ["seamless_sort/siss_antifreeze/af_safe_compare"] = true,
+        ["seamless_sort/siss_trade_diag/trade_diag_enabled"] = false,
+    },
+    fps = {
+        ["seamless_sort/siss_perf/perf_mode"] = "fps",
+        ["seamless_sort/siss_perf/trade_policy"] = "additions",
+        ["seamless_sort/siss_perf/trade_max_items"] = 200,
+        ["seamless_sort/siss_perf/trade_fast_unhighlight"] = true,
+        ["seamless_sort/siss_perf/osc_guard"] = true,
+        ["seamless_sort/siss_perf/osc_limit"] = 6,
+        ["seamless_sort/siss_perf/osc_cooldown"] = 2,
+        ["seamless_sort/siss_gaps/keep_gaps"] = true,
+        ["seamless_sort/siss_antifreeze/af_enabled"] = true,
+        ["seamless_sort/siss_antifreeze/af_trade_enabled"] = true,
+        ["seamless_sort/siss_antifreeze/af_deferred_limit"] = 100,
+        ["seamless_sort/siss_antifreeze/af_frame_budget"] = 1,
+        ["seamless_sort/siss_antifreeze/af_sort_step"] = 60,
+        ["seamless_sort/siss_antifreeze/af_icon_step"] = 8,
+        ["seamless_sort/siss_antifreeze/af_indicator"] = false,
+        ["seamless_sort/siss_antifreeze/af_safe_compare"] = true,
+        ["seamless_sort/siss_trade_diag/trade_diag_enabled"] = false,
+    },
+}
+
+function apply_ux_preset()
+    if not ui_mcm or not ui_mcm.get or not ui_mcm.set then return end
+    local p = ui_mcm.get(UX_PRESET_PATH)
+    if p == nil then p = "comfort" end
+    if PRESET_APPLIED == false then
+        PRESET_APPLIED = p
+        return
+    end
+    if p == PRESET_APPLIED then return end
+    if p == "custom" then
+        PRESET_APPLIED = "custom"
+        return
+    end
+    local map = UX_PRESETS[p]
+    if not map then
+        PRESET_APPLIED = p
+        return
+    end
+    for path, val in pairs(map) do
+        ui_mcm.set(path, val)
+    end
+    PRESET_APPLIED = p
+    printf("%s applied ux_preset=%s", LOG_TAG, tostring(p))
+end
 
 local function refresh_opts()
     for id, def in pairs(DEF) do
@@ -1742,6 +1815,7 @@ end
 
 -- Re-read the option cache (and the colour derived from it) on MCM apply.
 local function on_opts_change()
+    apply_ux_preset()
     cancel_pending()
     refresh_opts()
     refresh_new_color()

@@ -10,13 +10,20 @@
 	<string id="ui_mcm_menu_siss_loot"><text>Looting and Bodies</text></string>
 	<string id="ui_mcm_menu_siss_hl"><text>Loot Highlight</text></string>
 	<string id="ui_mcm_menu_siss_perf"><text>Performance</text></string>
-	<string id="ui_mcm_menu_siss_trade_diag"><text>Trade diagnostics and optimization</text></string>
+	<string id="ui_mcm_menu_siss_trade_diag"><text>Debug / trade profiling</text></string>
 	<string id="ui_mcm_menu_siss_antifreeze"><text>Antifreeze - large inventory opening</text></string>
 
 	<!-- General -->
 	<string id="ui_mcm_seamless_sort_siss_general_desc">
-		<text>Keeps a SortingPlus inventory tidy: when an item lands out of order (gun modified, item moved, traded, marked favorite/junk) it snaps back into its sorted position in place, with no flicker and without losing your scroll position.</text>
+		<text>Keeps a SortingPlus inventory tidy: when an item lands out of order (gun modified, item moved, traded, marked favorite/junk) it snaps back into its sorted position in place, with no flicker and without losing your scroll position. Pick a comfort preset below unless you want to tune advanced knobs yourself.</text>
 	</string>
+	<string id="ui_mcm_seamless_sort_siss_general_ux_preset"><text>Comfort preset</text></string>
+	<string id="ui_mcm_seamless_sort_siss_general_ux_preset_desc">
+		<text>Comfort — recommended defaults (smooth trade, Antifreeze in trade, balanced batching). Max FPS — longer batching, lighter Antifreeze budget, lower trade sort limit. Custom — do not overwrite Performance / Antifreeze knobs. Applying Comfort or Max FPS writes those pages; switch to Custom before hand-tuning if you do not want a later preset re-apply to overwrite you.</text>
+	</string>
+	<string id="seamless_sort_siss_general_ux_preset_lst_comfort"><text>Comfort (recommended)</text></string>
+	<string id="seamless_sort_siss_general_ux_preset_lst_fps"><text>Max FPS</text></string>
+	<string id="seamless_sort_siss_general_ux_preset_lst_custom"><text>Custom</text></string>
 	<string id="ui_mcm_seamless_sort_siss_general_enable"><text>Enable</text></string>
 	<string id="ui_mcm_seamless_sort_siss_general_enable_desc">
 		<text>Master switch. When off, inventories behave like vanilla SortingPlus (items land at the end until you reopen the window).</text>
@@ -119,7 +126,10 @@
 	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_enabled"><text>Enable multi-frame loading</text></string>
 	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_enabled_desc"><text>Large containers open without one blocking sort. Small containers always use the original immediate path.</text></string>
 	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_trade_enabled"><text>Use Antifreeze in trade</text></string>
-	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_trade_enabled_desc"><text>Enables multi-frame loading for actor_trade_bag and npc_trade_bag. Keep disabled for the diagnostic test: trade lists use the original engine path while Antifreeze remains active in normal inventory and corpse-loot grids. Close and reopen the trade window after changing this option.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_trade_enabled_desc"><text>Multi-frame loading for actor_trade_bag and npc_trade_bag. Recommended on for large traders. Close and reopen the trade window after changing this option.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_advanced_desc">
+		<text>Advanced Antifreeze knobs. Comfort and Max FPS overwrite these when you apply those presets. Choose Custom on the General page before fine-tuning.</text>
+	</string>
 	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_deferred_limit"><text>Minimum items for Antifreeze</text></string>
 	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_deferred_limit_desc"><text>Containers below this count are not intercepted. Recommended: 120-200. Lower values engage deferred loading more often.</text></string>
 	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_frame_budget"><text>Per-frame work budget (ms)</text></string>
@@ -167,15 +177,15 @@
 	<string id="ui_mcm_seamless_sort_siss_perf_osc_cooldown_desc">
 		<text>How long the guard stops re-sorting an oscillating container so it can settle, then seamless sorting resumes. Default 1.5 s.</text>
 	</string>
+	<string id="ui_mcm_seamless_sort_siss_perf_trade_fast_unhighlight"><text>Fast highlight cleanup</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_trade_fast_unhighlight_desc"><text>In trade, only clears cells that were actually highlighted instead of scanning every actor and trader item every idle frame. Disable and report the scenario if a highlight sticks.</text></string>
 
 
-	<string id="ui_mcm_seamless_sort_siss_trade_diag_desc"><text>This diagnostic build measures active trade UI methods and writes compact reports to the xray log. Timing format: calls / total ms / average ms / maximum ms. Fast highlight cleanup replaces the stock every-frame full inventory scan with a sparse set of cells that were actually highlighted.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_desc"><text>Developer tools. Leave profiling off during normal play. Timings go to the xray log (calls / total ms / average ms / maximum ms).</text></string>
 	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_enabled"><text>Enable trade profiling</text></string>
-	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_enabled_desc"><text>Collects counters and timings only while trade UI is open. Keep enabled for this test build.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_enabled_desc"><text>Collects counters and timings only while the trade UI is open. Off by default. Turn on only when investigating stutter, then turn off again.</text></string>
 	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_interval"><text>Report interval, seconds</text></string>
 	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_interval_desc"><text>How often a periodic REPORT is written to the log. Five seconds is recommended.</text></string>
 	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_slow_ms"><text>Slow call threshold, ms</text></string>
 	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_slow_ms_desc"><text>Writes a rate-limited SLOW line when a measured phase exceeds this threshold.</text></string>
-	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_fast_unhighlight"><text>Fast highlight cleanup</text></string>
-	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_fast_unhighlight_desc"><text>In trade mode, processes only cells that were actually highlighted instead of scanning every actor and trader item on every idle frame. Disable and report the exact scenario if a highlight remains stuck.</text></string>
 </string_table>

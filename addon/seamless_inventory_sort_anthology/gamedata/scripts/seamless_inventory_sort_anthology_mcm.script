@@ -2,6 +2,11 @@
 -- Values are read in seamless_inventory_sort_anthology.script via
 --   ui_mcm.get("seamless_sort/<subgroup>/<id>")
 -- MCM is optional; the script falls back to its own defaults when it is absent.
+--
+-- ux_preset (General): Comfort / Max FPS writes recommended knobs on change;
+-- Custom leaves every advanced control alone. Path ids of existing options are
+-- kept so player configs do not reset, except trade_fast_unhighlight which moved
+-- from siss_trade_diag to siss_perf (profiler paths migrate in trade_ui_profiler).
 
 local BANNER = "ui_options_slider_player"
 
@@ -12,6 +17,9 @@ function on_mcm_load()
             { id = "siss_general", sh = true, gr = {
                 { id = "title", type = "slide", link = BANNER, text = "ui_mcm_menu_siss_general", size = {512,50}, spacing = 20 },
                 { id = "desc",  type = "desc",  text = "ui_mcm_seamless_sort_siss_general_desc" },
+                { id = "ux_preset", type = "list", val = 0, def = "comfort", content = {
+                    { "comfort" }, { "fps" }, { "custom" },
+                }},
                 { id = "enable",        type = "check", val = 1, def = true },
                 { id = "win_inventory", type = "check", val = 1, def = true },
                 { id = "win_loot",      type = "check", val = 1, def = true },
@@ -55,19 +63,6 @@ function on_mcm_load()
                 { id = "hl_new_a", type = "track", val = 2, min = 0, max = 255, step = 1, def = 60 },
             }},
 
-            { id = "siss_antifreeze", sh = true, gr = {
-                { id = "title", type = "slide", link = BANNER, text = "ui_mcm_menu_siss_antifreeze", size = {512,50}, spacing = 20 },
-                { id = "desc", type = "desc", text = "ui_mcm_seamless_sort_siss_antifreeze_desc" },
-                { id = "af_enabled",        type = "check", val = 1, def = true },
-                { id = "af_trade_enabled",  type = "check", val = 1, def = false },
-                { id = "af_deferred_limit", type = "track", val = 2, min = 50, max = 1000, step = 25, def = 120 },
-                { id = "af_frame_budget",   type = "track", val = 2, min = 1, max = 8, step = 1, def = 2 },
-                { id = "af_sort_step",      type = "track", val = 2, min = 10, max = 400, step = 10, def = 80 },
-                { id = "af_icon_step",      type = "track", val = 2, min = 1, max = 100, step = 1, def = 12 },
-                { id = "af_indicator",      type = "check", val = 1, def = false },
-                { id = "af_safe_compare",   type = "check", val = 1, def = true },
-            }},
-
             { id = "siss_perf", sh = true, gr = {
                 { id = "title", type = "slide", link = BANNER, text = "ui_mcm_menu_siss_perf", size = {512,50}, spacing = 20 },
                 { id = "desc",  type = "desc",  text = "ui_mcm_seamless_sort_siss_perf_desc" },
@@ -78,9 +73,24 @@ function on_mcm_load()
                     { "full" }, { "additions" }, { "off" },
                 }},
                 { id = "trade_max_items", type = "track", val = 2, min = 0, max = 1000, step = 50, def = 300 },
+                { id = "trade_fast_unhighlight", type = "check", val = 1, def = true },
                 { id = "osc_guard",    type = "check", val = 1, def = true },
                 { id = "osc_limit",    type = "track", val = 2, min = 3,   max = 20, step = 1,   def = 8 },
                 { id = "osc_cooldown", type = "track", val = 2, min = 0.5, max = 5,  step = 0.5, def = 1.5 },
+            }},
+
+            { id = "siss_antifreeze", sh = true, gr = {
+                { id = "title", type = "slide", link = BANNER, text = "ui_mcm_menu_siss_antifreeze", size = {512,50}, spacing = 20 },
+                { id = "desc", type = "desc", text = "ui_mcm_seamless_sort_siss_antifreeze_desc" },
+                { id = "af_enabled",        type = "check", val = 1, def = true },
+                { id = "af_trade_enabled",  type = "check", val = 1, def = true },
+                { id = "af_advanced_desc",  type = "desc", text = "ui_mcm_seamless_sort_siss_antifreeze_af_advanced_desc" },
+                { id = "af_deferred_limit", type = "track", val = 2, min = 50, max = 1000, step = 25, def = 120 },
+                { id = "af_frame_budget",   type = "track", val = 2, min = 1, max = 8, step = 1, def = 2 },
+                { id = "af_sort_step",      type = "track", val = 2, min = 10, max = 400, step = 10, def = 80 },
+                { id = "af_icon_step",      type = "track", val = 2, min = 1, max = 100, step = 1, def = 12 },
+                { id = "af_indicator",      type = "check", val = 1, def = false },
+                { id = "af_safe_compare",   type = "check", val = 1, def = true },
             }},
 
             { id = "siss_trade_diag", sh = true, gr = {
@@ -89,7 +99,6 @@ function on_mcm_load()
                 { id = "trade_diag_enabled", type = "check", val = 1, def = false },
                 { id = "trade_diag_interval", type = "track", val = 2, min = 2, max = 20, step = 1, def = 5 },
                 { id = "trade_diag_slow_ms", type = "track", val = 2, min = 2, max = 30, step = 1, def = 8 },
-                { id = "trade_fast_unhighlight", type = "check", val = 1, def = true },
             }},
         }
     }

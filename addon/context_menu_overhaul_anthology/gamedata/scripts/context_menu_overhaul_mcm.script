@@ -6,11 +6,11 @@ addonId = "context_menu_overhaul"
 
 defaultConfig = {
   group_related_actions = true,
-  use_colors = false,
+  use_colors = true,
   show_separators = true,
   details_shows_item_name = true,
   capitalize_labels = true,
-  hide_gift = false,
+  hide_gift = true,
   field_strip_icons = true,
   maintenance_icons = true
 }

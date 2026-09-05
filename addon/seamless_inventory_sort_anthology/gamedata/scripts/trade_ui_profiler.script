@@ -3,7 +3,7 @@
 -- It does not cache prices or trade status yet; the purpose is to identify the
 -- first real hot path before changing trade semantics.
 
-local VERSION = "1.5.7-time-event-return"
+local VERSION = "1.5.8-ux-presets"
 
 local DEF = {
     trade_diag_enabled    = false,
@@ -16,6 +16,11 @@ local OPT_PATH = {
     trade_diag_enabled     = "seamless_sort/siss_trade_diag/trade_diag_enabled",
     trade_diag_interval    = "seamless_sort/siss_trade_diag/trade_diag_interval",
     trade_diag_slow_ms     = "seamless_sort/siss_trade_diag/trade_diag_slow_ms",
+    -- Moved from siss_trade_diag in 1.5.8 (player-facing optimization, not debug).
+    trade_fast_unhighlight = "seamless_sort/siss_perf/trade_fast_unhighlight",
+}
+
+local OPT_PATH_LEGACY = {
     trade_fast_unhighlight = "seamless_sort/siss_trade_diag/trade_fast_unhighlight",
 }
 
@@ -39,8 +44,16 @@ end
 local install_diag
 
 local function refresh_opts()
+    if seamless_inventory_sort_anthology
+            and seamless_inventory_sort_anthology.apply_ux_preset then
+        seamless_inventory_sort_anthology.apply_ux_preset()
+    end
     for id, def in pairs(DEF) do
         local v = ui_mcm and ui_mcm.get(OPT_PATH[id])
+        -- One-release migration for the moved highlight toggle.
+        if v == nil and OPT_PATH_LEGACY[id] and ui_mcm then
+            v = ui_mcm.get(OPT_PATH_LEGACY[id])
+        end
         if v == nil then v = def end
         OPTS[id] = v
     end

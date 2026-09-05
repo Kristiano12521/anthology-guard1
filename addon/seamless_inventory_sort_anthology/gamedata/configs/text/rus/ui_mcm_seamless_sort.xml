@@ -9,13 +9,20 @@
 	<string id="ui_mcm_menu_siss_loot"><text>Обыск и тела</text></string>
 	<string id="ui_mcm_menu_siss_hl"><text>Подсветка добычи</text></string>
 	<string id="ui_mcm_menu_siss_perf"><text>Производительность</text></string>
-	<string id="ui_mcm_menu_siss_trade_diag"><text>Диагностика и оптимизация торговли</text></string>
+	<string id="ui_mcm_menu_siss_trade_diag"><text>Отладка / профилирование торговли</text></string>
 	<string id="ui_mcm_menu_siss_antifreeze"><text>Antifreeze — открытие больших инвентарей</text></string>
 
 	
 	<string id="ui_mcm_seamless_sort_siss_general_desc">
-		<text>Поддерживает порядок SortingPlus без закрытия окна: изменённые, перемещённые, проданные и помеченные предметы сразу возвращаются на своё место без мерцания и сброса прокрутки.</text>
+		<text>Поддерживает порядок SortingPlus без закрытия окна: изменённые, перемещённые, проданные и помеченные предметы сразу возвращаются на своё место без мерцания и сброса прокрутки. Для обычной игры достаточно пресета Comfort ниже.</text>
 	</string>
+	<string id="ui_mcm_seamless_sort_siss_general_ux_preset"><text>Пресет комфорта</text></string>
+	<string id="ui_mcm_seamless_sort_siss_general_ux_preset_desc">
+		<text>Comfort — рекомендуемые значения (плавная торговля, Antifreeze в торговле, сбалансированная пакетная сортировка). Max FPS — более длинные задержки, меньший бюджет Antifreeze и лимит сортировки в торговле. Custom — не перезаписывать страницы Производительность и Antifreeze. Смена Comfort или Max FPS записывает эти страницы; перед ручной тонкой настройкой выберите Custom.</text>
+	</string>
+	<string id="seamless_sort_siss_general_ux_preset_lst_comfort"><text>Comfort (рекомендуется)</text></string>
+	<string id="seamless_sort_siss_general_ux_preset_lst_fps"><text>Max FPS</text></string>
+	<string id="seamless_sort_siss_general_ux_preset_lst_custom"><text>Custom</text></string>
 	<string id="ui_mcm_seamless_sort_siss_general_enable"><text>Включить</text></string>
 	<string id="ui_mcm_seamless_sort_siss_general_enable_desc">
 		<text>Главный переключатель. Если выключено, предметы ведут себя как в обычном SortingPlus и остаются в конце списка до повторного открытия окна.</text>
@@ -118,7 +125,10 @@
 	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_enabled"><text>Включить многокадровую загрузку</text></string>
 	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_enabled_desc"><text>Большие контейнеры открываются без одной тяжёлой блокирующей сортировки. Малые контейнеры всегда используют штатную мгновенную загрузку.</text></string>
 	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_trade_enabled"><text>Antifreeze в торговле</text></string>
-	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_trade_enabled_desc"><text>Включает многокадровую загрузку для actor_trade_bag и npc_trade_bag. Для диагностического теста оставьте выключенным: торговые списки будут строиться штатным кодом, а Antifreeze продолжит работать в обычном инвентаре и при осмотре тел. После изменения закройте и заново откройте окно торговли.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_trade_enabled_desc"><text>Многокадровая загрузка для actor_trade_bag и npc_trade_bag. Рекомендуется включать при крупных торговцах. После изменения закройте и заново откройте окно торговли.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_advanced_desc">
+		<text>Расширенные параметры Antifreeze. Пресеты Comfort и Max FPS перезаписывают их. Перед ручной настройкой выберите Custom на странице «Основные».</text>
+	</string>
 	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_deferred_limit"><text>Минимум предметов для Antifreeze</text></string>
 	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_deferred_limit_desc"><text>Контейнеры с меньшим количеством предметов не перехватываются. Рекомендуется 120–200. Снижение значения чаще включает постепенную загрузку.</text></string>
 	<string id="ui_mcm_seamless_sort_siss_antifreeze_af_frame_budget"><text>Бюджет обработки на кадр, мс</text></string>
@@ -166,15 +176,15 @@
 	<string id="ui_mcm_seamless_sort_siss_perf_osc_cooldown_desc">
 		<text>Время, на которое сортировка нестабильного контейнера приостанавливается. После паузы бесшовная сортировка возобновляется. По умолчанию 1.5 сек.</text>
 	</string>
+	<string id="ui_mcm_seamless_sort_siss_perf_trade_fast_unhighlight"><text>Быстрая очистка подсветки</text></string>
+	<string id="ui_mcm_seamless_sort_siss_perf_trade_fast_unhighlight_desc"><text>В торговле обрабатывает только ячейки, которые действительно были подсвечены, вместо полного обхода всех предметов игрока и торговца каждый кадр. При залипшей подсветке отключите и опишите сценарий.</text></string>
 
 
-	<string id="ui_mcm_seamless_sort_siss_trade_diag_desc"><text>Диагностическая версия измеряет активные методы торгового интерфейса и выводит компактный отчёт в xray-лог. Формат времени: вызовы / суммарные мс / средние мс / максимальные мс. Быстрая очистка подсветки заменяет штатный полный обход всех предметов каждый кадр на обработку только реально подсвеченных ячеек.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_desc"><text>Инструменты разработчика. В обычной игре профилирование оставляйте выключенным. Тайминги пишутся в xray-лог (вызовы / суммарные мс / средние мс / максимальные мс).</text></string>
 	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_enabled"><text>Включить профилирование торговли</text></string>
-	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_enabled_desc"><text>Собирает счётчики и таймеры только пока открыто окно торговли. Для тестовой версии оставьте включённым. После определения узкого места параметр можно выключить.</text></string>
+	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_enabled_desc"><text>Собирает счётчики и таймеры только пока открыто окно торговли. По умолчанию выключено. Включайте только при разборе просадок FPS, затем снова выключайте.</text></string>
 	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_interval"><text>Интервал отчёта, сек.</text></string>
 	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_interval_desc"><text>Как часто писать промежуточный REPORT в лог. Рекомендуется 5 секунд. Слишком маленькое значение увеличивает объём журнала.</text></string>
 	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_slow_ms"><text>Порог медленного вызова, мс</text></string>
 	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_diag_slow_ms_desc"><text>Отдельная строка SLOW выводится, когда измеряемый этап превышает этот порог. Сообщения ограничены по частоте.</text></string>
-	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_fast_unhighlight"><text>Быстрая очистка подсветки</text></string>
-	<string id="ui_mcm_seamless_sort_siss_trade_diag_trade_fast_unhighlight_desc"><text>В торговле обрабатывает только ячейки, которые действительно были подсвечены, вместо полного обхода всех предметов игрока и торговца каждый кадр. Это первая целевая оптимизация по результатам тестов. При визуальной проблеме с подсветкой отключите параметр и сообщите сценарий.</text></string>
 </string_table>
