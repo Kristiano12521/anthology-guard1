@@ -1,0 +1,203 @@
+-- Hostage task slot collision fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- All DRX/AXR hostage rescue tasks share one story_id / info slot:
+--   hostage_companion_task_1 (+ _started / _hostage_rescued).
+-- Preconditions already forbid a second active hostage, but
+-- CRandomTask:give_task never re-checks them. PDA Taskboard (and rapid
+-- dialog accept) can therefore issue two hostage tasks within one frame
+-- at the same assault target. setup_companion_task then spawns a second
+-- squad with the same story_id; completing one removes the squad and
+-- fails the other (goodwill swing + orphan companion).
+--
+-- This addon does not replace task LTX. It wraps give_task and
+-- setup_companion_task at runtime.
+
+-- load-order: after igi_task_manager / axr_companions (install wraps current)
+
+local LOG_TAG = "[fix_hostage_task_collision]"
+local VERSION = "1.0.0"
+local HOSTAGE_STORY = "hostage_companion_task_1"
+local HOSTAGE_STARTED = "hostage_companion_task_1_started"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local orig = {}
+local installed = false
+local callbacks_registered = false
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function task_ini()
+	local tm = rawget(_G, "task_manager")
+	return tm and tm.task_ini
+end
+
+-- True for the shared hostage-slot family (sim 26+, wolf_task_2, JTDR *b, etc.).
+local function is_hostage_slot_task(task_id)
+	if type(task_id) ~= "string" or task_id == "" then
+		return false
+	end
+	local ini = task_ini()
+	if not (ini and ini.section_exist and ini:section_exist(task_id)) then
+		return false
+	end
+	local pre = ini:r_string_ex(task_id, "precondition") or ""
+	local on_init = ini:r_string_ex(task_id, "on_init") or ""
+	return (string.find(pre, HOSTAGE_STORY, 1, true) ~= nil)
+		or (string.find(on_init, HOSTAGE_STORY, 1, true) ~= nil)
+end
+
+local function prerequisites_ok(task_id)
+	local cond = rawget(_G, "xr_conditions")
+	if not (cond and type(cond.has_completed_task_prerequisites) == "function") then
+		return true
+	end
+	local ok, result = pcall(cond.has_completed_task_prerequisites, nil, nil, {task_id})
+	if not ok then
+		log("prerequisites check error for %s: %s", tostring(task_id), tostring(result))
+		return true
+	end
+	return result and true or false
+end
+
+local function hostage_slot_busy()
+	if type(has_alife_info) == "function" then
+		local ok, has = pcall(has_alife_info, HOSTAGE_STARTED)
+		if ok and has then
+			return true, "info"
+		end
+	end
+	if type(get_story_squad) == "function" then
+		local ok, squad = pcall(get_story_squad, HOSTAGE_STORY)
+		if ok and squad then
+			return true, "story_squad"
+		end
+	end
+	local cond = rawget(_G, "xr_conditions")
+	if cond and type(cond.squad_exist) == "function" and db and db.actor then
+		local ok, exists = pcall(cond.squad_exist, db.actor, db.actor, {HOSTAGE_STORY})
+		if ok and exists then
+			return true, "squad_exist"
+		end
+	end
+	return false, nil
+end
+
+local function patched_give_task(self, task_id, task_giver_id)
+	if is_hostage_slot_task(task_id) and not prerequisites_ok(task_id) then
+		log("blocked give_task %s (hostage slot precondition failed, giver=%s)",
+			tostring(task_id), tostring(task_giver_id))
+		return
+	end
+	return orig.give_task(self, task_id, task_giver_id)
+end
+
+local function patched_setup_companion_task(actor, npc, p)
+	local is_hostage = p and tostring(p[5]) == "true"
+	local sq_sec = p and p[1]
+	local looks_hostage = is_hostage
+		or (type(sq_sec) == "string" and string.find(sq_sec, HOSTAGE_STORY, 1, true) ~= nil)
+
+	if looks_hostage then
+		local busy, reason = hostage_slot_busy()
+		if busy then
+			log("blocked setup_companion_task section=%s task_var=%s reason=%s",
+				tostring(sq_sec), tostring(p and p[3]), tostring(reason))
+			return
+		end
+	end
+	return orig.setup_companion_task(actor, npc, p)
+end
+
+local function install()
+	if installed then
+		return
+	end
+
+	local tm = rawget(_G, "task_manager")
+	local crt = tm and tm.CRandomTask
+	local effects = rawget(_G, "xr_effects")
+	local wrapped = {}
+
+	if crt and type(crt.give_task) == "function" then
+		orig.give_task = crt.give_task
+		crt.give_task = patched_give_task
+		wrapped[#wrapped + 1] = "give_task"
+	else
+		log("task_manager.CRandomTask.give_task not found - give_task guard NOT installed")
+	end
+
+	if effects and type(effects.setup_companion_task) == "function" then
+		orig.setup_companion_task = effects.setup_companion_task
+		effects.setup_companion_task = patched_setup_companion_task
+		wrapped[#wrapped + 1] = "setup_companion_task"
+	else
+		log("xr_effects.setup_companion_task not found - companion guard NOT installed")
+	end
+
+	if #wrapped > 0 then
+		installed = true
+		log("v%s wrapped: %s", VERSION, table.concat(wrapped, ", "))
+	end
+end
+
+local function uninstall()
+	if not installed then
+		orig = {}
+		return
+	end
+
+	local tm = rawget(_G, "task_manager")
+	local crt = tm and tm.CRandomTask
+	local effects = rawget(_G, "xr_effects")
+
+	if crt and orig.give_task then
+		crt.give_task = orig.give_task
+	end
+	if effects and orig.setup_companion_task then
+		effects.setup_companion_task = orig.setup_companion_task
+	end
+
+	orig = {}
+	installed = false
+end
+
+function on_game_load()
+	-- no save state
+end
+
+function actor_on_first_update()
+	-- MT reload can replace module tables after on_game_start.
+	local tm = rawget(_G, "task_manager")
+	local crt = tm and tm.CRandomTask
+	local effects = rawget(_G, "xr_effects")
+	local give_ok = (not orig.give_task) or (crt and crt.give_task == patched_give_task)
+	local setup_ok = (not orig.setup_companion_task)
+		or (effects and effects.setup_companion_task == patched_setup_companion_task)
+	if not installed or not give_ok or not setup_ok then
+		installed = false
+		orig = {}
+		install()
+	end
+end
+
+function on_game_start()
+	install()
+	if not callbacks_registered then
+		RegisterScriptCallback("on_game_load", on_game_load)
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
+	uninstall()
+end
