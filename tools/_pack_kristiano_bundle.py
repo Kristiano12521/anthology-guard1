@@ -38,7 +38,6 @@ VANILLA_OK = {
     "fix_gonta_duplicate_dialog",
     "fix_soc_nimble_flash",
     "fix_trader_restock_callback",
-    "fix_item_combination_magnifiers",
     "fix_x15_freeplay_gate",
     "fix_rogue_hostility",
     "fix_sim_mechanic_trade",

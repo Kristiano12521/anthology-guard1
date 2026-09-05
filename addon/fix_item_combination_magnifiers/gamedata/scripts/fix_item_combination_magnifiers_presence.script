@@ -7,7 +7,7 @@
 -- refused (would mask upstream updates). Upstream fix required.
 
 local LOG_TAG = "[fix_item_combination_magnifiers]"
-local VERSION = "1.1.0"
+local VERSION = "1.1.1"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 

@@ -1,5 +1,15 @@
 # fix_item_combination_magnifiers
 
+## [1.1.1] — 2026-09-05
+
+**Изменено**
+
+- `tools/_pack_kristiano_aio.py` — `fix_item_combination_magnifiers` в `SKIP` (не попадает в новые сборки AIO).
+
+**Проверено**
+
+- pack: `python tools/_pack_kristiano_aio.py` — мода нет в CONTENTS / zip
+
 ## [1.1.0] — 2026-09-04
 
 **Изменено**
