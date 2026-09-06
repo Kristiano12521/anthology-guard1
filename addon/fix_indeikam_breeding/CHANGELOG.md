@@ -1,5 +1,29 @@
 # Indeikam Breeding Fix
 
+## [1.1.0] — 2026-09-06
+
+**Изменено**
+
+- `gamedata/configs/mod_system_fix_indeikam_breeding.ltx` — как в рабочем старом Kristiano AIO: `![af_indeikam]` / `![af_indeikam3]` (+ контейнеры) переназначают `inv_name` на ключи `*_anth_fix`; `@[af_indeikam_breeding_1/2/3]` создают секции селекции Брунько.
+- `gamedata/configs/text/rus|eng/st_fix_indeikam_breeding.xml` — только новые ключи `*_anth_fix`: «Индейский камень» / «Узорчатый камень» (eng: Indian / Patterned Stone).
+- Удалён `mod_items_artefacts_upgrades_fix_indeikam_breeding.ltx` — файл рядом с `#include`-емым LTX DLTX не подхватывает (`bIsRootFile`, см. `fix_quest_stash`).
+
+**Причина**
+
+В логе: `section [af_indeikam_breeding_1/2/3] doesn't exist` при выдаче у Брунько. В UI имя SGM оставалось `"Индийский камень";` из языкового пака, а Dean показывал чужое «Индейский…». Overlay старых ключей проигрывал паку; `@` в `items/items/` не грузился.
+
+**Не затронуто**
+
+- Статы/иконки/visual базовых `af_indeikam` / `af_indeikam3`
+- Описания (`st_af_indeikam*_descr`)
+- Селекция остальных артефактов
+- Статы breeding — как у `af_oblivion_breeding_*` (−0.00047 / +12 вес / 0.0005 HP + 0.00088 сила), не «выдуманные» −0.00094 из старого ZIP
+
+**Проверено**
+
+- lint / encoding: ниже
+- В игре: не прогонялось. Нужно заменить New1 AIO, проверить спавнер и выдачу breeding_1/2/3 у Брунько
+
 ## [1.0.1] — 2026-09-06
 
 **Изменено**

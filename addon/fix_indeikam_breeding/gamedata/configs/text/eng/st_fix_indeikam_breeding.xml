@@ -1,23 +1,25 @@
 <?xml version="1.0" encoding="windows-1251"?>
 <!--
-  fix_indeikam_breeding: overlay names for the Dean artefact af_indeikam3.
-  Same string ids as st_items_artefacts_dean.xml / container tables.
-  Does not remap inv_name. Does not change stats or descriptions.
+  fix_indeikam_breeding: new string ids (*_anth_fix).
+  inv_name remapped in mod_system_fix_indeikam_breeding.ltx.
 -->
 <string_table>
-	<string id="st_af_indeikam3_name">
+	<string id="st_af_indeikam_name_anth_fix">
+		<text>Indian Stone</text>
+	</string>
+	<string id="st_af_indeikam3_name_anth_fix">
 		<text>Patterned Stone</text>
 	</string>
-	<string id="st_af_indeikam3_af_iam_name">
+	<string id="st_af_indeikam3_af_iam_name_anth_fix">
 		<text>IAM w/ Patterned Stone</text>
 	</string>
-	<string id="st_af_indeikam3_af_aac_name">
+	<string id="st_af_indeikam3_af_aac_name_anth_fix">
 		<text>AAC w/ Patterned Stone</text>
 	</string>
-	<string id="st_af_indeikam3_af_aam_name">
+	<string id="st_af_indeikam3_af_aam_name_anth_fix">
 		<text>AAM w/ Patterned Stone</text>
 	</string>
-	<string id="st_af_indeikam3_lead_box_name">
+	<string id="st_af_indeikam3_lead_box_name_anth_fix">
 		<text>LLMC w/ Patterned Stone</text>
 	</string>
 </string_table>
