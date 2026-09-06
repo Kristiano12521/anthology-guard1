@@ -1,5 +1,28 @@
 # Indeikam Breeding Fix
 
+## [1.0.1] — 2026-09-06
+
+**Изменено**
+
+- `gamedata/configs/text/rus/st_fix_indeikam_breeding.xml` — восстановлен из `9086c14`: кириллица снова в Windows-1251 (после `5bbf8db` текст был заменён на UTF-8 U+FFFD).
+- `gamedata/configs/items/items/mod_items_artefacts_upgrades_fix_indeikam_breeding.ltx` — комментарий с em-dash переведён в CP1251 через `to_cp1251.ps1`.
+
+**Причина**
+
+В игре русские overlay-имена артефактов отображались как кракозябры / пустые квадраты: файл декларировал `windows-1251`, а байты были UTF-8 replacement character.
+
+**Не затронуто**
+
+- Тексты имён (те же, что в 1.0.0): «Индейский камень», «Узорчатый камень», контейнеры СПМ/ПКА/ПМА/СИМК
+- Eng XML, DLTX-секции breeding_1/2/3, скрипт presence
+- Статы артефактов и `inv_name`
+
+**Проверено**
+
+- `powershell -File tools/check_encoding.ps1 addon/fix_indeikam_breeding` — rus XML и LTX = cp1251
+- `python tools/lint_addon.py fix_indeikam_breeding` — 0 ошибок
+- В игре: не прогонялось
+
 ## [1.0.0] — 2026-08-29
 
 **Изменено**

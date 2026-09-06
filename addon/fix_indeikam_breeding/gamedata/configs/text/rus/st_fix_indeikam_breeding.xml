@@ -6,21 +6,21 @@
 -->
 <string_table>
 	<string id="st_af_indeikam_name">
-		<text>пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ</text>
+		<text>«Индейский камень»</text>
 	</string>
 	<string id="st_af_indeikam3_name">
-		<text>пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ</text>
+		<text>«Узорчатый камень»</text>
 	</string>
 	<string id="st_af_indeikam3_af_iam_name">
-		<text>пїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ</text>
+		<text>СПМ с «Узорчатым камнем»</text>
 	</string>
 	<string id="st_af_indeikam3_af_aac_name">
-		<text>пїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ</text>
+		<text>ПКА с «Узорчатым камнем»</text>
 	</string>
 	<string id="st_af_indeikam3_af_aam_name">
-		<text>пїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ</text>
+		<text>ПМА с «Узорчатым камнем»</text>
 	</string>
 	<string id="st_af_indeikam3_lead_box_name">
-		<text>пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ</text>
+		<text>СИМК с «Узорчатым камнем»</text>
 	</string>
 </string_table>
