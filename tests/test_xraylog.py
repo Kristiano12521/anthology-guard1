@@ -182,6 +182,33 @@ class CulpritScriptTests(unittest.TestCase):
         self.assertEqual(xraylog.culprit_script(frames), "_g.script")
 
 
+class ResourceCrashTests(unittest.TestCase):
+    def test_lua_pcall_failed_not_plain_lua_error(self):
+        report = parse("crash_lua_pcall.log")
+        crash_class, hints = report.classify()
+        self.assertTrue(report.crashed)
+        self.assertEqual(report.fields["Function"], "CScriptEngine::lua_pcall_failed")
+        self.assertEqual(crash_class, "Lua error (pcall)")
+        self.assertTrue(any("pcall" in hint.lower() for hint in hints))
+        self.assertTrue(any("anth_box_hook.script:40" in hint for hint in hints))
+
+    def test_missing_model_not_lua(self):
+        report = parse("crash_missing_model.log")
+        crash_class, hints = report.classify()
+        self.assertTrue(report.crashed)
+        self.assertEqual(report.fields["Function"], "CModelPool::Instance_Load")
+        self.assertEqual(crash_class, "ресурсы: нет модели")
+        self.assertEqual(report.lua_refs(), [])
+        self.assertTrue(any("не Lua" in hint or ".ogf" in hint for hint in hints))
+
+    def test_oom_not_lua(self):
+        report = parse("crash_oom.log")
+        crash_class, hints = report.classify()
+        self.assertTrue(report.crashed)
+        self.assertEqual(crash_class, "движок: память")
+        self.assertTrue(any("OOM" in hint or "VRAM" in hint for hint in hints))
+
+
 class FatalSampleRegressionTests(unittest.TestCase):
     def test_lua_crash_classification_unchanged(self):
         report = parse("crash_lua_nil.log")

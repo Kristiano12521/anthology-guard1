@@ -1,0 +1,18 @@
+'xrCore' build 8028, Jan 29 2021
+Initializing File System...
+using fs-ltx fsgame.ltx
+Starting engine...
+* Loading objects...
+FATAL ERROR
+
+[error]Expression    : fatal error
+[error]Function      : CModelPool::Instance_Load
+[error]File          : xrEngine\ModelPool.cpp
+[error]Line          : 88
+[error]Description   : Can't find model file 'meshes\dynamics\devices\dev_torch_light\dev_torch_light_red.ogf'
+
+stack trace:
+
+SymInit: Symbol-SearchPath: '.;C:\games\anomaly;', symOptions: 530, UserName: 'ivan'
+OS-Version: 10.0.19045 () 0x300-0x1
+C:\games\anomaly\bin\AnomalyDX11AVX.exe:AnomalyDX11AVX.exe (0000000140000000), size: 18690048 (result: 0), SymType: '-exported-'

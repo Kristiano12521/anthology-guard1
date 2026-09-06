@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.57] — пробелы crash/Lua: pcall, модель, OOM, отложенный тик
+
+`workflow-crash.mdc` и `docs/plans/crash.md`: в таблице классификации — `lua_pcall_failed`, `Can't find model file` / `CModelPool`, OOM/`VirtualAlloc`; несколько Lua-ошибок — первая по времени; вылет на сейве — более ранний сейв и смена списка модов; «удали мод и начни новую игру» — не диагностика. `anomaly-lua.mdc`: тяжёлую очистку в callback со сносом объекта/UI откладывать через `CreateTimeEvent(..., 0, named_fn)`. Самопроверка `workflow-addon` / `docs/plans/addon.md`: конфликт с другим модом и nil вне онлайна. `tools/xraylog.py`: те же три FATAL-класса; синтетические `logs/samples/crash_{lua_pcall,missing_model,oom}.log` и тесты. pitfalls §13: первая Lua-ошибка и `.bkp`.
+
 ## [0.1.56] — check_changelog_tools: ссылка ≠ правка
 
 `tools/check_changelog_tools.py`: путь `tools/` в добавленной строке CHANGELOG без изменений под `tools/` больше не валит сборку, если в конце строки стоит `(tools-ref)` — явная пометка «ссылка на инструмент, не правка» (как `-- load-order:` для ORDER-002). Без пометки прежнее поведение. Ложное срабатывание на [0.1.55] (упоминание `tools/refindex.py` как маршрута поиска) — причина правки. Тесты на оба случая и на формулировку df81d5f; README.

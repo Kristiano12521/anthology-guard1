@@ -408,6 +408,18 @@ class LogReport:
         variable = self.missing_variable()
         include = self.missing_include()
 
+        if "lua_pcall_failed" in text:
+            refs = self.lua_refs()
+            hints = [
+                "Класс: Lua error из-под pcall (`CScriptEngine::lua_pcall_failed`).",
+                "Это не обычный lua_error: ошибка всплыла из pcall и всё равно стала fatal. "
+                "Разбирай, какой pcall это был и что дальше по стеку.",
+            ]
+            if refs:
+                hints.append(f"Первый кадр: {refs[0]} — найди этот файл в reference/ и открой строку.")
+            hints.append("Несколько Lua-ошибок подряд — первая по времени, остальные часто каскад.")
+            return "Lua error (pcall)", hints
+
         if "lua_error" in text or "cscriptengine" in text or self.lua_refs():
             refs = self.lua_refs()
             hints = [
@@ -420,6 +432,7 @@ class LogReport:
                     f"tools/refindex.py find {refs[0].split(':')[0].split('.')[0]}"
                 )
             hints.append("nil в кадре — это симптом. Причина обычно в другом файле, выше по цепочке.")
+            hints.append("Несколько Lua-ошибок подряд — первая по времени, остальные часто каскад.")
             return "Lua error", hints
 
         if section:
@@ -450,6 +463,28 @@ class LogReport:
                 [
                     f"Не найден включаемый файл: {include}.",
                     "Обычно остаётся после удаления мода, чьи конфиги ещё подключаются через #include.",
+                ],
+            )
+
+        if "can't find model" in text or "cmodelpool" in text:
+            return (
+                "ресурсы: нет модели",
+                [
+                    "Класс: нет меша (`.ogf`), не Lua.",
+                    "Ищи `Can't find model file` / `CModelPool::Instance_Load`: неполная установка "
+                    "или DLTX на `visual` без файла в VFS. Эталон: fix_g2x_torch_meshes.",
+                    "Фикс — ресурс, не скрипт.",
+                ],
+            )
+
+        if "virtualalloc" in text or "ran out of memory" in text:
+            return (
+                "движок: память",
+                [
+                    "Класс: OOM (`Ran out of memory` / `VirtualAlloc failed` / `CRender::texture_load`).",
+                    "Не скрипты: текстурные моды, VRAM, адресное пространство.",
+                    "Диагностика: снизить текстуры / снять тяжёлые texture-моды. "
+                    "Если краш пропал — код мода не поможет.",
                 ],
             )
 

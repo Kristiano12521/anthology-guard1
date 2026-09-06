@@ -1,0 +1,22 @@
+'xrCore' build 8028, Jan 29 2021
+Initializing File System...
+using fs-ltx fsgame.ltx
+Starting engine...
+~ [anth_box_hook] wrapping actor_on_item_take_from_box
+! [LUA] ...games\anomaly\gamedata\scripts\anth_box_hook.script:40: attempt to index a nil value
+FATAL ERROR
+
+[error]Expression    : <no expression>
+[error]Function      : CScriptEngine::lua_pcall_failed
+[error]File          : ..\xrServerEntities\script_engine.cpp
+[error]Line          : 186
+[error]Description   : ...games\anomaly\gamedata\scripts\anth_box_hook.script:40: attempt to index a nil value
+
+stack trace:
+
+0 : [C]  -1
+1 : [Lua] ...games\anomaly\gamedata\scripts\anth_box_hook.script(40) : on_take
+2 : [Lua] ...games\anomaly\gamedata\scripts\axr_main.script(315) : SendScriptCallback
+SymInit: Symbol-SearchPath: '.;C:\games\anomaly;', symOptions: 530, UserName: 'ivan'
+OS-Version: 10.0.19045 () 0x300-0x1
+C:\games\anomaly\bin\AnomalyDX11AVX.exe:AnomalyDX11AVX.exe (0000000140000000), size: 18690048 (result: 0), SymType: '-exported-'
