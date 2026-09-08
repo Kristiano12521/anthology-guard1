@@ -1,5 +1,18 @@
 # fix_sim_medic_task_dialog
 
+## [1.0.3] — 2026-09-08
+
+**Сделано**
+
+- Убран инжект второй строки сдачи (`dm_sim_ordered_task_completed_dialog`): при наличии ordered-completed sim-completed/cancel снимаются.
+- Monkey-patch `actor_has_finished_ordered_task` / `text_task_finish` / `npc_set_finished_task_complete`: если нет обычного finished-task — fallback на sim (`is_sim=true`).
+- Дубль «Найдётся ли работа…» по-прежнему снимается.
+
+**Не затронуто**
+
+- Диалоги generic-сталкеров только с sim-линиями
+- Сейвы, XML персонажей
+
 ## [1.0.2] — 2026-09-08
 
 **Сделано**

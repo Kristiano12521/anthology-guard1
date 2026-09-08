@@ -1,16 +1,16 @@
--- Sim specials: restore simulation task turn-in/cancel; kill duplicate
--- "any work?" when both ordered and sim give dialogs are listed.
+-- Sim specials: one turn-in line for simulation tasks.
 -- Anomaly 1.5.3 / Anthology 2.1
 --
--- Many specials list dm_ordered_task_* and also pick up
--- dm_sim_ordered_task_* (character_dialogs.xml / earlier inject).
--- Both give dialogs use the same player line -> duplicate menu entry.
+-- Specials list dm_ordered_task_* ; sim tasks need is_sim=true in
+-- axr_task_manager.get_first_finished_task / set_finished_task_complete.
+-- Injecting dm_sim_ordered_task_completed_dialog next to ordered completed
+-- duplicates st_ordered_task_query_finished when both predicates pass.
 --
--- Fix: always remove sim give (and dialog2) when ordered give is present;
--- add sim completed/cancel only if ordered completed exists without sim completed.
+-- Fix: strip duplicate sim give / sim completed(+cancel); make ordered
+-- finish path fall back to sim so medics keep a single working line.
 
 local LOG_TAG = "[fix_sim_medic_task_dialog]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -22,23 +22,31 @@ local SIM_GIVE2 = "dm_sim_ordered_task_dialog2"
 local SIM_DONE = "dm_sim_ordered_task_completed_dialog"
 local SIM_CANCEL = "dm_sim_ordered_task_cancel_dialog"
 
+local patched = false
+
+local function list_remove(dialog_list, id)
+	if dialog_list:has(id) and type(dialog_list.remove) == "function" then
+		dialog_list:remove(id)
+		return true
+	end
+	return false
+end
+
 function on_specific_character_dialog_list(character_id, dialog_list)
 	if not dialog_list or type(dialog_list.has) ~= "function" then
 		return
 	end
 
 	local has_ordered_give = dialog_list:has(ORDERED_GIVE) or dialog_list:has(ORDERED_GIVE2)
-	if has_ordered_give and type(dialog_list.remove) == "function" then
-		local removed = false
-		if dialog_list:has(SIM_GIVE) then
-			dialog_list:remove(SIM_GIVE)
-			removed = true
+	if has_ordered_give then
+		local removed_give = false
+		if list_remove(dialog_list, SIM_GIVE) then
+			removed_give = true
 		end
-		if dialog_list:has(SIM_GIVE2) then
-			dialog_list:remove(SIM_GIVE2)
-			removed = true
+		if list_remove(dialog_list, SIM_GIVE2) then
+			removed_give = true
 		end
-		if removed then
+		if removed_give then
 			printf("%s removed duplicate sim give for %s", LOG_TAG, tostring(character_id))
 		end
 	end
@@ -46,20 +54,85 @@ function on_specific_character_dialog_list(character_id, dialog_list)
 	if not dialog_list:has(ORDERED_DONE) then
 		return
 	end
-	if dialog_list:has(SIM_DONE) then
-		return
-	end
-	if type(dialog_list.add) ~= "function" then
+
+	-- With ordered->sim fallback, keep a single completed phrase.
+	if patched and dialog_list:has(SIM_DONE) then
+		local removed_done = list_remove(dialog_list, SIM_DONE)
+		local removed_cancel = list_remove(dialog_list, SIM_CANCEL)
+		if removed_done or removed_cancel then
+			printf("%s removed duplicate sim turn-in/cancel for %s", LOG_TAG, tostring(character_id))
+		end
 		return
 	end
 
-	dialog_list:add(SIM_DONE)
-	dialog_list:add(SIM_CANCEL)
-	printf("%s injected sim turn-in/cancel for %s", LOG_TAG, tostring(character_id))
+	-- Patch missing: last-resort inject (may duplicate if both predicates pass).
+	if not patched and not dialog_list:has(SIM_DONE) and type(dialog_list.add) == "function" then
+		dialog_list:add(SIM_DONE)
+		dialog_list:add(SIM_CANCEL)
+		printf("%s injected sim turn-in/cancel (no patch) for %s", LOG_TAG, tostring(character_id))
+	end
+end
+
+local function install_ordered_sim_fallback()
+	if patched then
+		return
+	end
+	if not dialogs or type(dialogs.actor_has_finished_ordered_task) ~= "function" then
+		printf("%s WARN: dialogs.actor_has_finished_ordered_task missing, skip patch", LOG_TAG)
+		return
+	end
+	if not axr_task_manager or type(axr_task_manager.get_first_finished_task) ~= "function" then
+		printf("%s WARN: axr_task_manager.get_first_finished_task missing, skip patch", LOG_TAG)
+		return
+	end
+
+	local orig_has = dialogs.actor_has_finished_ordered_task
+	local orig_text = dialogs.text_task_finish
+	local orig_set = dialogs.npc_set_finished_task_complete
+
+	dialogs.actor_has_finished_ordered_task = function(a, b)
+		if orig_has(a, b) then
+			return true
+		end
+		local npc = dialogs.who_is_npc(a, b)
+		if not npc then
+			return false
+		end
+		return axr_task_manager.get_first_finished_task(npc, true) ~= nil
+	end
+
+	if type(orig_text) == "function" and type(dialogs.text_sim_task_finish) == "function" then
+		dialogs.text_task_finish = function(a, b)
+			local npc = dialogs.who_is_npc(a, b)
+			if npc and axr_task_manager.get_first_finished_task(npc) then
+				return orig_text(a, b)
+			end
+			return dialogs.text_sim_task_finish(a, b)
+		end
+	end
+
+	if type(orig_set) == "function" then
+		dialogs.npc_set_finished_task_complete = function(a, b)
+			local npc = dialogs.who_is_npc(a, b)
+			if npc and axr_task_manager.get_first_finished_task(npc) then
+				return orig_set(a, b)
+			end
+			if type(dialogs.npc_sim_set_finished_task_complete) == "function" then
+				return dialogs.npc_sim_set_finished_task_complete(a, b)
+			end
+			if npc and type(axr_task_manager.set_finished_task_complete) == "function" then
+				axr_task_manager.set_finished_task_complete(npc, true)
+			end
+		end
+	end
+
+	patched = true
+	printf("%s ordered finish fallback -> sim installed", LOG_TAG)
 end
 
 function on_game_start()
 	RegisterScriptCallback("on_specific_character_dialog_list", on_specific_character_dialog_list)
+	install_ordered_sim_fallback()
 	printf("%s callback installed", LOG_TAG)
 end
 
