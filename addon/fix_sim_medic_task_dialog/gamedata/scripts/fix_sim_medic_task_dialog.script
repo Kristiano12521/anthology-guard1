@@ -1,0 +1,54 @@
+-- Sim specials: restore simulation task turn-in/cancel without duplicating
+-- the "any work?" phrase already provided by dm_ordered_task_dialog.
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Vanilla sim_*_medic (traders/mechanics/barman specials, many unique NPCs)
+-- list dm_ordered_task_* but omit dm_sim_ordered_task_* from
+-- character_dialogs.xml. Simulation jobs then cannot be turned in.
+--
+-- Fix: on_specific_character_dialog_list — if ordered completed exists and
+-- sim completed does not, add sim completed + cancel. Do not add
+-- dm_sim_ordered_task_dialog when dm_ordered_task_dialog is already present
+-- (same player-facing line "???????? ?? ??????...").
+
+local LOG_TAG = "[fix_sim_medic_task_dialog]"
+local VERSION = "1.0.1"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local ORDERED_GIVE = "dm_ordered_task_dialog"
+local ORDERED_DONE = "dm_ordered_task_completed_dialog"
+local SIM_GIVE = "dm_sim_ordered_task_dialog"
+local SIM_DONE = "dm_sim_ordered_task_completed_dialog"
+local SIM_CANCEL = "dm_sim_ordered_task_cancel_dialog"
+
+function on_specific_character_dialog_list(character_id, dialog_list)
+	if not dialog_list or type(dialog_list.has) ~= "function" or type(dialog_list.add) ~= "function" then
+		return
+	end
+	if not dialog_list:has(ORDERED_DONE) then
+		return
+	end
+	if dialog_list:has(SIM_DONE) then
+		return
+	end
+
+	dialog_list:add(SIM_DONE)
+	dialog_list:add(SIM_CANCEL)
+
+	-- Avoid duplicate "any work?" when character-task give is already listed.
+	if not dialog_list:has(ORDERED_GIVE) then
+		dialog_list:add(SIM_GIVE)
+	end
+
+	printf("%s injected sim turn-in/cancel for %s", LOG_TAG, tostring(character_id))
+end
+
+function on_game_start()
+	RegisterScriptCallback("on_specific_character_dialog_list", on_specific_character_dialog_list)
+	printf("%s callback installed", LOG_TAG)
+end
+
+function on_game_end()
+	UnregisterScriptCallback("on_specific_character_dialog_list", on_specific_character_dialog_list)
+end

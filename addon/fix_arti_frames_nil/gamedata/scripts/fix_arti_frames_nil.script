@@ -1,0 +1,129 @@
+-- load-order: after arti_frames_control.script
+-- Arti Frames Nil Guard
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- ActorMenu_on_item_after_move can deliver obj=nil during Action_Move_All
+-- (ish_fast_transfer move-all + ammo_aggregation): CheckItem fails for an
+-- already-released child id, but ui_inventory still SendScriptCallback.
+-- arti_frames_control.on_move does obj:id() without a nil check -> FATAL at
+-- line 98 (lua_pcall_failed). Same root pattern as fix_dynamic_armor_visuals_nil.
+-- Plain nil indexing: obj == nil before calling original is enough.
+
+local LOG_TAG = "[fix_arti_frames_nil]"
+local VERSION = "1.0.0"
+local MODULE_NAME = "arti_frames_control"
+local CALLBACK = "ActorMenu_on_item_after_move"
+local LOG_INTERVAL_MS = 1000
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local orig_fn = nil
+local installed = false
+local skip_count = 0
+local last_log_tg = 0
+
+local function log_skip(npc_id)
+	skip_count = skip_count + 1
+	local now = time_global()
+	if (now - last_log_tg) < LOG_INTERVAL_MS then
+		return
+	end
+	last_log_tg = now
+	printf(
+		"%s skip nil obj (npc_id=%s, batch_total=%d)",
+		LOG_TAG,
+		tostring(npc_id),
+		skip_count
+	)
+end
+
+function guarded_on_move(npc_id, obj, ...)
+	if obj == nil then
+		log_skip(npc_id)
+		return
+	end
+	return orig_fn(npc_id, obj, ...)
+end
+
+local function steal_callback(name, old_fn, new_fn)
+	if type(UnregisterScriptCallback) == "function" and type(old_fn) == "function" and old_fn ~= new_fn then
+		UnregisterScriptCallback(name, old_fn)
+	end
+	if type(RegisterScriptCallback) == "function" then
+		RegisterScriptCallback(name, new_fn)
+		return true
+	end
+	return false
+end
+
+local function install()
+	if installed then
+		return true
+	end
+
+	local mod = rawget(_G, MODULE_NAME)
+	if not (mod and type(mod.on_move) == "function") then
+		printf(
+			"%s %s.on_move not found - guard NOT installed",
+			LOG_TAG,
+			MODULE_NAME
+		)
+		return false
+	end
+
+	if mod.on_move == guarded_on_move then
+		installed = true
+		return true
+	end
+
+	orig_fn = mod.on_move
+	mod.on_move = guarded_on_move
+
+	if not steal_callback(CALLBACK, orig_fn, guarded_on_move) then
+		mod.on_move = orig_fn
+		orig_fn = nil
+		printf("%s RegisterScriptCallback missing - guard NOT installed", LOG_TAG)
+		return false
+	end
+
+	installed = true
+	printf("%s guard installed v%s", LOG_TAG, VERSION)
+	return true
+end
+
+local function uninstall()
+	local mod = rawget(_G, MODULE_NAME)
+	if not installed or not orig_fn then
+		return
+	end
+
+	if type(UnregisterScriptCallback) == "function" then
+		UnregisterScriptCallback(CALLBACK, guarded_on_move)
+	end
+	if type(RegisterScriptCallback) == "function" then
+		RegisterScriptCallback(CALLBACK, orig_fn)
+	end
+	if mod then
+		mod.on_move = orig_fn
+	end
+
+	installed = false
+	orig_fn = nil
+end
+
+function actor_on_first_update()
+	if not installed then
+		install()
+	end
+end
+
+function on_game_start()
+	-- Top-level install if arti_frames already ran; retry on first update if not.
+	install()
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+end
+
+function on_game_end()
+	UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	uninstall()
+end
