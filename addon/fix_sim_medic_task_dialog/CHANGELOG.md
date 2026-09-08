@@ -1,21 +1,21 @@
 # fix_sim_medic_task_dialog
 
-## [1.0.1] — 2026-09-08
+## [1.0.2] — 2026-09-08
 
 **Сделано**
 
-- Не добавлять `dm_sim_ordered_task_dialog`, если уже есть `dm_ordered_task_dialog` (одинаковая фраза «Найдётся ли работа…»).
-- По-прежнему добавляются только `dm_sim_ordered_task_completed_dialog` и `dm_sim_ordered_task_cancel_dialog`.
-
-**Причина**
-
-После 1.0.0 сдача sim-замера заработала, но в меню появились две одинаковые строки про работу.
+- Если есть `dm_ordered_task_dialog` / `_dialog2`, **всегда снимаются** `dm_sim_ordered_task_dialog` / `_dialog2` (вторая «Найдётся ли работа…»).
+- Раньше при уже существующем sim-completed скрипт выходил сразу и дубль не трогал (типично у механиков/торговцев с `character_dialogs.xml` + ordered).
 
 **Не затронуто**
 
-- Логика сдачи / `get_first_finished_task`
-- Диалоги лечения
+- Сдача/отмена sim-заданий
+- Одна оставшаяся строка выдачи работы (ordered)
+
+## [1.0.1] — 2026-09-08
+
+Не добавлять sim-give, если ordered-give уже есть; только completed/cancel.
 
 ## [1.0.0] — 2026-09-08
 
-Callback `on_specific_character_dialog_list`: при наличии `dm_ordered_task_completed_dialog` без sim-варианта добавлялись все три `dm_sim_ordered_task_*`.
+Первый инжект трёх `dm_sim_ordered_task_*` при наличии ordered-completed.
