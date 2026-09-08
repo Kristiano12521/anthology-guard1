@@ -10,7 +10,7 @@
 -- access on destroyed userdata: item == nil before calling original is enough.
 
 local LOG_TAG = "[fix_dynamic_armor_visuals_nil]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local CALLBACK = "ActorMenu_on_item_after_move"
 local LOG_INTERVAL_MS = 1000
 
@@ -109,10 +109,19 @@ local function uninstall()
 	orig_fn = nil
 end
 
+function actor_on_first_update()
+	if not installed then
+		install()
+	end
+end
+
 function on_game_start()
+	-- Top-level install if dynamic_npc_armor_visuals already ran; retry on first update if not.
 	install()
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 end
 
 function on_game_end()
+	UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	uninstall()
 end
