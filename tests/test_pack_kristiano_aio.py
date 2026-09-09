@@ -98,6 +98,14 @@ class PackKristianoTests(unittest.TestCase):
             "-- skipped\n",
         )
         write(
+            self.addon_root / "diag_fetch_marker" / "gamedata" / "scripts" / "zzzz_diag_fetch_marker.script",
+            "-- diag only\n",
+        )
+        write(
+            self.addon_root / "fix_stale_fetch_marker" / "gamedata" / "scripts" / "fix_stale_fetch_marker.script",
+            "-- keep in aio\n",
+        )
+        write(
             self.addon_root
             / "anthology_busyhands_stability_fix"
             / "gamedata"
@@ -163,6 +171,8 @@ class PackKristianoTests(unittest.TestCase):
         self.assertNotIn("gamedata/scripts/campfires_only.script", names)
         self.assertNotIn("gamedata/scripts/skip_loot.script", names)
         self.assertNotIn("gamedata/scripts/skip_bhs.script", names)
+        self.assertNotIn("gamedata/scripts/zzzz_diag_fetch_marker.script", names)
+        self.assertIn("gamedata/scripts/fix_stale_fetch_marker.script", names)
         self.assertIn(f"gamedata/scripts/{pack_bhs.MAIN_ZIP}", names)
         self.assertIn("gamedata/scripts/sequential_load_magazine.script", names)
         with zipfile.ZipFile(aio) as zf:
@@ -186,7 +196,8 @@ class PackKristianoTests(unittest.TestCase):
             self.assertIn("version=3.2.1", meta)
 
         addons = {p.name for p in packer.aio_addons(self.addon_root)}
-        self.assertEqual(addons, {"also_keep", "keep_me"})
+        self.assertEqual(addons, {"also_keep", "fix_stale_fetch_marker", "keep_me"})
+        self.assertNotIn("diag_fetch_marker", addons)
 
     def test_version_from_meta_ini_without_changelog(self):
         write(self.addon_root / "keep_me" / "meta.ini", "version=7.7.7\n")

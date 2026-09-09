@@ -1,0 +1,18 @@
+; Stale fetch marker fix — patch tm_anthology_dynamic.ltx
+; Why: Eloquent fetch on_complete never called pstor_reset(*_fetch), so after
+;      turn-in (repeat_timeout cooldown) Utjans fetch_item_icon kept the icon.
+
+![eloquent_task_3]
+on_complete = %+eloquent_task_3_fetch_done =reward_random_money_by_dist(6200:9800:0.6) =reward_stash(true) =reward_random_item(detector_radio:stimpack_scientic:drug_radioprotector) =complete_task_inc_goodwill(50:isg) =inc_task_stage(eloquent_task_3) =pstor_reset(eloquent_task_3_fetch)%
+
+![eloquent_task_5]
+on_complete = %+eloquent_task_5_fetch_done =reward_random_money(4200:7200) =reward_stash(true) =complete_task_inc_goodwill(45:isg) =inc_task_stage(eloquent_task_5) =pstor_reset(eloquent_task_5_fetch)%
+
+![eloquent_task_6]
+on_complete = %+eloquent_task_6_fetch_done =reward_random_money(4400:7600) =reward_stash(true) =reward_random_item(ammo_9x39_ap:ammo_11.43x23_hydro:grenade_f1) =complete_task_inc_goodwill(45:isg) =inc_task_stage(eloquent_task_6) =pstor_reset(eloquent_task_6_fetch)%
+
+![eloquent_task_7]
+on_complete = %+eloquent_task_7_fetch_done =reward_random_money(3400:5600) =reward_stash(true) =complete_task_inc_goodwill(45:isg) =inc_task_stage(eloquent_task_7) =pstor_reset(eloquent_task_7_fetch)%
+
+![eloquent_task_8]
+on_complete = %+eloquent_task_8_fetch_done =reward_random_money(5200:7800) =reward_stash(true) =reward_random_item(ammo_9x39_ap:stimpack_army) =complete_task_inc_goodwill(45:isg) =inc_task_stage(eloquent_task_8) =pstor_reset(eloquent_task_8_fetch)%

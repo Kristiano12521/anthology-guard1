@@ -38,6 +38,7 @@ SKIP = {
     "fix_bhs_fdda_loot",
     "fix_minigun_dead_parent",  # withdrawn 1.1.1: registry guard ineffective
     "fix_item_combination_magnifiers",  # withdrawn 1.1.0: DLTX ! cannot delete keys with colon
+    "diag_fetch_marker",  # diagnostic for stale fetch marker; fix_stale_fetch_marker stays in AIO
 }
 BHS_MOD_ID = "anthology_busyhands_stability_fix"
 

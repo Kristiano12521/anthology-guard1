@@ -1,0 +1,188 @@
+-- Stale fetch inventory marker fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Utjans fetch_item_icon reads actor pstor via storage[AC_ID] and draws a
+-- marker while task_info exists and last_check_task is not complete/fail.
+-- After turn-in, repeat_timeout can leave *_fetch in pstor with no PDA task.
+--
+-- v1.0.0/1.0.1 used load_var(db.actor, …) while sweeping task_info only —
+-- log showed probed=0 while diag still saw eloquent_task_8_fetch. v1.0.2
+-- scans pstor tables at AC_ID / 0 / actor:id() for keys ending in _fetch
+-- and clears ghosts when the engine CGameTask is gone (or status completed/fail).
+
+local LOG_TAG = "[fix_stale_fetch_marker]"
+local VERSION = "1.0.2"
+local DELAY_EVENT = "fix_stale_fetch_marker_delay"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function get_task_info()
+	if not (task_manager and task_manager.get_task_manager) then
+		return nil
+	end
+	local tm = task_manager.get_task_manager()
+	return tm and tm.task_info or nil
+end
+
+local function has_engine_task(actor, task_id)
+	if not (actor and actor.get_task) then
+		return false
+	end
+	local ok, tsk = pcall(function()
+		return actor:get_task(task_id, true)
+	end)
+	return ok and tsk ~= nil
+end
+
+local function each_actor_pstor(fn)
+	local storage = db and db.storage
+	if type(storage) ~= "table" then
+		return
+	end
+	local seen = {}
+	local function try_id(id, label)
+		if id == nil or seen[id] then
+			return
+		end
+		seen[id] = true
+		local st = storage[id]
+		if type(st) == "table" and type(st.pstor) == "table" then
+			fn(id, st.pstor, label)
+		end
+	end
+	try_id(rawget(_G, "AC_ID") or 0, "AC_ID")
+	try_id(0, "zero")
+	if db.actor then
+		local ok, aid = pcall(function()
+			return db.actor:id()
+		end)
+		if ok then
+			try_id(aid, "actor_id")
+		end
+	end
+end
+
+local function clear_fetch_keys(pstor, task_id)
+	pstor[task_id .. "_fetch"] = nil
+	pstor[task_id .. "_fetch_count"] = nil
+	pstor[task_id .. "_count"] = nil
+	if db.actor and save_var then
+		save_var(db.actor, task_id .. "_fetch", nil)
+		save_var(db.actor, task_id .. "_fetch_count", nil)
+		save_var(db.actor, task_id .. "_count", nil)
+	end
+end
+
+local function is_stale(actor, task_id, info)
+	if type(info) ~= "table" then
+		-- Orphan pstor key, no task_info entry — safe to drop for marker purposes.
+		if not has_engine_task(actor, task_id) then
+			return true, "orphan_no_engine"
+		end
+		return false, nil
+	end
+
+	local status = info.status
+	local stage = info.stage
+	local engine = has_engine_task(actor, task_id)
+
+	if status == "completed" or status == "fail" then
+		return true, "status_" .. tostring(status)
+	end
+	if stage == 255 then
+		return true, "stage_255"
+	end
+	if not engine then
+		return true, "no_engine_task"
+	end
+	return false, nil
+end
+
+local function sweep_stale_fetch(reason)
+	local actor = db and db.actor
+	if not actor then
+		log("sweep skipped reason=%s | no actor", tostring(reason))
+		return true
+	end
+
+	local task_info = get_task_info()
+	local probed = 0
+	local cleared = 0
+	local pstor_seen = 0
+
+	each_actor_pstor(function(stor_id, pstor, label)
+		pstor_seen = pstor_seen + 1
+		local fetch_keys = 0
+		for key, sec in pairs(pstor) do
+			if type(key) == "string" and string.sub(key, -6) == "_fetch" and type(sec) == "string" then
+				fetch_keys = fetch_keys + 1
+				probed = probed + 1
+				local task_id = string.sub(key, 1, -7)
+				local info = task_info and task_info[task_id] or nil
+				local status = info and info.status or nil
+				local stage = info and info.stage or nil
+				local engine = has_engine_task(actor, task_id)
+
+				log(
+					"probe stor=%s/%s task=%s status=%s stage=%s engine=%s sec=%s",
+					tostring(stor_id),
+					tostring(label),
+					tostring(task_id),
+					tostring(status),
+					tostring(stage),
+					tostring(engine),
+					tostring(sec)
+				)
+
+				local stale, why = is_stale(actor, task_id, info)
+				if stale then
+					clear_fetch_keys(pstor, task_id)
+					cleared = cleared + 1
+					log("cleared fetch pstor task=%s why=%s sec=%s stor=%s", tostring(task_id), tostring(why), tostring(sec), tostring(label))
+				end
+			end
+		end
+		log("pstor scan id=%s label=%s fetch_keys=%s", tostring(stor_id), tostring(label), tostring(fetch_keys))
+	end)
+
+	log(
+		"sweep reason=%s pstors=%s probed=%s cleared=%s task_info=%s",
+		tostring(reason),
+		tostring(pstor_seen),
+		tostring(probed),
+		tostring(cleared),
+		tostring(task_info ~= nil)
+	)
+	return true
+end
+
+local function delayed_sweep()
+	sweep_stale_fetch("delayed")
+	return true
+end
+
+local function actor_on_first_update()
+	sweep_stale_fetch("actor_on_first_update")
+	if CreateTimeEvent then
+		CreateTimeEvent(0, DELAY_EVENT, 2, delayed_sweep)
+	end
+end
+
+local function on_before_level_changing()
+	sweep_stale_fetch("on_before_level_changing")
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("on_before_level_changing", on_before_level_changing)
+	log("installed v%s", VERSION)
+end
+
+function on_game_end()
+	UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	UnregisterScriptCallback("on_before_level_changing", on_before_level_changing)
+end
