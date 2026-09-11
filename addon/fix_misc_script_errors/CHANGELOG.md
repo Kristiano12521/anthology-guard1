@@ -1,5 +1,26 @@
 # Misc Script Error Fixes
 
+## [1.0.3] — 2026-09-11
+
+**Изменено**
+
+- `gamedata/scripts/fix_misc_script_errors.script` — nil-гард на `mas_scope_detach` `ActorMenu_on_item_after_move` (`move`): при `obj == nil` выход без `obj:section()`. Перехват при `RegisterScriptCallback` в обёртке `on_game_start`; late-path через `debug.getupvalue` → `axr_main` `intercepts`, если колбэк уже был зарегистрирован.
+
+**Причина**
+
+Лут больших стаков из тайника (`Action_Move_All`) шлёт `ActorMenu_on_item_after_move` с `obj=nil` (child id уже снят, `CheckItem` падает). Локальный `move` при `mode == "loot"` сразу делает `obj:section()` → FATAL `lua_pcall_failed` на `mas_scope_detach.script:16`. Тот же класс, что `fix_arti_frames_nil` / `fix_dynamic_armor_visuals_nil`.
+
+**Не затронуто**
+
+- Оригинал `mas_scope_detach.script`, drag/drop, `detach()`
+- `ui_inventory.script`, `ish_fast_transfer`
+- Гард `actor_on_item_use`, tutorial `guard_key`
+
+**Проверка**
+
+- lint: `python tools/lint_addon.py fix_misc_script_errors`
+- В игре: не подтверждено. Репро: take-all крупных стаков деталей патронов из тайника — без FATAL на `mas_scope_detach.script:16`; в логе при срабатывании `skip nil obj after_move`.
+
 ## [1.0.2] — 2026-09-02
 
 **Изменено**

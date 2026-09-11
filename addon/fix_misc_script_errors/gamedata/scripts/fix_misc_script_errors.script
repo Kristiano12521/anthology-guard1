@@ -6,21 +6,30 @@
 -- AOL is already guarded by Anthology_Performance_MO2_merged.
 -- Empty <guard_key/> is handled in modxml_fix_tutorial_hooks.script.
 --
--- mas_scope_detach.on_game_start registers actor_on_item_use while the
--- function is missing. axr_main.callback_set logs:
---   trying to set callback actor_on_item_use to nil function
---   mas_scope_detach.script (line: 106)
--- Detach still uses ActorMenu_on_item_drag_drop / ActorMenu_on_item_after_move.
+-- 1) mas_scope_detach.on_game_start registers actor_on_item_use while the
+--    function is missing. axr_main.callback_set logs:
+--      trying to set callback actor_on_item_use to nil function
+--      mas_scope_detach.script (line: 106)
+-- 2) local move() on ActorMenu_on_item_after_move does obj:section() with no
+--    nil check. Action_Move_All can SendScriptCallback with obj=nil (same
+--    root as fix_arti_frames_nil). FATAL at mas_scope_detach.script:16.
+-- move is local - wrap at RegisterScriptCallback during on_game_start.
 
 local LOG_TAG = "[fix_misc_script_errors]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 local MODULE_NAME = "mas_scope_detach"
+local AFTER_MOVE = "ActorMenu_on_item_after_move"
+local LOG_INTERVAL_MS = 1000
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local orig_on_game_start = nil
+local orig_after_move = nil
 local installed = false
+local after_move_wrapped = false
 local callbacks_registered = false
+local skip_count = 0
+local last_log_tg = 0
 
 local function log(fmt, ...)
 	printf(LOG_TAG .. " " .. fmt, ...)
@@ -28,6 +37,113 @@ end
 
 local function module_of(name)
 	return rawget(_G, name)
+end
+
+local function log_skip(npc_id)
+	skip_count = skip_count + 1
+	local now = time_global()
+	if (now - last_log_tg) < LOG_INTERVAL_MS then
+		return
+	end
+	last_log_tg = now
+	printf(
+		"%s skip nil obj after_move (npc_id=%s, batch_total=%d)",
+		LOG_TAG,
+		tostring(npc_id),
+		skip_count
+	)
+end
+
+function guarded_mas_after_move(npc_id, obj, ...)
+	if obj == nil then
+		log_skip(npc_id)
+		return
+	end
+	return orig_after_move(npc_id, obj, ...)
+end
+
+local function steal_after_move(raw_fn)
+	if after_move_wrapped or type(raw_fn) ~= "function" then
+		return raw_fn
+	end
+	if raw_fn == guarded_mas_after_move then
+		after_move_wrapped = true
+		return raw_fn
+	end
+	orig_after_move = raw_fn
+	after_move_wrapped = true
+	return guarded_mas_after_move
+end
+
+local function restore_after_move()
+	if not after_move_wrapped or not orig_after_move then
+		orig_after_move = nil
+		after_move_wrapped = false
+		return
+	end
+	if type(UnregisterScriptCallback) == "function" then
+		UnregisterScriptCallback(AFTER_MOVE, guarded_mas_after_move)
+	end
+	if type(RegisterScriptCallback) == "function" then
+		RegisterScriptCallback(AFTER_MOVE, orig_after_move)
+	end
+	orig_after_move = nil
+	after_move_wrapped = false
+end
+
+-- Late path when MAS already registered move before our wrap (getupvalue on
+-- axr_main.callback_set -> local intercepts). Verified: debug.getupvalue in
+-- reference/anomaly/scripts/luapanda.lua.
+local function try_wrap_registered_after_move()
+	if after_move_wrapped then
+		return true
+	end
+	if not (debug and type(debug.getupvalue) == "function" and type(debug.getinfo) == "function") then
+		return false
+	end
+	local axr = module_of("axr_main")
+	if not (axr and type(axr.callback_set) == "function") then
+		return false
+	end
+
+	local intercepts = nil
+	local i = 1
+	while true do
+		local name, val = debug.getupvalue(axr.callback_set, i)
+		if not name then
+			break
+		end
+		if name == "intercepts" and type(val) == "table" then
+			intercepts = val
+			break
+		end
+		i = i + 1
+	end
+	if not intercepts then
+		return false
+	end
+
+	local bucket = intercepts[AFTER_MOVE]
+	if type(bucket) ~= "table" then
+		return false
+	end
+
+	for fn, _ in pairs(bucket) do
+		if type(fn) == "function" and fn ~= guarded_mas_after_move then
+			local info = debug.getinfo(fn, "S")
+			local src = info and (info.short_src or info.source) or ""
+			if string.find(src, "mas_scope_detach", 1, true) then
+				local guarded = steal_after_move(fn)
+				if guarded == guarded_mas_after_move and type(UnregisterScriptCallback) == "function" then
+					UnregisterScriptCallback(AFTER_MOVE, fn)
+					RegisterScriptCallback(AFTER_MOVE, guarded_mas_after_move)
+					log("wrapped existing mas_scope_detach after_move (late)")
+					return true
+				end
+			end
+		end
+	end
+	return false
 end
 
 function patched_mas_on_game_start()
@@ -38,16 +154,30 @@ function patched_mas_on_game_start()
 		mas.actor_on_item_use = dummy
 	end
 
+	local prev_register = RegisterScriptCallback
+	RegisterScriptCallback = function(name, fn)
+		if name == AFTER_MOVE then
+			fn = steal_after_move(fn)
+		end
+		return prev_register(name, fn)
+	end
+
 	local ok, err = true, nil
 	if orig_on_game_start then
 		ok, err = pcall(orig_on_game_start)
 	end
+
+	RegisterScriptCallback = prev_register
 
 	if dummy and mas then
 		UnregisterScriptCallback("actor_on_item_use", dummy)
 		if mas.actor_on_item_use == dummy then
 			mas.actor_on_item_use = nil
 		end
+	end
+
+	if after_move_wrapped then
+		log("wrapped mas_scope_detach after_move nil-guard")
 	end
 
 	if not ok then
@@ -57,6 +187,9 @@ end
 
 local function install_mas(silent)
 	if installed then
+		if not after_move_wrapped then
+			try_wrap_registered_after_move()
+		end
 		return true
 	end
 
@@ -69,6 +202,7 @@ local function install_mas(silent)
 	end
 	if mas.on_game_start == patched_mas_on_game_start then
 		installed = true
+		try_wrap_registered_after_move()
 		return true
 	end
 
@@ -76,10 +210,12 @@ local function install_mas(silent)
 	mas.on_game_start = patched_mas_on_game_start
 	installed = true
 	log("loaded v%s wrapped mas_scope_detach.on_game_start", VERSION)
+	try_wrap_registered_after_move()
 	return true
 end
 
 local function uninstall_mas()
+	restore_after_move()
 	local mas = module_of(MODULE_NAME)
 	if mas and orig_on_game_start then
 		mas.on_game_start = orig_on_game_start
@@ -91,6 +227,10 @@ end
 function actor_on_first_update()
 	if not installed then
 		install_mas(false)
+	elseif not after_move_wrapped then
+		if not try_wrap_registered_after_move() then
+			printf("%s mas after_move nil-guard NOT installed (callback not found)", LOG_TAG)
+		end
 	end
 end
 
