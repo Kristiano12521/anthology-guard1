@@ -1,0 +1,178 @@
+-- load-order: after smart_terrain.script
+-- Smart Terrain STATE_Write Nil Guard
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- During alife save, se_smart_terrain:STATE_Write does
+--   table.size(self.npc_info)
+-- When npc_info is nil (arriving_npc may already be a table after STATE_Read,
+-- which recreates arriving_npc but never ensures npc_info), Lua FATAL:
+--   smart_terrain.script:971 bad argument #1 to 'size' (table expected, got nil)
+-- Seen on l02_garbage Depot assault -> quicksave (xray_exalt.log).
+-- Guard restores empty tables before Write/Read; job logic unchanged.
+
+local LOG_TAG = "[fix_smart_terrain_state_write]"
+local VERSION = "1.0.0"
+local MODULE_NAME = "smart_terrain"
+local LOG_INTERVAL_MS = 1000
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local orig_STATE_Write = nil
+local orig_STATE_Read = nil
+local installed = false
+local heal_count = 0
+local last_log_tg = 0
+
+local function module_of(name)
+	return rawget(_G, name)
+end
+
+local function smart_class()
+	local mod = module_of(MODULE_NAME)
+	return mod and mod.se_smart_terrain or nil
+end
+
+local function smart_label(self)
+	local name = "?"
+	local id = "?"
+	if self then
+		if type(self.name) == "function" then
+			local ok, n = pcall(self.name, self)
+			if ok and n then
+				name = tostring(n)
+			end
+		end
+		if self.id ~= nil then
+			id = tostring(self.id)
+		end
+	end
+	return name, id
+end
+
+local function log_heal(self, fields)
+	heal_count = heal_count + 1
+	local now = time_global and time_global() or 0
+	if last_log_tg > 0 and (now - last_log_tg) < LOG_INTERVAL_MS then
+		return
+	end
+	last_log_tg = now
+	local name, id = smart_label(self)
+	printf(
+		"%s healed nil tables [%s] name=%s id=%s total=%d",
+		LOG_TAG,
+		fields,
+		name,
+		id,
+		heal_count
+	)
+end
+
+-- Returns comma-separated field names that were nil and got {}.
+local function ensure_state_tables(self, with_respawn)
+	if not self then
+		return nil
+	end
+	local healed = nil
+	if type(self.npc_info) ~= "table" then
+		self.npc_info = {}
+		healed = "npc_info"
+	end
+	if type(self.arriving_npc) ~= "table" then
+		self.arriving_npc = {}
+		healed = healed and (healed .. ",arriving_npc") or "arriving_npc"
+	end
+	if with_respawn and self.respawn_point and type(self.already_spawned) ~= "table" then
+		self.already_spawned = {}
+		healed = healed and (healed .. ",already_spawned") or "already_spawned"
+	end
+	return healed
+end
+
+function guarded_STATE_Write(self, packet)
+	local healed = ensure_state_tables(self, true)
+	if healed then
+		log_heal(self, healed)
+	end
+	return orig_STATE_Write(self, packet)
+end
+
+function guarded_STATE_Read(self, packet, size)
+	-- STATE_Read recreates arriving_npc but never assigns npc_info.
+	-- Ensure before so a skipped __init__ cannot leave npc_info nil after load.
+	local healed_before = ensure_state_tables(self, false)
+	local result = orig_STATE_Read(self, packet, size)
+	local healed_after = ensure_state_tables(self, false)
+	local healed = healed_before or healed_after
+	if healed_before and healed_after and healed_before ~= healed_after then
+		healed = healed_before .. "+" .. healed_after
+	end
+	if healed then
+		log_heal(self, healed)
+	end
+	return result
+end
+
+local function install()
+	if installed then
+		return true
+	end
+
+	local cls = smart_class()
+	if not (cls and type(cls.STATE_Write) == "function" and type(cls.STATE_Read) == "function") then
+		printf(
+			"%s %s.se_smart_terrain STATE_Write/Read not found - guard NOT installed",
+			LOG_TAG,
+			MODULE_NAME
+		)
+		return false
+	end
+
+	if cls.STATE_Write == guarded_STATE_Write and cls.STATE_Read == guarded_STATE_Read then
+		installed = true
+		return true
+	end
+
+	orig_STATE_Write = cls.STATE_Write
+	orig_STATE_Read = cls.STATE_Read
+	cls.STATE_Write = guarded_STATE_Write
+	cls.STATE_Read = guarded_STATE_Read
+
+	installed = true
+	printf("%s guard installed v%s", LOG_TAG, VERSION)
+	return true
+end
+
+local function uninstall()
+	if not installed then
+		return
+	end
+	local cls = smart_class()
+	if cls then
+		if orig_STATE_Write and cls.STATE_Write == guarded_STATE_Write then
+			cls.STATE_Write = orig_STATE_Write
+		end
+		if orig_STATE_Read and cls.STATE_Read == guarded_STATE_Read then
+			cls.STATE_Read = orig_STATE_Read
+		end
+	end
+	orig_STATE_Write = nil
+	orig_STATE_Read = nil
+	installed = false
+end
+
+function actor_on_first_update()
+	if not installed then
+		install()
+	end
+end
+
+function on_game_start()
+	-- Class exists after all scripts load; retry on first update if needed.
+	install()
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+end
+
+function on_game_end()
+	UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	uninstall()
+end
