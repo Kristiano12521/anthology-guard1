@@ -26,6 +26,7 @@ reference/              исходники сборки, только чтени
 build/                  собранные моды для MO2
 logs/                   логи игры для разбора вылетов
 docs/                   плейбуки, справочники, готовые промпты
+community/              правила Discord-сервера и индекс для проверки нарушений
 templates/              скелет аддона
 tools/                  инструменты анализа и сборки
 ```
@@ -79,6 +80,7 @@ python3 tools/build_addon.py my_fix_weapon_jam --zip
 | `tools/dds_tool.ps1 decode\|encode` | DDS ↔ PNG для UI-иконок: DXT1/DXT5 и несжатый A8R8G8B8; encode пишет DXT5 без мипов |
 | `tools/draw_cmo_unique_icons.ps1` | рисует уникальные 64×64 силуэты CMO и кодирует их в DXT5 DDS через `dds_tool.ps1` |
 | `tools/check_changelog_tools.py` | падает, если в диффе `CHANGELOG.md` есть путь `tools/` без пометки `(tools-ref)` в конце строки, а файлы в `tools/` не менялись; `(tools-ref)` — ссылка на инструмент, не правка (как `-- load-order:` для ORDER-002) |
+| `tools/modcheck.py lookup\|scan\|list` | сверка текста с правилами Discord: пункты из `community/discord-rules.json`; `scan` — кандидаты по ключевым словам, не приговор |
 | `tools/pack_bhs.py` | собирает zip Anthology Busy Hands Stability Fix из `reference/` + оверлеи `addon/anthology_busyhands_stability_fix` |
 | `tools/_pack_kristiano_aio.py` | одноразовый пакер: zip `[DBG] Kristiano Fixes ALL IN ONE` из всех модов в `addon/` с `gamedata/` (кроме трёх отдельных и снятого `fix_bhs_fdda_loot`) плюс три отдельных архива — Context Menu Overhaul, QuickQK Task Complete, ST2 Footstep — в `build/` |
 
@@ -97,6 +99,7 @@ Markdown в [`.cursor/commands/`](.cursor/commands/), вызов через `/` 
 | `/verify` | `lint_addon.py --unverified`, чек-лист в игре по CHANGELOG; приоритет поведения над текстом |
 | `/fork <mod_id>` | сверка `vendor_fork=1` с `reference/addons/` (`FORK-001`, префиксы `zzz`/`aaa`) |
 | `/deploy` | `pack_bhs.py`, `_pack_kristiano_aio.py`, сверка `check_installed.py` с MO2, список переустановки |
+| `/modcheck` | сверка цитаты игрока с [`community/RULES.md`](community/RULES.md); `tools/modcheck.py scan`, вердикт по пунктам |
 
 Промпты из [`docs/prompts.md`](docs/prompts.md), ставшие командами, вызываются через `/`.
 
@@ -131,6 +134,7 @@ Markdown в [`.cursor/commands/`](.cursor/commands/), вызов через `/` 
 - [`docs/mo2.md`](docs/mo2.md) — цепочка исходники → build → MO2 → игра
 - [`docs/prompts.md`](docs/prompts.md) — готовые промпты
 - [`docs/references.md`](docs/references.md) — внешние источники
+- [`community/README.md`](community/README.md) — правила Discord и проверка нарушений
 
 ## Правила самого репозитория
 
