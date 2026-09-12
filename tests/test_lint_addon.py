@@ -154,6 +154,31 @@ class EncodingTests(unittest.TestCase):
             findings = lint_addon.lint(addon, lint_addon.ReferenceView())
             self.assertNotIn("ENC-002", {f.code for f in findings})
 
+    def test_utf8_replacement_is_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = Path(tmp) / "fffd_mod"
+            scripts = addon / "gamedata" / "scripts"
+            scripts.mkdir(parents=True)
+            # «после» → пять U+FFFD после UTF-8 round-trip без исходной кодировки
+            (scripts / "fffd_mod.script").write_bytes(
+                b"-- load-order: " + b"\xef\xbf\xbd" * 5 + b" other_mod\r\n"
+                b"function on_game_start() end\r\n"
+            )
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView())
+            enc = [f for f in findings if f.code == "ENC-004"]
+            self.assertEqual(len(enc), 1)
+            self.assertEqual(enc[0].severity, "error")
+
+    def test_cp1251_cyrillic_no_replacement(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = Path(tmp) / "cp1251_mod"
+            scripts = addon / "gamedata" / "scripts"
+            scripts.mkdir(parents=True)
+            line = "-- load-order: после other_mod\r\nfunction on_game_start() end\r\n"
+            (scripts / "cp1251_mod.script").write_bytes(line.encode("cp1251"))
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView())
+            self.assertNotIn("ENC-004", {f.code for f in findings})
+
 
 class EmptyReferenceTests(unittest.TestCase):
     def test_checks_needing_reference_are_skipped(self):

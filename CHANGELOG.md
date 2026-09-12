@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.59] — ENC-004: UTF-8 replacement (EF BF BD)
+
+`tools/lint_addon.py`: ошибка ENC-004 на байты `EF BF BD` (U+FFFD) в игровых текстовых файлах — порча после перекодировки, которую ENC-003 не ловит. Детектор в `tools/_common.py::has_utf8_replacement`. Тесты на порчу и корректный cp1251. В `addon/fix_qaw_ammo_nil` восстановлено `-- load-order: после …` в Windows-1251 (ORDER-002).
+
 ## [0.1.58] — правила Discord и проверка нарушений
 
 `community/RULES.md` — полный свод сервера Anomaly Anthology; `community/discord-rules.json` — индекс пунктов (id, наказание, сигналы). `tools/modcheck.py`: `lookup`, `scan`, `list`. Команда `/modcheck`, правило `workflow-discord-mod.mdc`. `scan` — кандидаты по словам, вердикт по тексту пункта.

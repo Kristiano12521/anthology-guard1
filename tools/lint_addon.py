@@ -35,6 +35,7 @@ from _common import (  # noqa: E402
     REPO_ROOT,
     decode_bytes,
     has_bad_line_endings,
+    has_utf8_replacement,
     iter_files,
     looks_like_utf8_cyrillic,
     path_tail,
@@ -747,6 +748,15 @@ class AddonLinter:
                 "error",
                 "Порча окончаний строк: \\r\\r\\n или одиночный \\r (не CRLF). "
                 "Часто от двойной конвертации; .script в .gitattributes как -text.",
+                path,
+            )
+        elif has_utf8_replacement(data):
+            self.add(
+                "ENC-004",
+                "error",
+                "UTF-8 replacement character (EF BF BD / U+FFFD) в игровом файле: "
+                "порча после перекодировки. Перепиши кириллицу в Windows-1251 "
+                "(tools/to_cp1251.ps1).",
                 path,
             )
         elif looks_like_utf8_cyrillic(data):

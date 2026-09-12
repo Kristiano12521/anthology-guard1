@@ -69,6 +69,15 @@ def has_bad_line_endings(data: bytes) -> bool:
     return False
 
 
+def has_utf8_replacement(data: bytes) -> bool:
+    """True, если в файле UTF-8 replacement character (U+FFFD, байты EF BF BD).
+
+    Появляется при двойной перекодировке: кириллица → UTF-8 с ошибкой → снова
+    байты. В рабочем игровом файле символ замены не нужен — это всегда порча.
+    """
+    return b"\xef\xbf\xbd" in data
+
+
 def looks_like_utf8_cyrillic(data: bytes) -> bool:
     """True, если файл похож на UTF-8 с кириллицей (для игровых файлов это ошибка)."""
     if data.startswith(b"\xef\xbb\xbf"):
