@@ -1,5 +1,33 @@
 # Arena Loadout Fix
 
+## [1.1.0] — 2026-09-12
+
+**Изменено**
+
+- `gamedata/scripts/fix_arena_loadout.script` — `pcall` вокруг цепочки `bar_arena_teleport` (MAG/Exo/ваниль). При `attempt to index local 'se'` логирует ошибку и, если в инвентаре ещё нет оружия, безопасно доспавнивает loadout текущего `bar_arena_fight_*` с nil-check перед `se_save_var`. Presence-строка `loaded v1.1.0`.
+
+**Причина**
+
+Ванильный `xr_effects.bar_arena_teleport` после `alife_create` сразу делает `se_save_var(se.id, se:name(), ...)` без проверки. Если секция не создаётся — FATAL в обёртке Mags Redux (`mags_patches.script` / диалог `magc_patches`). У игрока стабильно на 4-м бое арены SoC.
+
+**Не затронуто**
+
+- Таблицы боёв Арни и список стволов
+- `mags_patches.script` / `exo_loot.script` на диске
+- Поведение при успешном телепорте (как в 1.0.0)
+- Сохраняемое состояние
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+- В MO2 ниже MAG Redux и Exo System (как раньше)
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_arena_loadout`
+- В игре: не прогонялось. Ожидается: нет CTD на 4-м бое; в логе при сбое — `orig bar_arena_teleport error` и при пустом оружии — `recover bar_arena_fight_N`.
+
 ## [1.0.0] — 2026-08-28
 
 **Изменено**

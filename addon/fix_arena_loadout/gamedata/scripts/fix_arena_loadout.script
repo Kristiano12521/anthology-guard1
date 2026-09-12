@@ -1,3 +1,4 @@
+-- load-order: after mags_patches.script, exo_loot.script
 -- Arena Loadout Fix
 -- Anomaly 1.5.3 / Anthology 2.1
 --
@@ -5,11 +6,40 @@
 -- Anthology issues SoC-style guns (PM / MP5 / Groza / G36). Spare mags do not fit.
 -- Exo System free_power only matches exobackpack_exo_outfit and never installs a PSU,
 -- so arena exo_outfit stays at 0 power and the actor is slowed to a crawl.
+--
+-- Vanilla xr_effects.bar_arena_teleport (via MAG/Exo wrappers) does
+-- se_save_var(se.id, ...) with no nil check after alife_create. Missing section
+-- -> FATAL attempt to index local 'se'. Guard with pcall + safe recover spawn.
 
 local LOG_TAG = "[fix_arena_loadout]"
+local VERSION = "1.1.0"
 local APPLY_DELAY = 0.35
 local SPARE_MAGS = 2
 local PSU_SECTION = "exo_power_supply"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+-- Same sections as reference/anomaly/scripts/xr_effects.script bar_arena_teleport.
+local FIGHT_LOADOUTS = {
+	["bar_arena_fight_1"] = { "novice_outfit", "wpn_pm", "ammo_9x18_pmm", "ammo_9x18_pmm" },
+	["bar_arena_fight_2"] = { "stalker_outfit", "wpn_mp5", "ammo_9x19_pbp" },
+	["bar_arena_fight_3"] = { "stalker_outfit", "wpn_bm16", "ammo_12x70_buck", "ammo_12x70_buck" },
+	["bar_arena_fight_4"] = {
+		"stalker_outfit", "wpn_ak74", "ammo_5.45x39_ap", "ammo_5.45x39_ap", "bandage", "bandage",
+	},
+	["bar_arena_fight_5"] = {
+		"wpn_abakan", "ammo_5.45x39_ap", "ammo_5.45x39_ap", "ammo_5.45x39_ap",
+		"bandage", "medkit", "svoboda_light_outfit",
+	},
+	["bar_arena_fight_6"] = {
+		"wpn_groza", "ammo_9x39_ap", "ammo_9x39_ap", "ammo_9x39_ap", "specops_outfit",
+	},
+	["bar_arena_fight_7"] = { "wpn_knife", "bandage", "grenade_f1", "grenade_f1" },
+	["bar_arena_fight_8"] = {
+		"wpn_g36", "exo_outfit",
+		"ammo_5.56x45_ap", "ammo_5.56x45_ap", "ammo_5.56x45_ap", "ammo_5.56x45_ap",
+	},
+}
 
 local orig_teleport = nil
 local pending_exo_id = nil
@@ -18,7 +48,6 @@ local pending_psu_id = nil
 local function log(fmt, ...)
 	printf(LOG_TAG .. " " .. fmt, ...)
 end
-
 local function has_mags()
 	return magazine_binder
 		and type(magazine_binder.is_supported_weapon) == "function"
@@ -282,9 +311,84 @@ function apply_arena_loadout()
 	return true
 end
 
+local function current_fight_loadout()
+	for info, items in pairs(FIGHT_LOADOUTS) do
+		if has_alife_info(info) then
+			return info, items
+		end
+	end
+	return nil, nil
+end
+
+local function spawn_arena_item(sec)
+	if not (sec and db and db.actor and type(alife_create) == "function") then
+		return false
+	end
+	if ini_sys and type(ini_sys.section_exist) == "function" and not ini_sys:section_exist(sec) then
+		log("spawn skip missing section %s", sec)
+		return false
+	end
+	local se = alife_create(
+		sec,
+		db.actor:position(),
+		db.actor:level_vertex_id(),
+		db.actor:game_vertex_id(),
+		AC_ID
+	)
+	if not se then
+		log("alife_create failed for %s", sec)
+		return false
+	end
+	if type(se_save_var) == "function" and se.id then
+		pcall(se_save_var, se.id, se:name(), "unpatched", true)
+	end
+	return true
+end
+
+local function actor_has_any_weapon()
+	local found = false
+	db.actor:iterate_inventory(function(_, item)
+		if item and IsWeapon and IsWeapon(item) then
+			found = true
+		end
+	end)
+	return found
+end
+
+-- If vanilla/MAG crashed mid-spawn after inventory was dumped to the arena box,
+-- finish the fight loadout with nil-safe creates. Skip when a weapon already
+-- landed (partial success) to avoid duplicate AKs.
+function recover_arena_spawn()
+	if not (db and db.actor) then
+		return
+	end
+	local info, items = current_fight_loadout()
+	if not (info and items) then
+		log("recover skipped: no bar_arena_fight_* info")
+		return
+	end
+	if actor_has_any_weapon() then
+		log("recover skipped: weapon already present (%s)", info)
+		return
+	end
+	local ok_n, fail_n = 0, 0
+	for i = 1, #items do
+		if spawn_arena_item(items[i]) then
+			ok_n = ok_n + 1
+		else
+			fail_n = fail_n + 1
+		end
+	end
+	log("recover %s: spawned %s, failed %s", info, ok_n, fail_n)
+end
+
 function patched_bar_arena_teleport(actor, npc)
 	if orig_teleport then
-		orig_teleport(actor, npc)
+		local ok, err = pcall(orig_teleport, actor, npc)
+		if not ok then
+			log("orig bar_arena_teleport error: %s", tostring(err))
+			pcall(recover_arena_spawn)
+		end
 	end
 	delay_call("apply", APPLY_DELAY, apply_arena_loadout)
 end
