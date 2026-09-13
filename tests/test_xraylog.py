@@ -134,8 +134,8 @@ class NonfatalTracebackTests(unittest.TestCase):
         warnings_at = card.index("## Предупреждения")
         self.assertLess(mine_at, errors_at)
         self.assertLess(errors_at, warnings_at)
-        self.assertIn("`axr_main.script` ×2", card)
-        self.assertIn("`sound_theme.script` ×1", card)
+        self.assertIn("`axr_main.script` x2", card)
+        self.assertIn("`sound_theme.script` x1", card)
         self.assertIn("Триггер:", card)
         self.assertIn("dxml_core.script", card)
 
@@ -376,6 +376,95 @@ class ArchiveCardTests(unittest.TestCase):
             card = files[0].read_text(encoding="utf-8")
             self.assertIn("- Дата разбора:", card)
             self.assertIn("- Файл: `crash_lua_nil.log`", card)
+
+    def test_archive_skips_clean_session_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            err = io.StringIO()
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code = xraylog.main(
+                    [
+                        str(SAMPLES / "clean_session.log"),
+                        "--archive",
+                        "--archive-dir",
+                        str(dest),
+                    ]
+                )
+            self.assertEqual(code, 0)
+            self.assertEqual(list(dest.glob("*.md")), [])
+            self.assertIn("вылета в логе нет", err.getvalue())
+            self.assertIn("--archive-clean", err.getvalue())
+            self.assertIn("Класс:", out.getvalue())
+
+    def test_archive_clean_allows_clean_session(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                code = xraylog.main(
+                    [
+                        str(SAMPLES / "clean_session.log"),
+                        "--archive",
+                        "--archive-clean",
+                        "--archive-dir",
+                        str(dest),
+                    ]
+                )
+            self.assertEqual(code, 0)
+            files = list(dest.glob("*.md"))
+            self.assertEqual(len(files), 1)
+            expected = f"{date.today().isoformat()}_clean_session.md"
+            self.assertEqual(files[0].name, expected)
+            self.assertIn(expected, buffer.getvalue())
+            card = files[0].read_text(encoding="utf-8")
+            self.assertIn("вылета в логе нет", card)
+
+    def test_is_clean_session_class(self):
+        self.assertTrue(xraylog.is_clean_session_class("вылета в логе нет"))
+        self.assertFalse(
+            xraylog.is_clean_session_class("вылета нет, есть повторяющиеся ошибки (1 групп)")
+        )
+        self.assertFalse(xraylog.is_clean_session_class("Lua error"))
+
+    def test_main_survives_cp1251_stdout(self):
+        """Консоль Windows часто cp1251: печать карточки не должна давать UnicodeEncodeError."""
+        real_out, real_err = sys.stdout, sys.stderr
+        out_buf = io.BytesIO()
+        err_buf = io.BytesIO()
+        try:
+            sys.stdout = io.TextIOWrapper(
+                out_buf, encoding="cp1251", errors="strict", write_through=True
+            )
+            sys.stderr = io.TextIOWrapper(
+                err_buf, encoding="cp1251", errors="strict", write_through=True
+            )
+            code = xraylog.main(
+                [str(SAMPLES / "nonfatal_traceback.log"), "--errors-only"]
+            )
+            self.assertEqual(code, 0)
+        finally:
+            sys.stdout = real_out
+            sys.stderr = real_err
+
+    def test_configure_stdio_allows_chars_outside_cp1251(self):
+        from _common import configure_stdio
+
+        real_out = sys.stdout
+        buf = io.BytesIO()
+        stream = io.TextIOWrapper(
+            buf, encoding="cp1251", errors="strict", write_through=True
+        )
+        try:
+            sys.stdout = stream
+            configure_stdio()
+            print(" Culprit ×3 → done")  # без replace здесь был бы UnicodeEncodeError
+            stream.flush()
+            data = buf.getvalue()
+        finally:
+            sys.stdout = real_out
+            stream.detach()
+        self.assertGreater(len(data), 0)
 
 
 class MineSectionTests(unittest.TestCase):

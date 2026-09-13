@@ -29,9 +29,11 @@ python3 tools/refindex.py build
 Команда: `/crash <путь к логу>`.
 
 ```bash
-python3 tools/xraylog.py logs/xray_<user>.log --out logs/card.md
-python3 tools/xraylog.py logs/xray_<user>.log --errors-only
+python3 tools/xraylog.py logs/xray_<user>.log --out logs/card.md --archive
+python3 tools/xraylog.py logs/xray_<user>.log --errors-only --out logs/card.md --archive
 ```
+
+Не направляй вывод xraylog через `>` / `Out-File` — PowerShell портит кодировку; файл пишет сам `--archive` / `--out`.
 
 `--errors-only` — когда `FATAL ERROR` в логе нет, а Lua-ошибки / `STACK TRACEBACK` есть: только секция «Нефатальные ошибки», без вылета и warning'ов.
 

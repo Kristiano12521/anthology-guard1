@@ -65,7 +65,7 @@ python3 tools/build_addon.py my_fix_weapon_jam --zip
 
 | Команда | Зачем |
 | --- | --- |
-| `tools/xraylog.py <log> [--archive]` | сжимает лог игры в карточку вылета: класс ошибки, стек, warning'и. `--archive` пишет копию в `logs/cards/YYYY-MM-DD_<имя>.md` |
+| `tools/xraylog.py <log> [--archive]` | сжимает лог игры в карточку вылета: класс ошибки, стек, warning'и. `--archive` пишет копию в `logs/cards/YYYY-MM-DD_<имя>.md`; чистая сессия («вылета в логе нет») — только с `--archive-clean` |
 | `tools/prune_logs.py [--dry-run\|--yes] [--keep N]` | оставляет N самых свежих `logs/*.log` (по умолчанию 3). Без `--yes` ничего не удаляет. `logs/samples/` не трогает |
 | `tools/xdb_unpack.py <archive> [--list\|--out]` | распаковка `.db`/`.dbN`/`.xdb`: TOC через LZHUF, файлы через LZO1X |
 | `tools/fill_reference.py <игра> [--dry-run]` | наполняет `reference/anomaly/` и `reference/anthology/` из `<игра>/db`: только `scripts/`, `configs/`, `text/`, `materials/` |

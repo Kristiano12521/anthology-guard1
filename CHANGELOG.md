@@ -2,6 +2,14 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.61] — xraylog: консоль cp1251 и карточки без Out-File
+
+Удалены пять битых файлов в `logs/cards/` (три `xray_nikit_*`, `nizrim_card.txt`, дамп `nizrim_card_errors.txt`) — порча от `>`/`Out-File` и падения печати. `xraylog` / `_common.configure_stdio`: stdout/stderr с `errors=replace`, чтобы `UnicodeEncodeError` на ×/→ не валил запуск на cp1251; в карточке счётчики `xN` вместо `×N`. В `docs/setup.md` (у chcp): карточки только через `--archive`/`--out`. `docs/prompts.md`, `docs/mo2.md` — то же. Тесты на печать в cp1251.
+
+## [0.1.60] — чистка логов: clean-карточки и журнал issues
+
+`logs/cards/`: удалены 12 из 14 карточек класса «вылета в логе нет» (оставлены `2026-09-08_xray_nikit_measure`, `2026-09-03_xray_mg9000-5` как точка отсчёта). `docs/issues.md` — блоки `## [issue] \`сигнатура\`` с полями дата/мод/итог/карточка (grep по классу ошибки). `xraylog.py --archive` больше не кладёт чистые сессии в архив без `--archive-clean`. `.cursorignore` уже исключал `logs/cards/` — без изменений. Тесты на отказ/разрешение архивации clean.
+
 ## [0.1.59] — ENC-004: UTF-8 replacement (EF BF BD)
 
 `tools/lint_addon.py`: ошибка ENC-004 на байты `EF BF BD` (U+FFFD) в игровых текстовых файлах — порча после перекодировки, которую ENC-003 не ловит. Детектор в `tools/_common.py::has_utf8_replacement`. Тесты на порчу и корректный cp1251. В `addon/fix_qaw_ammo_nil` восстановлено `-- load-order: после …` в Windows-1251 (ORDER-002).

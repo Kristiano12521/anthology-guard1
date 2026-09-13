@@ -8,7 +8,7 @@
 python3 tools/xraylog.py logs/xray_ivan.log --out logs/card.md --archive
 ```
 
-`--archive` пишет карточку в `logs/cards/` и печатает путь. Без флага поведение прежнее: stdout или `--out`.
+`--archive` пишет карточку в `logs/cards/` и печатает путь. Без флага поведение прежнее: stdout или `--out`. Класс «вылета в логе нет» (чистая сессия) по умолчанию **не** архивируется — нужен явный `--archive-clean`, иначе база снова забьётся пустыми карточками.
 
 Дальше работаем по карточке — см. [`../docs/plans/crash.md`](../docs/plans/crash.md).
 

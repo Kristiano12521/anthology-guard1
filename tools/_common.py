@@ -4,10 +4,27 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Iterable, Iterator
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def configure_stdio(*, errors: str = "replace") -> None:
+    """Не ронять print на консоли cp1251/OEM.
+
+    Символы вне кодировки потока (×, →, …) при errors=strict дают
+    UnicodeEncodeError и валят весь запуск. replace — печать идёт дальше.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if not callable(reconfigure):
+            continue
+        try:
+            reconfigure(errors=errors)
+        except Exception:
+            continue
 
 GAME_TEXT_SUFFIXES = {".script", ".lua", ".ltx", ".xml", ".seq"}
 

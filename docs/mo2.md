@@ -67,7 +67,7 @@ python3 tools/check_installed.py --reinstall
 Перед разбором вылета: скопируй свежий лог в `logs/`, сожми его в карточку и работай по ней.
 
 ```bash
-python3 tools/xraylog.py logs/xray_<user>.log --out logs/card.md
+python3 tools/xraylog.py logs/xray_<user>.log --out logs/card.md --archive
 ```
 
 Содержимое `logs/` в git не попадает (кроме `logs/samples/`) — в реальных логах есть локальные пути и имя пользователя Windows.

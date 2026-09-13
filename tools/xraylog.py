@@ -26,7 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _common import REPO_ROOT, decode_bytes, filename, rel  # noqa: E402
+from _common import REPO_ROOT, configure_stdio, decode_bytes, filename, rel  # noqa: E402
 from mod_mine import (  # noqa: E402
     DEFAULT_ADDON_DIR,
     ModScanResult,
@@ -36,6 +36,9 @@ from mod_mine import (  # noqa: E402
 )
 
 DEFAULT_ARCHIVE_DIR = REPO_ROOT / "logs" / "cards"
+# Чистая сессия без FATAL и без нефатальных Lua — в базу карточек не кладём:
+# фиксирует пустоту и за месяц забивает logs/cards/. Архивация только с --archive-clean.
+CLEAN_SESSION_CLASS = "вылета в логе нет"
 
 FATAL_RE = re.compile(r"^\s*(?:-+\s*)?fatal error\s*(?:-+)?\s*$", re.I)
 FIELD_RE = re.compile(
@@ -392,7 +395,7 @@ class LogReport:
                     [
                         f"Блок FATAL ERROR не найден, но есть {total} нефатальных Lua-ошибок, {groups} уникальных сигнатур.",
                         "Смотри секцию «Нефатальные ошибки»: повторяющиеся traceback'и — основной класс проблем этой сборки.",
-                        f"Самая частая: `{culprit}` ×{top.count}.",
+                        f"Самая частая: `{culprit}` x{top.count}.",
                     ],
                 )
             return (
@@ -613,7 +616,7 @@ class LogReport:
                 out.append("")
             for i, group in enumerate(shown_errors, 1):
                 culprit = group.culprit or "неизвестный скрипт"
-                out.append(f"### {i}. `{culprit}` ×{group.count}")
+                out.append(f"### {i}. `{culprit}` x{group.count}")
                 out.append("")
                 if group.trigger:
                     out.append(f"Триггер: `{group.trigger[:200]}`")
@@ -688,6 +691,11 @@ def unique_archive_path(
         n += 1
 
 
+def is_clean_session_class(crash_class: str) -> bool:
+    """True для класса «вылета в логе нет» (нет FATAL и нет нефатальных Lua)."""
+    return crash_class == CLEAN_SESSION_CLASS
+
+
 def write_archive(
     text: str,
     log_path: Path,
@@ -701,10 +709,16 @@ def write_archive(
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_stdio()
     parser = argparse.ArgumentParser(description="Карточка вылета из лога X-Ray/Anomaly")
     parser.add_argument("log", type=Path, help="путь к xray_*.log или тексту крэша")
     parser.add_argument("--out", type=Path, help="записать карточку в файл")
     parser.add_argument("--archive", action="store_true", help="записать карточку в logs/cards/")
+    parser.add_argument(
+        "--archive-clean",
+        action="store_true",
+        help="с --archive: разрешить архивацию чистой сессии (класс «вылета в логе нет»)",
+    )
     parser.add_argument(
         "--archive-dir",
         type=Path,
@@ -748,24 +762,34 @@ def main(argv: list[str] | None = None) -> int:
             mine_only=args.mine,
         )
 
+    archived = False
     if args.archive:
-        dest_dir = args.archive_dir if args.archive_dir is not None else DEFAULT_ARCHIVE_DIR
-        card_md = report.to_markdown(
-            args.max_warnings,
-            args.warnings_only,
-            args.errors_only,
-            analyzed_on=analyzed_on,
-            mine_only=args.mine,
-        )
-        archive_path = write_archive(card_md, args.log, dest_dir, analyzed_on)
-        sink = sys.stderr if args.json else sys.stdout
-        print(rel(archive_path), file=sink)
+        crash_class, _ = report.classify()
+        if is_clean_session_class(crash_class) and not args.archive_clean:
+            print(
+                "класс «вылета в логе нет»: в logs/cards/ не архивирую "
+                "(нужен --archive-clean)",
+                file=sys.stderr,
+            )
+        else:
+            dest_dir = args.archive_dir if args.archive_dir is not None else DEFAULT_ARCHIVE_DIR
+            card_md = report.to_markdown(
+                args.max_warnings,
+                args.warnings_only,
+                args.errors_only,
+                analyzed_on=analyzed_on,
+                mine_only=args.mine,
+            )
+            archive_path = write_archive(card_md, args.log, dest_dir, analyzed_on)
+            sink = sys.stderr if args.json else sys.stdout
+            print(rel(archive_path), file=sink)
+            archived = True
 
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(text + "\n", encoding="utf-8")
         print(f"Карточка записана: {rel(args.out)}")
-    elif not args.archive or args.json:
+    elif not archived or args.json:
         print(text)
     return 0
 
