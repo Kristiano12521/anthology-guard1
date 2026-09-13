@@ -6,11 +6,14 @@
 -- pda_inter_gui.GUI:Upd*LowerMenu(). Anthology's embedded tab lives in PDA_GUI;
 -- standalone GUI stays nil. Indexing it is a fatal Lua error.
 --
--- This addon does not replace pda_inter_x_buyinfo.script. It points GUI at
+-- Banter (ask_surge / ask_psi_storm / ask_status / send_sos) hits the same
+-- field immediately and again from CreateTimeEvent cooldown callbacks.
+--
+-- This addon does not replace Interactive PDA scripts. It points GUI at
 -- the live window for the original call, then restores the field.
 
 local LOG_TAG = "[fix_pda_buyinfo_gui]"
-local VERSION = "1.0.1"
+local VERSION = "1.1.0"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -19,12 +22,15 @@ local installed = false
 local callbacks_registered = false
 local logged_err = {}
 
--- Original last line is GUI:UpdFindLowerMenu / UpdTradeLowerMenu. If both
--- windows are missing, a no-op object lets that line finish without a fatal.
+-- Original last line is GUI:UpdFindLowerMenu / UpdTradeLowerMenu / UpdBanterButtons.
+-- If both windows are missing, a no-op object lets that line finish without a fatal.
 local noop_gui = {
 	UpdFindLowerMenu = function() end,
 	UpdTradeLowerMenu = function() end,
+	UpdBanterButtons = function() end,
 }
+
+local BANTER_FNS = { "send_sos", "ask_surge", "ask_psi_storm", "ask_status" }
 
 local function log(fmt, ...)
 	printf(LOG_TAG .. " " .. fmt, ...)
@@ -49,7 +55,12 @@ end
 -- is PDA_GUI, the old standalone window is GUI. Prefer the live one.
 local function with_live_gui(slot, fn)
 	if type(pda_inter_gui) ~= "table" then
-		return fn()
+		local ok, a, b, c = pcall(fn)
+		if not ok then
+			log_once(slot, "%s failed (no pda_inter_gui): %s", slot, tostring(a))
+			return
+		end
+		return a, b, c
 	end
 
 	local saved = pda_inter_gui.GUI
@@ -57,14 +68,40 @@ local function with_live_gui(slot, fn)
 		pda_inter_gui.GUI = live_gui() or noop_gui
 	end
 
-	local ok, err = pcall(fn)
+	local ok, a, b, c = pcall(fn)
 
 	pda_inter_gui.GUI = saved
 
 	if not ok then
-		log_once(slot, "%s failed after GUI bind: %s", slot, tostring(err))
+		log_once(slot, "%s failed after GUI bind: %s", slot, tostring(a))
+		return
 	end
-	return ok
+	return a, b, c
+end
+
+-- Banter schedules UpdBanterButtons from CreateTimeEvent after the PDA may
+-- already be closed. Wrap callbacks created during ask_* / send_sos.
+local function with_cte_gui_guard(slot, fn)
+	local prev = CreateTimeEvent
+	CreateTimeEvent = function(e, a, t, cb)
+		if type(cb) == "function" then
+			local inner = cb
+			cb = function(...)
+				return with_live_gui(slot .. "_cte", function()
+					return inner(...)
+				end)
+			end
+		end
+		return prev(e, a, t, cb)
+	end
+
+	local ok, a, b, c = pcall(fn)
+	CreateTimeEvent = prev
+	if not ok then
+		log_once(slot, "%s failed under CTE guard: %s", slot, tostring(a))
+		return
+	end
+	return a, b, c
 end
 
 local function patched_add_sender()
@@ -73,6 +110,23 @@ end
 
 local function patched_add_trader()
 	return with_live_gui("add_trader", orig.add_trader)
+end
+
+local function make_banter_patch(slot)
+	return function(...)
+		local args = { ... }
+		return with_cte_gui_guard(slot, function()
+			return with_live_gui(slot, function()
+				return orig[slot](unpack(args))
+			end)
+		end)
+	end
+end
+
+local banter_patched = {}
+for i = 1, #BANTER_FNS do
+	local name = BANTER_FNS[i]
+	banter_patched[name] = make_banter_patch(name)
 end
 
 local function wrap(slot, owner, name, patched)
@@ -117,6 +171,19 @@ local function install()
 		need(wrap("add_trader", pda_inter_x_trade, "add_trader", patched_add_trader), "pda_inter_x_trade.add_trader")
 	end
 
+	if type(pda_inter_x_banter) == "table" then
+		for i = 1, #BANTER_FNS do
+			local name = BANTER_FNS[i]
+			need(
+				wrap(name, pda_inter_x_banter, name, banter_patched[name]),
+				"pda_inter_x_banter." .. name
+			)
+		end
+	else
+		missing = missing + 1
+		log("pda_inter_x_banter not found - Interactive PDA banter not loaded")
+	end
+
 	installed = wrapped > 0
 	log("loaded v%s wrapped=%s missing=%s", VERSION, tostring(wrapped), tostring(missing))
 	return installed
@@ -128,6 +195,14 @@ local function uninstall()
 	end
 	if type(pda_inter_x_trade) == "table" and orig.add_trader then
 		pda_inter_x_trade.add_trader = orig.add_trader
+	end
+	if type(pda_inter_x_banter) == "table" then
+		for i = 1, #BANTER_FNS do
+			local name = BANTER_FNS[i]
+			if orig[name] then
+				pda_inter_x_banter[name] = orig[name]
+			end
+		end
 	end
 	orig = {}
 	installed = false

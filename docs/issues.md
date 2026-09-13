@@ -19,6 +19,24 @@
 
 ---
 
+## [issue] `pda_inter_x_banter.script:170: attempt to index field 'GUI' (a nil value)`
+
+- дата: 2026-09-13
+- мод: `fix_pda_buyinfo_gui` **1.1.0** (раньше только buyinfo/trade)
+- итог: починено — обёртка `send_sos` / `ask_surge` / `ask_psi_storm` / `ask_status` + CTE-колбэки через `PDA_GUI` / noop
+- карточка: нет (Discord-скрин hicross)
+- pitfalls: нет
+- подробности: `addon/fix_pda_buyinfo_gui/CHANGELOG.md` [1.1.0]
+
+## [issue] Discord nil-FATAL пакет (crow / Semenov / unregister_npc / clear_dead / intercept / cover_tilt / spawn_fast / vid_mode)
+
+- дата: 2026-09-13
+- мод: `fix_nil_crash_guards` **1.0.0**
+- итог: починено гардами (см. CHANGELOG мода); не покрывает patrol vertex, Not enough IDs, missing anm/xml, armor_ripper без HF
+- карточка: нет (пачка Discord-скринов авг 2026)
+- pitfalls: нет
+- подробности: `addon/fix_nil_crash_guards/CHANGELOG.md` [1.0.0]
+
 ## [issue] `![axr_main callback_set] callback trader_on_restock doesn't exist!`
 
 - дата: 2026-08-31

@@ -1,5 +1,30 @@
 # PDA Buy Info GUI Fix
 
+## [1.1.0] — 2026-09-13
+
+**Изменено**
+
+- Обёртки `pda_inter_x_banter.send_sos` / `ask_surge` / `ask_psi_storm` / `ask_status`: на время вызова `GUI` → живое окно (`PDA_GUI` / noop); колбэки `CreateTimeEvent` (сброс кулдауна кнопок) тоже идут через тот же bind.
+- `noop_gui.UpdBanterButtons`; `with_live_gui` возвращает результаты `pcall` (нужно для CTE `return true`).
+
+**Причина**
+
+`pda_inter_x_banter.script:170` (и соседние `UpdBanterButtons`): `attempt to index field 'GUI' (a nil value)` на встроенной вкладке Interactive PDA — тот же класс, что buyinfo/trade. Срабатывает и сразу в `ask_*`, и из отложенного `reset_cd`.
+
+**Не затронуто**
+
+- `pda_inter_x_raid`; файлы Interactive PDA без полной замены
+- Логика SOS / выброс / пси / статус
+
+**Совместимость**
+
+- Как 1.0.x; в MO2 ниже `[GAM] Interactive PDA`
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_pda_buyinfo_gui`
+- В игре: не прогонялось. Ожидание: banter-кнопка → закрыть КПК до конца кулдауна → без FATAL на `GUI`
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**

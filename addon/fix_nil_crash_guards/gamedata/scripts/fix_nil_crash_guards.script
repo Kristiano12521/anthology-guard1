@@ -1,0 +1,508 @@
+-- Nil Crash Guards
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Monkey-patch guards for recurring Discord FATAL signatures that are not
+-- covered by a dedicated addon. Does not replace upstream files.
+--
+-- Covers:
+-- 1) item_knife.get_condition nil -> bind_crow / bind_monster compare crash
+-- 2) task_functor yan_ecolog_semenov_task_target(_1) squad nil
+-- 3) se_monster / se_stalker on_unregister unregister_npc nil
+-- 4) smart_terrain.on_death clear_dead nil (offline combat path)
+-- 5) xr_effects.spawn_intercept_artifact_artifact nil target/create
+-- 6) demonized_randomizing_functions stub before weapon_cover_tilt loads
+-- 7) anthology_actor_spawn_fast without iterate_objects_by_clsid
+-- 8) reverse_resolution_list_mcm.cont_vid_mode bad resolution tokens
+
+-- load-order: before weapon_cover_tilt (stub global ease table if missing)
+
+local LOG_TAG = "[fix_nil_crash_guards]"
+local VERSION = "1.0.0"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local orig = {}
+local installed = {}
+local callbacks_registered = false
+local logged_err = {}
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function log_once(key, fmt, ...)
+	if logged_err[key] then
+		return
+	end
+	logged_err[key] = true
+	log(fmt, ...)
+end
+
+local function module_of(name)
+	return rawget(_G, name)
+end
+
+------------------------------------------------------------------------
+-- 6) Weapon Cover Tilt ease stub (must run at file load, before WCT)
+------------------------------------------------------------------------
+local function ensure_ease_stub()
+	if type(rawget(_G, "demonized_randomizing_functions")) == "table" then
+		return false
+	end
+	_G.demonized_randomizing_functions = {
+		CircularEaseOutPowered = function(p, _power)
+			if type(p) ~= "number" then
+				return 0
+			end
+			return p
+		end,
+	}
+	log("stub demonized_randomizing_functions (Weapon Cover Tilt without Ledge Grabbing)")
+	return true
+end
+
+ensure_ease_stub()
+
+------------------------------------------------------------------------
+-- 1) item_knife.get_condition
+------------------------------------------------------------------------
+local function patched_get_condition()
+	local c = orig.get_condition and orig.get_condition()
+	if c == nil then
+		return 1
+	end
+	return c
+end
+
+local function install_knife()
+	if installed.knife then
+		return true
+	end
+	local mod = module_of("item_knife")
+	if not (mod and type(mod.get_condition) == "function") then
+		log("item_knife.get_condition not found - guard NOT installed")
+		return false
+	end
+	if mod.get_condition == patched_get_condition then
+		installed.knife = true
+		return true
+	end
+	orig.get_condition = mod.get_condition
+	mod.get_condition = patched_get_condition
+	installed.knife = true
+	log("wrapped item_knife.get_condition")
+	return true
+end
+
+------------------------------------------------------------------------
+-- 2) Semenov task_functor
+------------------------------------------------------------------------
+local function patched_semenov_task_target(task_id, field, p, tsk)
+	if task_id == "yan_ecolog_semenov_task_1" then
+		local squad = get_story_squad("yan_ecolog_semenov_squad")
+		if squad and squad.dist_to_actor and squad.dist_to_actor > 50 then
+			return squad.id
+		end
+		if tsk and tsk.stage and tsk.stage >= 1 and squad then
+			return squad.id
+		end
+	end
+end
+
+local function patched_semenov_task_target_1(task_id, field, p, tsk)
+	local squad = get_story_squad("yan_ecolog_semenov_squad")
+	if db.actor and squad and squad.dist_to_actor and squad.dist_to_actor > 50 then
+		return squad.id
+	end
+	if tsk and tsk.stage and tsk.stage >= 1 and squad then
+		return squad.id
+	end
+end
+
+local SEMENOV_PATCHES = {
+	yan_ecolog_semenov_task_target = patched_semenov_task_target,
+	yan_ecolog_semenov_task_target_1 = patched_semenov_task_target_1,
+}
+
+local function install_semenov()
+	if installed.semenov then
+		return true
+	end
+	local mod = module_of("task_functor")
+	if type(mod) ~= "table" then
+		log("task_functor not found - guard NOT installed")
+		return false
+	end
+	local n = 0
+	for name, patched in pairs(SEMENOV_PATCHES) do
+		if type(mod[name]) == "function" and mod[name] ~= patched then
+			orig[name] = orig[name] or mod[name]
+			mod[name] = patched
+			n = n + 1
+		elseif mod[name] == patched then
+			n = n + 1
+		end
+	end
+	if n == 0 then
+		log("semenov task_functor targets not found - guard NOT installed")
+		return false
+	end
+	installed.semenov = true
+	log("wrapped semenov task_functor targets=%s", tostring(n))
+	return true
+end
+
+------------------------------------------------------------------------
+-- 3) se_monster / se_stalker on_unregister
+------------------------------------------------------------------------
+local function safe_unregister_npc(self, kind)
+	local strn_id = self:smart_terrain_id()
+	if strn_id ~= 65535 then
+		local smart = alife_object(strn_id)
+		if smart ~= nil then
+			local fn = smart.unregister_npc
+			if type(fn) == "function" then
+				fn(smart, self)
+			else
+				log_once(
+					"unreg_" .. kind,
+					"skip unregister_npc on non-smart id=%s kind=%s",
+					tostring(strn_id),
+					kind
+				)
+			end
+		end
+	end
+	db.offline_objects[self.id] = nil
+end
+
+local function patched_monster_on_unregister(self, ...)
+	safe_unregister_npc(self, "monster")
+	SendScriptCallback("server_entity_on_unregister", self, "se_monster")
+	cse_alife_monster_base.on_unregister(self)
+end
+
+local function patched_stalker_on_unregister(self, ...)
+	safe_unregister_npc(self, "stalker")
+	SendScriptCallback("server_entity_on_unregister", self, "se_stalker")
+	cse_alife_human_stalker.on_unregister(self)
+end
+
+local function install_unregister(class_mod, name, patched, base_label)
+	if installed[name] then
+		return true
+	end
+	local mod = module_of(class_mod)
+	if not (mod and type(mod.on_unregister) == "function") then
+		log("%s.on_unregister not found - guard NOT installed", class_mod)
+		return false
+	end
+	if mod.on_unregister == patched then
+		installed[name] = true
+		return true
+	end
+	orig[name] = mod.on_unregister
+	mod.on_unregister = patched
+	installed[name] = true
+	log("wrapped %s.on_unregister (%s)", class_mod, base_label)
+	return true
+end
+
+------------------------------------------------------------------------
+-- 4) smart_terrain.on_death / clear_dead
+------------------------------------------------------------------------
+local function patched_smart_on_death(se_obj)
+	local sim = alife()
+	local smart = sim
+		and se_obj
+		and se_obj.m_smart_terrain_id
+		and se_obj.m_smart_terrain_id ~= 65535
+		and sim:object(se_obj.m_smart_terrain_id)
+	if not smart then
+		return
+	end
+	local fn = smart.clear_dead
+	if type(fn) == "function" then
+		fn(smart, se_obj)
+	else
+		log_once(
+			"clear_dead",
+			"skip clear_dead on non-smart id=%s",
+			tostring(se_obj and se_obj.m_smart_terrain_id)
+		)
+	end
+end
+
+local function install_clear_dead()
+	if installed.clear_dead then
+		return true
+	end
+	local mod = module_of("smart_terrain")
+	if not (mod and type(mod.on_death) == "function") then
+		log("smart_terrain.on_death not found - guard NOT installed")
+		return false
+	end
+	if mod.on_death == patched_smart_on_death then
+		installed.clear_dead = true
+		return true
+	end
+	orig.smart_on_death = mod.on_death
+	mod.on_death = patched_smart_on_death
+	installed.clear_dead = true
+	log("wrapped smart_terrain.on_death")
+	return true
+end
+
+------------------------------------------------------------------------
+-- 5) intercept artifact spawn
+------------------------------------------------------------------------
+local function patched_intercept_spawn(actor, npc, p)
+	local ok, err = pcall(orig.intercept_spawn, actor, npc, p)
+	if ok then
+		return err
+	end
+	log_once("intercept", "spawn_intercept_artifact_artifact skipped: %s", tostring(err))
+end
+
+local function install_intercept()
+	if installed.intercept then
+		return true
+	end
+	local mod = module_of("xr_effects")
+	if not (mod and type(mod.spawn_intercept_artifact_artifact) == "function") then
+		-- Optional: iTheon may be absent
+		return false
+	end
+	if mod.spawn_intercept_artifact_artifact == patched_intercept_spawn then
+		installed.intercept = true
+		return true
+	end
+	orig.intercept_spawn = mod.spawn_intercept_artifact_artifact
+	mod.spawn_intercept_artifact_artifact = patched_intercept_spawn
+	installed.intercept = true
+	log("wrapped xr_effects.spawn_intercept_artifact_artifact")
+	return true
+end
+
+------------------------------------------------------------------------
+-- 7) actor spawn fast without engine API
+------------------------------------------------------------------------
+local function patched_actor_on_net_spawn(...)
+	local sim = alife()
+	if sim and type(sim.iterate_objects_by_clsid) ~= "function" then
+		log_once(
+			"spawn_fast",
+			"iterate_objects_by_clsid missing - safe spawn path"
+		)
+		local ok, err = pcall(orig.actor_on_net_spawn, ...)
+		if ok then
+			return err
+		end
+		log_once("spawn_fast_err", "actor_on_net_spawn failed: %s", tostring(err))
+		if type(SendScriptCallback) == "function" then
+			pcall(SendScriptCallback, "on_game_load")
+		end
+		return
+	end
+	return orig.actor_on_net_spawn(...)
+end
+
+local function install_spawn_fast()
+	if installed.spawn_fast then
+		return true
+	end
+	local ext = module_of("bind_stalker_ext")
+	if not (ext and type(ext.actor_on_net_spawn) == "function") then
+		return false
+	end
+	-- Only wrap when Performance fast-spawn is the one installed, or always
+	-- wrap: our check no-ops when API exists.
+	if ext.actor_on_net_spawn == patched_actor_on_net_spawn then
+		installed.spawn_fast = true
+		return true
+	end
+	orig.actor_on_net_spawn = ext.actor_on_net_spawn
+	ext.actor_on_net_spawn = patched_actor_on_net_spawn
+	installed.spawn_fast = true
+	log("wrapped bind_stalker_ext.actor_on_net_spawn")
+	return true
+end
+
+------------------------------------------------------------------------
+-- 8) reverse resolution list
+------------------------------------------------------------------------
+local function patched_cont_vid_mode()
+	local ok, result = pcall(orig.cont_vid_mode)
+	if ok and type(result) == "table" then
+		return result
+	end
+	log_once(
+		"vid_mode",
+		"cont_vid_mode failed (%s) - fallback list",
+		tostring(result)
+	)
+	return {
+		{ "1920x1080", "1920 x 1080" },
+		{ "1280x720", "1280 x 720" },
+		{ "1024x768", "1024 x 768" },
+	}
+end
+
+-- Safer: skip bad tokens instead of only falling back after full failure.
+local function patched_cont_vid_mode_safe()
+	if type(orig.cont_vid_mode) ~= "function" then
+		return patched_cont_vid_mode()
+	end
+	-- Prefer filtering by re-running logic with guards when game.get_resolutions exists.
+	if type(game) ~= "table" or type(game.get_resolutions) ~= "function" or type(str_explode) ~= "function" then
+		return patched_cont_vid_mode()
+	end
+
+	local function round_idp(num, idp)
+		local mult = 10 ^ (idp or 0)
+		return math.ceil(num * mult + 0.5) / mult
+	end
+
+	local ratio = {
+		[round_idp(8 / 9, 1)] = "(8:9)",
+		[round_idp(5 / 3, 1)] = "(5:3)",
+		[round_idp(5 / 4, 1)] = "(5:4)",
+		[round_idp(4 / 3, 1)] = "(4:3)",
+		[round_idp(16 / 9, 1)] = "(16:9)",
+		[round_idp(16 / 10, 1)] = "(16:10)",
+		[round_idp(21 / 9, 1)] = "(21:9)",
+		[round_idp(21.33 / 9, 1)] = "(21:9)",
+		[round_idp(32 / 9, 1)] = "(32:9)",
+	}
+
+	local ress = game.get_resolutions()
+	if type(ress) ~= "string" or not string.find(ress, "x", 1, true) then
+		ress = "640x480,800x600,1024x768,1280x720,1280x800,1280x1024,1366x768,1440x900,1680x1050,1920x1080,2560x1440,3840x2160"
+	end
+	ress = str_explode(ress, ",")
+
+	local cont = {}
+	for i = #ress, 1, -1 do
+		local res = str_explode(ress[i], "x")
+		local w = tonumber(res and res[1])
+		local h = tonumber(res and res[2])
+		if w and h and h ~= 0 then
+			local rat = ratio[round_idp(w / h, 1)] or ""
+			cont[#cont + 1] = { (w .. "x" .. h), (w .. " x " .. h .. " " .. rat) }
+		else
+			log_once("vid_token", "skip bad resolution token: %s", tostring(ress[i]))
+		end
+	end
+	if #cont == 0 then
+		return patched_cont_vid_mode()
+	end
+	return cont
+end
+
+local function install_vid_mode()
+	if installed.vid_mode then
+		return true
+	end
+	local mod = module_of("reverse_resolution_list_mcm")
+	if not (mod and type(mod.cont_vid_mode) == "function") then
+		return false
+	end
+	if mod.cont_vid_mode == patched_cont_vid_mode_safe then
+		installed.vid_mode = true
+		return true
+	end
+	orig.cont_vid_mode = mod.cont_vid_mode
+	mod.cont_vid_mode = patched_cont_vid_mode_safe
+	installed.vid_mode = true
+	log("wrapped reverse_resolution_list_mcm.cont_vid_mode")
+	return true
+end
+
+------------------------------------------------------------------------
+-- install / uninstall
+------------------------------------------------------------------------
+local function install_all()
+	install_knife()
+	install_semenov()
+	install_unregister("se_monster", "monster_unreg", patched_monster_on_unregister, "monster")
+	install_unregister("se_stalker", "stalker_unreg", patched_stalker_on_unregister, "stalker")
+	install_clear_dead()
+	install_intercept()
+	install_spawn_fast()
+	install_vid_mode()
+end
+
+local function uninstall_all()
+	local knife = module_of("item_knife")
+	if knife and orig.get_condition then
+		knife.get_condition = orig.get_condition
+	end
+
+	local tf = module_of("task_functor")
+	if tf then
+		for name, _ in pairs(SEMENOV_PATCHES) do
+			if orig[name] then
+				tf[name] = orig[name]
+			end
+		end
+	end
+
+	local mon = module_of("se_monster")
+	if mon and orig.monster_unreg then
+		mon.on_unregister = orig.monster_unreg
+	end
+	local stk = module_of("se_stalker")
+	if stk and orig.stalker_unreg then
+		stk.on_unregister = orig.stalker_unreg
+	end
+
+	local st = module_of("smart_terrain")
+	if st and orig.smart_on_death then
+		st.on_death = orig.smart_on_death
+	end
+
+	local fx = module_of("xr_effects")
+	if fx and orig.intercept_spawn then
+		fx.spawn_intercept_artifact_artifact = orig.intercept_spawn
+	end
+
+	local ext = module_of("bind_stalker_ext")
+	if ext and orig.actor_on_net_spawn then
+		ext.actor_on_net_spawn = orig.actor_on_net_spawn
+	end
+
+	local rrm = module_of("reverse_resolution_list_mcm")
+	if rrm and orig.cont_vid_mode then
+		rrm.cont_vid_mode = orig.cont_vid_mode
+	end
+
+	orig = {}
+	installed = {}
+	logged_err = {}
+end
+
+function on_game_load()
+	logged_err = {}
+end
+
+function actor_on_first_update()
+	install_all()
+end
+
+function on_game_start()
+	install_all()
+	if not callbacks_registered then
+		RegisterScriptCallback("on_game_load", on_game_load)
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
+	uninstall_all()
+end
