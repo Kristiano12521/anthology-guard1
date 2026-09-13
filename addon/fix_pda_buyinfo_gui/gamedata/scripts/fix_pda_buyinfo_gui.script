@@ -13,7 +13,7 @@
 -- the live window for the original call, then restores the field.
 
 local LOG_TAG = "[fix_pda_buyinfo_gui]"
-local VERSION = "1.1.0"
+local VERSION = "1.1.1"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -86,9 +86,12 @@ local function with_cte_gui_guard(slot, fn)
 	CreateTimeEvent = function(e, a, t, cb)
 		if type(cb) == "function" then
 			local inner = cb
+			-- LuaJIT: `...` is only valid in the immediate vararg function.
+			-- Nested `function() return inner(...) end` fails to load the script.
 			cb = function(...)
+				local args = { ... }
 				return with_live_gui(slot .. "_cte", function()
-					return inner(...)
+					return inner(unpack(args))
 				end)
 			end
 		end

@@ -1,5 +1,31 @@
 # Anthology Busy Hands Stability Fix
 
+## [0.6.11] — 2026-09-13
+
+**Изменено**
+
+- Новый `zzzzzz_anthology_bhs_inventory_weight_patch.script`: monkey-patch `UIInventory.IsInvOwner` (отсев destroyed partner до `IsStalker`/`clsid`) и `UIInventory.UpdateWeight` (pcall поверх цепочки, в т.ч. `stash_capacities`).
+- `anthology_busyhands_stability_fix.script` 0.6.11 — verify-маркер и счётчик гарда.
+
+**Причина**
+
+Лут трупа → закрытие инвентаря → смена лока: `ui_inventory.GUI` жив, partner уже destroyed. Classes & Talents (`endurance_weight_upd`) раз в секунду зовёт `UpdateWeight` → `IsInvOwner` → `IsStalker` → BusyHands (`_g.script:2923`, лог `xray_nikit` 23:11:17, id=40842).
+
+**Не затронуто**
+
+- Вендорские `ui_inventory` / `stash_capacities` / `talents_functions`, сейвы, `verified_*`.
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: без миграции
+- В MO2: как 0.6.10 (скрипт `zzzzzz_*` грузится после `stash_capacities`)
+
+**Проверено**
+
+- `lint_addon.py` и `--cross`
+- В игре: не прогонялось (ожидание: лут трупа → смена лока без диалога BusyHands; в логе `IsInvOwner skipped` / `UpdateWeight cancelled` не чаще одного раза за сессию)
+
 ## [0.6.10] — 2026-09-04
 
 **Изменено**

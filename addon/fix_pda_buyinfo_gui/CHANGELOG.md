@@ -1,5 +1,24 @@
 # PDA Buy Info GUI Fix
 
+## [1.1.1] — 2026-09-13
+
+**Изменено**
+
+- `with_cte_gui_guard`: аргументы CTE-колбэка пакуются в `{...}` / `unpack` перед входом во вложенную `function()` — иначе LuaJIT: `cannot use '...' outside a vararg function` на строке обёртки, скрипт не грузится.
+
+**Причина**
+
+Лог `xray_nikit`: `Failed to load script fix_pda_buyinfo_gui` (оба захода сессии).
+
+**Не затронуто**
+
+- Логика banter / buyinfo / trade; сейвы.
+
+**Проверено**
+
+- `lint_addon.py`
+- В игре: не прогонялось (ожидание: presence `loaded v1.1.1`, без `Failed to load script`)
+
 ## [1.1.0] — 2026-09-13
 
 **Изменено**

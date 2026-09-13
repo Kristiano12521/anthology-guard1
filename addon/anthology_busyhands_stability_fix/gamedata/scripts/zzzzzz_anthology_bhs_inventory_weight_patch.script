@@ -1,0 +1,74 @@
+-- Anthology Busy Hands Stability Fix v0.6.11 - UIInventory weight / IsInvOwner guard
+-- load-order: после stash_capacities (Anthology База.Данные) и ui_inventory
+--
+-- Classes & Talents calls ui_inventory.GUI:UpdateWeight() every second from
+-- actor_on_update even after the loot UI is closed. GUI still holds the last
+-- partner userdata. On level change that corpse/box is destroyed; IsStalker
+-- then does o:clsid() -> BusyHandsDebug (Accessing destroyed object).
+--
+-- Stack from xray_nikit 2026-09-13:
+--   endurance_weight_upd -> stash_capacities.UpdateWeight -> original_update_weight
+--   -> IsInvOwner -> IsStalker -> clsid on destroyed id
+--
+-- Vendor files untouched. Method-level monkey-patch on UIInventory only.
+
+local VERSION = "0.6.11"
+ANTHOLOGY_BHS_INVENTORY_WEIGHT_PATCH_VERSION = VERSION
+
+local logged_is_inv_owner = false
+local logged_update_weight = false
+
+local function partner_alive(npc)
+	if not npc then
+		return false
+	end
+	local ok = pcall(function()
+		return npc:clsid()
+	end)
+	return ok
+end
+
+if type(ui_inventory) == "table"
+and type(ui_inventory.UIInventory) == "table"
+and type(ui_inventory.UIInventory.IsInvOwner) == "function" then
+	local original_is_inv_owner = ui_inventory.UIInventory.IsInvOwner
+	ui_inventory.UIInventory.IsInvOwner = function(self, npc)
+		if npc and not partner_alive(npc) then
+			if not logged_is_inv_owner then
+				logged_is_inv_owner = true
+				printf("[BusyHandsFix v%s] IsInvOwner skipped destroyed partner", VERSION)
+			end
+			return false
+		end
+		local ok, result = pcall(original_is_inv_owner, self, npc)
+		if not ok then
+			if not logged_is_inv_owner then
+				logged_is_inv_owner = true
+				printf("[BusyHandsFix v%s] IsInvOwner cancelled: %s", VERSION, tostring(result))
+			end
+			return false
+		end
+		return result
+	end
+	printf("[BusyHandsFix v%s] UIInventory.IsInvOwner patched via ui_inventory.UIInventory (method-level, ui_inventory.script untouched)", VERSION)
+else
+	printf("[BusyHandsFix v%s] UIInventory.IsInvOwner was not found - guard NOT installed", VERSION)
+end
+
+if type(ui_inventory) == "table"
+and type(ui_inventory.UIInventory) == "table"
+and type(ui_inventory.UIInventory.UpdateWeight) == "function" then
+	local original_update_weight = ui_inventory.UIInventory.UpdateWeight
+	ui_inventory.UIInventory.UpdateWeight = function(self, ...)
+		local ok, err = pcall(original_update_weight, self, ...)
+		if not ok then
+			if not logged_update_weight then
+				logged_update_weight = true
+				printf("[BusyHandsFix v%s] UpdateWeight cancelled: %s", VERSION, tostring(err))
+			end
+		end
+	end
+	printf("[BusyHandsFix v%s] UIInventory.UpdateWeight patched via ui_inventory.UIInventory (method-level, stash_capacities / ui_inventory untouched)", VERSION)
+else
+	printf("[BusyHandsFix v%s] UIInventory.UpdateWeight was not found - guard NOT installed", VERSION)
+end
