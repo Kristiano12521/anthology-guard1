@@ -1,5 +1,20 @@
 # Dynamic Armor Visuals Nil Guard
 
+## [1.0.1] — 2026-09-08
+
+**Изменено**
+
+- `fix_dynamic_armor_visuals_nil.script` — повторная установка guard в `actor_on_first_update`, если `dynamic_npc_armor_visuals` ещё не экспортировал handler на `on_game_start` (тот же паттерн, что в `fix_arti_frames_nil`).
+
+**Причина**
+
+При отложенной регистрации callback в Dynamic NPC Armor Visuals guard молча не ставился (`guard NOT installed`), и «переложить всё» снова давало LUA/CTD на `dynamic_npc_armor_visuals.script:166`.
+
+**Проверено**
+
+- `python3 tools/lint_addon.py fix_dynamic_armor_visuals_nil`
+- В игре: не проверено
+
 ## [1.0.0] — 2026-09-04
 
 **Изменено**
