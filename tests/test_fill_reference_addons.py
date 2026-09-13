@@ -296,6 +296,33 @@ class FillAddonsTests(unittest.TestCase):
             (self.reference / "addons" / SIMPLE_MOD / "scripts" / "simple.script").exists()
         )
 
+    def test_skips_own_package_by_addon_id_with_version_suffix(self):
+        """Отдельный мод в MO2 как fix_*-1.0.0 без BUILD_INFO — имя своё по addon/ id."""
+        with tempfile.TemporaryDirectory() as tmp:
+            addon_root = Path(tmp) / "addon"
+            (addon_root / "fix_crowkiller_hello").mkdir(parents=True)
+            ids = fill_reference_addons.list_addon_ids(addon_root)
+            self.assertTrue(
+                fill_reference_addons.matches_own_addon_dirname(
+                    "fix_crowkiller_hello-1.0.0", ids
+                )
+            )
+            self.assertTrue(
+                fill_reference_addons.is_own_package_name(
+                    "fix_crowkiller_hello-1.0.0", ids
+                )
+            )
+            self.assertFalse(
+                fill_reference_addons.matches_own_addon_dirname(
+                    "fix_crowkiller_hello_extra", ids
+                )
+            )
+            self.assertFalse(
+                fill_reference_addons.matches_own_addon_dirname(
+                    "fix_crowkiller_hello-extra", ids
+                )
+            )
+
     def test_include_own_copies_marked_package(self):
         own = "Our Built Mod (NEW)"
         self._put_own_package(own, marker="notes")

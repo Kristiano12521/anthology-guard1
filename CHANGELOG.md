@@ -2,6 +2,10 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.62] — LUA-001: свои пакеты `addon/<id>-версия` в эталоне
+
+`fill_reference_addons`: имя папки == id из `addon/` или id + суффикс версии (`-1.0.0`) считается своим пакетом (раньше ловились только AIO/SEPARATE/BusyHands и BUILD_INFO). `lint_addon.ReferenceView` не индексирует такие папки в `reference/addons/` — иначе LUA-001/LTX-001 видят нашу же сборку. Риск: чужой мод, буквально названный `<наш_id>-1.2.3`, попадёт под фильтр; `fix_foo_extra` / `fix_foo-extra` — нет. В эталоне совпадений было два (`fix_crowkiller_hello-1.0.0`, `fix_xr_effects_sounds-1.0.0`); сирота `fix_rak_lsw_crash-1.1.0` без `addon/`. FORK-001 не затронут (читает `vendor_source` с диска). После правки `--cross --no-verify`: LUA-001/LTX-001 = 0. Тесты на версию и на похожий чужой префикс.
+
 ## [0.1.61] — xraylog: консоль cp1251 и карточки без Out-File
 
 Удалены пять битых файлов в `logs/cards/` (три `xray_nikit_*`, `nizrim_card.txt`, дамп `nizrim_card_errors.txt`) — порча от `>`/`Out-File` и падения печати. `xraylog` / `_common.configure_stdio`: stdout/stderr с `errors=replace`, чтобы `UnicodeEncodeError` на ×/→ не валил запуск на cp1251; в карточке счётчики `xN` вместо `×N`. В `docs/setup.md` (у chcp): карточки только через `--archive`/`--out`. `docs/prompts.md`, `docs/mo2.md` — то же. Тесты на печать в cp1251.

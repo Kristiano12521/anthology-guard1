@@ -42,6 +42,7 @@ from _common import (  # noqa: E402
     rel,
 )
 from refindex import DEFAULT_ROOT  # noqa: E402
+import fill_reference_addons  # noqa: E402
 
 ADDON_ROOT = REPO_ROOT / "addon"
 ALLOWED_TOP_LEVEL = {"meta.ini", "changelog.md", "readme.md", ".gitignore"}
@@ -124,11 +125,28 @@ class ReferenceView:
         return bool(self.tails)
 
     @classmethod
-    def load(cls, root: Path) -> "ReferenceView":
+    def load(
+        cls,
+        root: Path,
+        *,
+        addon_root: Path | None = None,
+    ) -> "ReferenceView":
+        """Индекс эталона. Пакеты из addon/<id>[-версия] в reference/addons/ не входят:
+        иначе LUA-001/LTX-001 видят нашу же сборку как «замену файла сборки».
+        """
         view = cls()
         if not root.exists():
             return view
+        addon_ids = fill_reference_addons.list_addon_ids(
+            addon_root if addon_root is not None else ADDON_ROOT
+        )
+        root_resolved = root.resolve()
         for path in iter_files(root, GAME_TEXT_SUFFIXES):
+            package = _reference_addons_package_name(path, root_resolved)
+            if package and fill_reference_addons.matches_own_addon_dirname(
+                package, addon_ids
+            ):
+                continue
             view.tails.setdefault(path_tail(path).lower(), []).append(rel(path))
             if path.suffix.lower() != ".ltx":
                 continue
@@ -152,6 +170,18 @@ class ReferenceView:
 
     def section_kinds(self, name: str) -> set:
         return self.sections.get(name, set())
+
+
+def _reference_addons_package_name(path: Path, reference_root: Path) -> str | None:
+    """Имя папки под reference/addons/, или None если путь не из addons/."""
+    try:
+        relative = path.resolve().relative_to(reference_root)
+    except ValueError:
+        return None
+    parts = relative.parts
+    if len(parts) >= 2 and parts[0].lower() == "addons":
+        return parts[1]
+    return None
 
 
 def _meta_active_lines(addon_dir: Path) -> list[str]:

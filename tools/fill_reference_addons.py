@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -29,6 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import xdb_unpack  # noqa: E402
+from _common import REPO_ROOT  # noqa: E402
 from fill_reference import (  # noqa: E402
     ADDONS_DIR_NAME,
     DEFAULT_REFERENCE,
@@ -36,6 +38,10 @@ from fill_reference import (  # noqa: E402
     dest_relative,
     write_if_changed,
 )
+
+# После id мода из addon/ — только суффикс версии (как в zip build_addon: mod-1.0.0).
+# Не подстрока: fix_foo_extra и fix_foo-extra не считаются своими.
+OWN_ADDON_VERSION_SUFFIX_RE = re.compile(r"^[-_]v?\d+(?:[._]\d+)*$", re.I)
 
 BYTEARRAY_PREFIX = "@ByteArray("
 NAMED_ESCAPES = {
@@ -80,17 +86,49 @@ def own_mo2_name_prefixes() -> tuple[str, ...]:
     return (kristiano_pack.AIO_NAME, *kristiano_pack.SEPARATE.values(), pack_bhs.OUT_STEM)
 
 
-def is_own_package_name(name: str) -> bool:
-    """Имя начинается с AIO_NAME / SEPARATE / BusyHands OUT_STEM (суффикс NEW и т.п.)."""
-    return any(name.startswith(prefix) for prefix in own_mo2_name_prefixes())
+def list_addon_ids(addon_root: Path | None = None) -> frozenset[str]:
+    """Имена каталогов в addon/ — id наших модов."""
+    root = addon_root if addon_root is not None else REPO_ROOT / "addon"
+    if not root.is_dir():
+        return frozenset()
+    return frozenset(path.name for path in root.iterdir() if path.is_dir())
 
 
-def is_own_mo2_package(mod_dir: Path) -> bool:
+def matches_own_addon_dirname(
+    name: str, addon_ids: frozenset[str] | None = None
+) -> bool:
+    """Имя папки == id из addon/ или id + суффикс версии (-1.0.0 / _v0_6_1).
+
+    Риск: чужой мод, буквально названный ``<наш_id>-1.2.3``, попадёт под фильтр.
+    Подстрока не используется: ``fix_foo_extra`` / ``fix_foo-extra`` своими не считаются.
+    """
+    ids = addon_ids if addon_ids is not None else list_addon_ids()
+    if name in ids:
+        return True
+    for mod_id in sorted(ids, key=len, reverse=True):
+        if not name.startswith(mod_id):
+            continue
+        rest = name[len(mod_id) :]
+        if rest and OWN_ADDON_VERSION_SUFFIX_RE.fullmatch(rest):
+            return True
+    return False
+
+
+def is_own_package_name(name: str, addon_ids: frozenset[str] | None = None) -> bool:
+    """Имя начинается с AIO_NAME / SEPARATE / BusyHands OUT_STEM, либо id из addon/ + версия."""
+    if any(name.startswith(prefix) for prefix in own_mo2_name_prefixes()):
+        return True
+    return matches_own_addon_dirname(name, addon_ids)
+
+
+def is_own_mo2_package(mod_dir: Path, addon_ids: frozenset[str] | None = None) -> bool:
     """True, если корень мода MO2 — наша сборка, а не чужой эталон.
 
     Признаки (любой):
     1) имя начинается с префикса из AIO_NAME / SEPARATE / pack_bhs.OUT_STEM
        (MO2 часто добавляет « (NEW)» и другие суффиксы);
+    1b) имя == id из addon/ или id + суффикс версии (отдельные моды в MO2 как
+        ``fix_crowkiller_hello-1.0.0`` без BUILD_INFO);
     2) BUILD_INFO.txt (build_addon / pack_bhs / kristiano packer);
     3) CONTENTS.txt от Kristiano AIO;
     4) meta.ini notes/comments со «STALKER Anthology Dev»; vendor_fork=1;
@@ -98,7 +136,7 @@ def is_own_mo2_package(mod_dir: Path) -> bool:
     """
     if not mod_dir.is_dir():
         return False
-    if is_own_package_name(mod_dir.name):
+    if is_own_package_name(mod_dir.name, addon_ids):
         return True
     if (mod_dir / "BUILD_INFO.txt").is_file():
         return True

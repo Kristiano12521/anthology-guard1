@@ -302,6 +302,71 @@ class VendorForkTests(unittest.TestCase):
             self.assertIn("профиле форка", buf.getvalue())
 
 
+class OwnPackageLua001Tests(unittest.TestCase):
+    """LUA-001 не должен срабатывать на копии нашего же пакета в reference/addons/."""
+
+    def _write(self, path: Path, text: str = "-- x\n") -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+    def test_versioned_own_package_skipped_in_reference_index(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            addon_root = root / "addon"
+            (addon_root / "fix_demo_guard").mkdir(parents=True)
+            ref = root / "reference"
+            self._write(
+                ref / "addons" / "fix_demo_guard-1.0.0" / "scripts" / "fix_demo_guard.script"
+            )
+            # чужой эталон с тем же хвостом пути — для контроля, что индекс живой
+            self._write(ref / "anomaly" / "scripts" / "vanilla_only.script")
+
+            view = lint_addon.ReferenceView.load(ref, addon_root=addon_root)
+            own_hits = view.has_file(Path("scripts/fix_demo_guard.script"))
+            self.assertEqual(own_hits, [])
+            self.assertTrue(view.has_file(Path("scripts/vanilla_only.script")))
+
+            addon = _minimal_addon(root, "fix_demo_guard")
+            self._write(
+                addon / "gamedata" / "scripts" / "fix_demo_guard.script",
+                "function on_game_start() end\n",
+            )
+            codes = {
+                f.code
+                for f in lint_addon.lint(addon, view, verify=False)
+            }
+            self.assertNotIn("LUA-001", codes)
+
+    def test_similar_prefix_foreign_package_still_lua001(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            addon_root = root / "addon"
+            (addon_root / "fix_demo_guard").mkdir(parents=True)
+            ref = root / "reference"
+            # чужой: похожее начало, но не «только версия»
+            self._write(
+                ref
+                / "addons"
+                / "fix_demo_guard_extra"
+                / "scripts"
+                / "fix_demo_guard.script"
+            )
+
+            view = lint_addon.ReferenceView.load(ref, addon_root=addon_root)
+            self.assertTrue(view.has_file(Path("scripts/fix_demo_guard.script")))
+
+            addon = _minimal_addon(root, "fix_demo_guard")
+            self._write(
+                addon / "gamedata" / "scripts" / "fix_demo_guard.script",
+                "function on_game_start() end\n",
+            )
+            codes = {
+                f.code
+                for f in lint_addon.lint(addon, view, verify=False)
+            }
+            self.assertIn("LUA-001", codes)
+
+
 class Fork001Tests(unittest.TestCase):
     ORIGIN = "Vendor_Original_v1"
 

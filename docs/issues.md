@@ -153,3 +153,21 @@
 - карточка: [2026-09-13_xray_Никита.log.md](../logs/cards/2026-09-13_xray_Никита.log.md)
 - pitfalls: нет
 - подробности: нет
+
+## [issue] `install() fallback via actor_on_first_update` (guards without retry)
+
+- дата: 2026-09-13
+- мод: десять без фолбэка — `fix_arena_loadout`, `fix_ashot_aw_travel`, `fix_charon_red_forest_travel`, `fix_crowkiller_hello`, `fix_faction_trade_supply`, `fix_loot_space`, `fix_milspec_exo_craft`, `fix_nta_stashes`, `fix_sim_mechanic_trade`, `fix_wtf_taskboard_guard` (+ два WITHDRAWN не трогали)
+- итог: **фолбэк не добавляем**. В `logs/cards/` и `logs/samples/` у этих десяти ни разу не было `guard NOT installed` / `not found` / `ABORT` / `missing` / `partial` от их `install()`. Большинство патчит ванильный модульный API (к `on_game_start` уже на месте) либо цель алфавитно раньше (`aa_*` / `faction_trade_ui`); у `fix_nta_stashes` уже есть повтор на `on_game_load`. Теоретический риск только у `fix_ashot_aw_travel` (`western_goods_utils`) и `fix_wtf_taskboard_guard` (`igi_*` / `pda_taskboard`) — без лог-оснований. У `fix_sim_mechanic_trade` три `printf … not found` только в ветках `else` при провале обёртки; молчание в логе = всё встало.
+- карточка: нет (сводка по всем cards/samples)
+- pitfalls: [§9](pitfalls.md) (порядок `.script` по имени)
+- подробности: разбор 13.09.2026 в чате (фолбэк PR #3 / `fix_dynamic_armor_visuals_nil`)
+
+## [issue] `LUA-001` `fix_crowkiller_hello` / `fix_xr_effects_sounds`
+
+- дата: 2026-09-13
+- мод: `fix_crowkiller_hello`, `fix_xr_effects_sounds`
+- итог: **ложное срабатывание снято** в инструментах (0.1.62). Линтер матчил хвост `scripts/fix_*.script` на `reference/addons/fix_*-1.0.0/` — **наши же** пакеты без BUILD_INFO. `ReferenceView` больше не индексирует папки `addon/<id>` / `<id>-версия`; fill опознаёт те же имена. Ваниль (`minigame_dialogs` / `xr_effects`) этими аддонами не подменялась — оба уже monkey-patch.
+- карточка: нет
+- pitfalls: нет
+- подробности: `CHANGELOG.md` [0.1.62]
