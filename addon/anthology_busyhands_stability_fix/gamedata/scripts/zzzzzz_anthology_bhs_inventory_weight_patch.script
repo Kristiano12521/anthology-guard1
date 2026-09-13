@@ -1,4 +1,4 @@
--- Anthology Busy Hands Stability Fix v0.6.11 - UIInventory weight / IsInvOwner guard
+-- Anthology Busy Hands Stability Fix v0.6.12 - UIInventory weight / IsInvOwner guard
 -- load-order: после stash_capacities (Anthology База.Данные) и ui_inventory
 --
 -- Classes & Talents calls ui_inventory.GUI:UpdateWeight() every second from
@@ -10,10 +10,13 @@
 --   endurance_weight_upd -> stash_capacities.UpdateWeight -> original_update_weight
 --   -> IsInvOwner -> IsStalker -> clsid on destroyed id
 --
+-- v0.6.12: class "UIInventory" is luabind userdata, not a plain table.
+-- 0.6.11 required type(...) == "table" and never installed (log 14.09).
+-- Lookup matches SortingPlus: bare / _G / ui_inventory.UIInventory.
+--
 -- Vendor files untouched. Method-level monkey-patch on UIInventory only.
 
-local VERSION = "0.6.11"
-ANTHOLOGY_BHS_INVENTORY_WEIGHT_PATCH_VERSION = VERSION
+local VERSION = "0.6.12"
 
 local logged_is_inv_owner = false
 local logged_update_weight = false
@@ -28,11 +31,35 @@ local function partner_alive(npc)
 	return ok
 end
 
-if type(ui_inventory) == "table"
-and type(ui_inventory.UIInventory) == "table"
-and type(ui_inventory.UIInventory.IsInvOwner) == "function" then
-	local original_is_inv_owner = ui_inventory.UIInventory.IsInvOwner
-	ui_inventory.UIInventory.IsInvOwner = function(self, npc)
+local function add_ui_inventory_target(list, seen, obj, via)
+	if obj == nil then
+		return
+	end
+	if seen[obj] then
+		for i = 1, #list do
+			if list[i].obj == obj then
+				list[i].via = list[i].via .. " + " .. via
+				return
+			end
+		end
+		return
+	end
+	seen[obj] = true
+	list[#list + 1] = { obj = obj, via = via }
+end
+
+local ui_inventory_targets = {}
+local ui_inventory_seen = {}
+add_ui_inventory_target(ui_inventory_targets, ui_inventory_seen, UIInventory, "bare UIInventory")
+if type(_G) == "table" then
+	add_ui_inventory_target(ui_inventory_targets, ui_inventory_seen, _G.UIInventory, "_G.UIInventory")
+end
+if type(ui_inventory) == "table" then
+	add_ui_inventory_target(ui_inventory_targets, ui_inventory_seen, ui_inventory.UIInventory, "ui_inventory.UIInventory")
+end
+
+local function wrap_is_inv_owner(original)
+	return function(self, npc)
 		if npc and not partner_alive(npc) then
 			if not logged_is_inv_owner then
 				logged_is_inv_owner = true
@@ -40,7 +67,7 @@ and type(ui_inventory.UIInventory.IsInvOwner) == "function" then
 			end
 			return false
 		end
-		local ok, result = pcall(original_is_inv_owner, self, npc)
+		local ok, result = pcall(original, self, npc)
 		if not ok then
 			if not logged_is_inv_owner then
 				logged_is_inv_owner = true
@@ -50,17 +77,11 @@ and type(ui_inventory.UIInventory.IsInvOwner) == "function" then
 		end
 		return result
 	end
-	printf("[BusyHandsFix v%s] UIInventory.IsInvOwner patched via ui_inventory.UIInventory (method-level, ui_inventory.script untouched)", VERSION)
-else
-	printf("[BusyHandsFix v%s] UIInventory.IsInvOwner was not found - guard NOT installed", VERSION)
 end
 
-if type(ui_inventory) == "table"
-and type(ui_inventory.UIInventory) == "table"
-and type(ui_inventory.UIInventory.UpdateWeight) == "function" then
-	local original_update_weight = ui_inventory.UIInventory.UpdateWeight
-	ui_inventory.UIInventory.UpdateWeight = function(self, ...)
-		local ok, err = pcall(original_update_weight, self, ...)
+local function wrap_update_weight(original)
+	return function(self, ...)
+		local ok, err = pcall(original, self, ...)
 		if not ok then
 			if not logged_update_weight then
 				logged_update_weight = true
@@ -68,7 +89,34 @@ and type(ui_inventory.UIInventory.UpdateWeight) == "function" then
 			end
 		end
 	end
-	printf("[BusyHandsFix v%s] UIInventory.UpdateWeight patched via ui_inventory.UIInventory (method-level, stash_capacities / ui_inventory untouched)", VERSION)
-else
-	printf("[BusyHandsFix v%s] UIInventory.UpdateWeight was not found - guard NOT installed", VERSION)
+end
+
+local is_inv_owner_installed = false
+local update_weight_installed = false
+
+for ui_i = 1, #ui_inventory_targets do
+	local cls = ui_inventory_targets[ui_i].obj
+	local via = ui_inventory_targets[ui_i].via
+	if cls and type(cls.IsInvOwner) == "function" then
+		cls.IsInvOwner = wrap_is_inv_owner(cls.IsInvOwner)
+		is_inv_owner_installed = true
+		printf("[BusyHandsFix v%s] UIInventory.IsInvOwner patched via %s (method-level, ui_inventory.script untouched)", VERSION, via)
+	end
+	if cls and type(cls.UpdateWeight) == "function" then
+		cls.UpdateWeight = wrap_update_weight(cls.UpdateWeight)
+		update_weight_installed = true
+		printf("[BusyHandsFix v%s] UIInventory.UpdateWeight patched via %s (method-level, stash_capacities / ui_inventory untouched)", VERSION, via)
+	end
+end
+
+if not is_inv_owner_installed then
+	printf("[BusyHandsFix v%s] UIInventory.IsInvOwner was not found via bare UIInventory / _G.UIInventory / ui_inventory.UIInventory - guard NOT installed", VERSION)
+end
+if not update_weight_installed then
+	printf("[BusyHandsFix v%s] UIInventory.UpdateWeight was not found via bare UIInventory / _G.UIInventory / ui_inventory.UIInventory - guard NOT installed", VERSION)
+end
+
+-- Marker only when at least one method wrapped (verify must not lie).
+if is_inv_owner_installed or update_weight_installed then
+	ANTHOLOGY_BHS_INVENTORY_WEIGHT_PATCH_VERSION = VERSION
 end

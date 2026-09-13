@@ -1,5 +1,25 @@
 # Anthology Busy Hands Stability Fix
 
+## [0.6.12] — 2026-09-14
+
+**Изменено**
+
+- `zzzzzz_anthology_bhs_inventory_weight_patch.script`: lookup как у SortingPlus (`bare UIInventory` / `_G.UIInventory` / `ui_inventory.UIInventory`), без `type(...) == "table"` (luabind-класс — userdata). Маркер `ANTHOLOGY_BHS_INVENTORY_WEIGHT_PATCH_VERSION` ставится только если хотя бы один метод обёрнут.
+- `anthology_busyhands_stability_fix.script` / `meta.ini` → 0.6.12.
+
+**Причина**
+
+В логе `xray_nikit` 14.09: 22× `IsInvOwner/UpdateWeight was not found - guard NOT installed`, при этом verify писал `guards installed: 1`. 0.6.11 требовал `table`, класс `UIInventory` — нет; гард не вставал.
+
+**Не затронуто**
+
+- Логика обёрток (destroyed partner / pcall), вендорские файлы, сейвы, `verified_*`.
+
+**Проверено**
+
+- `lint_addon.py`
+- В игре: не прогонялось (ожидание: `IsInvOwner patched via …` / `UpdateWeight patched via …`, без `NOT installed`; verify `guards installed: 1` только вместе с этими строками)
+
 ## [0.6.11] — 2026-09-13
 
 **Изменено**
@@ -24,7 +44,7 @@
 **Проверено**
 
 - `lint_addon.py` и `--cross`
-- В игре: не прогонялось (ожидание: лут трупа → смена лока без диалога BusyHands; в логе `IsInvOwner skipped` / `UpdateWeight cancelled` не чаще одного раза за сессию)
+- В игре: не прогонялось — **отклонено 14.09**: гард не вставал (см. 0.6.12)
 
 ## [0.6.10] — 2026-09-04
 

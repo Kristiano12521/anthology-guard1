@@ -1,4 +1,5 @@
--- Anthology Busy Hands Stability Fix v0.6.11
+-- Anthology Busy Hands Stability Fix v0.6.12
+-- v0.6.12: weight/IsInvOwner lookup like SortingPlus (luabind class, not table).
 -- v0.6.11: UIInventory.UpdateWeight / IsInvOwner  destroyed loot partner
 -- on level change (talents endurance_weight_upd -> BusyHands IsStalker).
 -- v0.6.10: bind arti_outfits helpers in repair recursion reconstruct (has_parts nil CTD).
@@ -20,7 +21,7 @@
 -- documented full-file exceptions (mon_sleep, guaranteed_loot,
 -- sequential_load_magazine).
 
-local VERSION = "0.6.11"
+local VERSION = "0.6.12"
 local installed = false
 
 local function safe_object_id(obj)
