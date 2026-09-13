@@ -31,11 +31,11 @@
 ## [issue] Discord nil-FATAL пакет (crow / Semenov / unregister_npc / clear_dead / intercept / cover_tilt / spawn_fast / vid_mode)
 
 - дата: 2026-09-13
-- мод: `fix_nil_crash_guards` **1.0.0**
-- итог: починено гардами (см. CHANGELOG мода); не покрывает patrol vertex, Not enough IDs, missing anm/xml, armor_ripper без HF
+- мод: `fix_nil_crash_guards` **1.1.0** (с 1.0.0 — пакет гардов; тумблеры `GUARD_*` в шапке)
+- итог: починено гардами (см. CHANGELOG мода); не покрывает patrol vertex, Not enough IDs, missing anm/xml, armor_ripper без HF; **подтверждение только у авторов Discord-скринов** — в наших cards сигнатур нет
 - карточка: нет (пачка Discord-скринов авг 2026)
 - pitfalls: нет
-- подробности: `addon/fix_nil_crash_guards/CHANGELOG.md` [1.0.0]
+- подробности: `addon/fix_nil_crash_guards/CHANGELOG.md` [1.1.0]
 
 ## [issue] mg9000 после nil-guards: 2 нефатальные группы (baseline)
 

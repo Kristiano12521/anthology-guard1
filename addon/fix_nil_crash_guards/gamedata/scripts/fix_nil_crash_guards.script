@@ -15,9 +15,21 @@
 -- 8) reverse_resolution_list_mcm.cont_vid_mode bad resolution tokens
 
 -- load-order: before weapon_cover_tilt (stub global ease table if missing)
+--
+-- Per-guard toggles (diagnostic). Flip to false to disable one wrapper without
+-- removing the whole mod. No MCM - edit here and redeploy.
+
+local GUARD_ITEM_KNIFE = true
+local GUARD_SEMENOV_TASK = true
+local GUARD_UNREGISTER_NPC = true
+local GUARD_CLEAR_DEAD = true
+local GUARD_INTERCEPT_ARTIFACT = true
+local GUARD_COVER_TILT = true
+local GUARD_SPAWN_FAST = true
+local GUARD_VID_MODE = true
 
 local LOG_TAG = "[fix_nil_crash_guards]"
-local VERSION = "1.0.0"
+local VERSION = "1.1.0"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -25,9 +37,18 @@ local orig = {}
 local installed = {}
 local callbacks_registered = false
 local logged_err = {}
+local skipped_logged = {}
 
 local function log(fmt, ...)
 	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function skip_disabled(const_name)
+	if skipped_logged[const_name] then
+		return
+	end
+	skipped_logged[const_name] = true
+	log("skipped %s (%s=false)", const_name, const_name)
 end
 
 local function log_once(key, fmt, ...)
@@ -61,7 +82,13 @@ local function ensure_ease_stub()
 	return true
 end
 
-ensure_ease_stub()
+if GUARD_COVER_TILT then
+	if not ensure_ease_stub() then
+		log("cover_tilt: demonized_randomizing_functions already present")
+	end
+else
+	skip_disabled("GUARD_COVER_TILT")
+end
 
 ------------------------------------------------------------------------
 -- 1) item_knife.get_condition
@@ -422,14 +449,50 @@ end
 -- install / uninstall
 ------------------------------------------------------------------------
 local function install_all()
-	install_knife()
-	install_semenov()
-	install_unregister("se_monster", "monster_unreg", patched_monster_on_unregister, "monster")
-	install_unregister("se_stalker", "stalker_unreg", patched_stalker_on_unregister, "stalker")
-	install_clear_dead()
-	install_intercept()
-	install_spawn_fast()
-	install_vid_mode()
+	if GUARD_ITEM_KNIFE then
+		install_knife()
+	else
+		skip_disabled("GUARD_ITEM_KNIFE")
+	end
+
+	if GUARD_SEMENOV_TASK then
+		install_semenov()
+	else
+		skip_disabled("GUARD_SEMENOV_TASK")
+	end
+
+	if GUARD_UNREGISTER_NPC then
+		install_unregister("se_monster", "monster_unreg", patched_monster_on_unregister, "monster")
+		install_unregister("se_stalker", "stalker_unreg", patched_stalker_on_unregister, "stalker")
+	else
+		skip_disabled("GUARD_UNREGISTER_NPC")
+	end
+
+	if GUARD_CLEAR_DEAD then
+		install_clear_dead()
+	else
+		skip_disabled("GUARD_CLEAR_DEAD")
+	end
+
+	if GUARD_INTERCEPT_ARTIFACT then
+		install_intercept()
+	else
+		skip_disabled("GUARD_INTERCEPT_ARTIFACT")
+	end
+
+	-- GUARD_COVER_TILT: applied at file load (before weapon_cover_tilt)
+
+	if GUARD_SPAWN_FAST then
+		install_spawn_fast()
+	else
+		skip_disabled("GUARD_SPAWN_FAST")
+	end
+
+	if GUARD_VID_MODE then
+		install_vid_mode()
+	else
+		skip_disabled("GUARD_VID_MODE")
+	end
 end
 
 local function uninstall_all()
@@ -479,10 +542,12 @@ local function uninstall_all()
 	orig = {}
 	installed = {}
 	logged_err = {}
+	skipped_logged = {}
 end
 
 function on_game_load()
 	logged_err = {}
+	skipped_logged = {}
 end
 
 function actor_on_first_update()

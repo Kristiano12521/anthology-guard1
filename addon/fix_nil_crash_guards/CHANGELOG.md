@@ -1,5 +1,49 @@
 # Nil Crash Guards
 
+## [1.1.0] — 2026-09-13
+
+**Изменено**
+
+- В шапке `fix_nil_crash_guards.script` — восемь констант `GUARD_*` (по умолчанию `true`). Выключенный гард в `install()` / при загрузке (cover tilt) пропускается; в лог: `skipped GUARD_… (GUARD_…=false)`. MCM нет.
+- Presence-строка `loaded v1.1.0`, затем по строке на гард (`wrapped` / `NOT installed` / `skipped` / stub cover tilt).
+
+**Причина**
+
+Один вредный гард нельзя было отключить без снятия всего мода (как с `fix_minigun_dead_parent`: защита раздула ошибки). Нужны ручные тумблеры для точечной диагностики у тестеров.
+
+**Не затронуто**
+
+- Логика обёрток, callbacks, uninstall, сейвы
+- Остальные аддоны
+
+**Источники сигнатур (ни одной нет в наших `logs/cards/`)**
+
+Мод целиком собран по чужим логам: ни одна из восьми сигнатур в наших карточках не встречается. Строка `wrapped` подтверждает только то, что обёртка встала, но не что она отсекает правильно. Настоящее подтверждение придёт от тестера, у которого эта сигнатура была. Это первый мод, который надо отдавать тестерам раньше, чем себе.
+
+| Гард | Константа | Источник | Подтверждение ждать у |
+|---|---|---|---|
+| `item_knife.get_condition` → nil (`bind_crow`) | `GUARD_ITEM_KNIFE` | Discord-скрин, пачка авг 2026 (`IMG-20260807…`); автор в разборе не зафиксирован | кто прислал crow/knife FATAL |
+| Semenov `task_functor` / `squad` nil | `GUARD_SEMENOV_TASK` | Discord-скрин, та же пачка авг 2026; автор не зафиксирован | кто падал на Янтаре / Semenov |
+| `unregister_npc` nil (`se_monster` / `se_stalker`) | `GUARD_UNREGISTER_NPC` | Discord-скрин, та же пачка (смена лока / химера); автор не зафиксирован | кто падал при unregister на смене лока |
+| `smart_terrain.clear_dead` nil | `GUARD_CLEAR_DEAD` | Discord-скрин, та же пачка (дыра в апстрим `zzzz_anthology_offline_combat_nil_fix`); автор не зафиксирован | кто падал в offline combat на `clear_dead` |
+| `spawn_intercept_artifact_artifact` | `GUARD_INTERCEPT_ARTIFACT` | Discord-скрин, та же пачка (iTheon); автор не зафиксирован | у кого iTheon + этот FATAL |
+| Cover Tilt / нет `demonized_randomizing_functions` | `GUARD_COVER_TILT` | Discord-скрин, та же пачка (в т.ч. кадр на Anthology **2.0**); автор не зафиксирован | у кого Cover Tilt без Ledge Grabbing |
+| `iterate_objects_by_clsid` nil (Performance spawn fast) | `GUARD_SPAWN_FAST` | Discord-скрин, та же пачка; автор не зафиксирован | у кого Performance на exe без API |
+| `cont_vid_mode` / битый `vid_mode` | `GUARD_VID_MODE` | Discord-скрин, та же пачка (Settings); автор не зафиксирован | кто падал в меню разрешений |
+
+Пачка разобрана 2026-09-13 ([issue] Discord nil-FATAL пакет); карточек под эти FATAL у нас нет — только скрины.
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: ничего не пишет
+- В MO2: как 1.0.0
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_nil_crash_guards`
+- В игре: не прогонялось. Ожидаемый лог при всех `true`: `loaded v1.1.0` и строки `wrapped` / stub; при `false` — `skipped GUARD_…`
+
 ## [1.0.0] — 2026-09-13
 
 **Изменено**
