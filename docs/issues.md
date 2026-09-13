@@ -37,6 +37,15 @@
 - pitfalls: нет
 - подробности: `addon/fix_nil_crash_guards/CHANGELOG.md` [1.0.0]
 
+## [issue] mg9000 после nil-guards: 2 нефатальные группы (baseline)
+
+- дата: 2026-09-13
+- мод: пакет у тестера mg9000 после `fix_nil_crash_guards` / соседних фиксов
+- итог: **точка отсчёта** — в fresh-логе класс «вылета нет, 2 группы» против **8** групп в `…_mg9000.log.md` и **Lua error (pcall)** в `…_mg9000-1.log.md` той же даты. Оставшиеся две: (1) `game_backpack_travel.script` x3, триггер `!ALIFE OBJECT ID IS 65535!`; (2) `game_fast_travel.script` x3, триггер без строки `!`/`~` перед блоком. Следующий лог от mg9000 сверять с этим списком — сдвинулось или нет.
+- карточка: [2026-09-13_xray_mg9000_fresh.md](../logs/cards/2026-09-13_xray_mg9000_fresh.md); было: [2026-09-13_xray_mg9000.log.md](../logs/cards/2026-09-13_xray_mg9000.log.md), [2026-09-13_xray_mg9000-1.log.md](../logs/cards/2026-09-13_xray_mg9000-1.log.md)
+- pitfalls: нет
+- подробности: нет
+
 ## [issue] `![axr_main callback_set] callback trader_on_restock doesn't exist!`
 
 - дата: 2026-08-31
