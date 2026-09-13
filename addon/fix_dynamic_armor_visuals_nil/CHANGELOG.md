@@ -1,5 +1,20 @@
 # Dynamic Armor Visuals Nil Guard
 
+## [1.0.1] — 2026-09-13
+
+**Изменено**
+
+- `fix_dynamic_armor_visuals_nil.script` — если `install()` на `on_game_start` не сработал, повторная попытка на `actor_on_first_update`; подписка снимается в `on_game_end`.
+
+**Причина**
+
+`install()` на `on_game_start` может проиграть гонку загрузки `dynamic_npc_armor_visuals`; фолбэк повторяет попытку на первом обновлении актора. В `logs/cards/` сообщений `[fix_dynamic_armor_visuals_nil] ... guard NOT installed` не встречалось — страховка превентивная.
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_dynamic_armor_visuals_nil`
+- В игре: не прогонялось
+
 ## [1.0.0] — 2026-09-04
 
 **Изменено**
