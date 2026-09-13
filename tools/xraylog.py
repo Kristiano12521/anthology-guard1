@@ -696,6 +696,133 @@ def is_clean_session_class(crash_class: str) -> bool:
     return crash_class == CLEAN_SESSION_CLASS
 
 
+def normalize_signature_text(text: str) -> str:
+    """Текст сигнатуры без путей, крупных чисел и номеров строк скриптов."""
+    out = text.strip()
+    for rx, repl in NORMALIZE_RES:
+        out = rx.sub(repl, out)
+    out = strip_line_numbers(out)
+    return re.sub(r"\s+", " ", out).strip()
+
+
+def report_fingerprint(report: LogReport) -> tuple:
+    """Отпечаток для сравнения с архивом: FATAL / топ нефатальных групп / clean.
+
+    Для нефатальных берём те же MAX_NONFATAL_GROUPS, что попадают в markdown
+    карточки — иначе round-trip с уже лежащими файлами не сойдётся.
+    """
+    if report.crashed:
+        return (
+            "fatal",
+            report.fields.get("Function", "").strip(),
+            normalize_signature_text(report.fields.get("Description", "")),
+        )
+    if report.nonfatal_errors:
+        groups = tuple(
+            sorted(
+                (
+                    group.culprit or "",
+                    group.count,
+                    group.signature,
+                )
+                for group in report.nonfatal_errors[:MAX_NONFATAL_GROUPS]
+            )
+        )
+        return ("nonfatal", groups)
+    return ("clean",)
+
+
+_CARD_CLASS_RE = re.compile(r"^- Класс:\s*\*\*(.+?)\*\*")
+_CARD_GROUP_RE = re.compile(r"^###\s+\d+\.\s+`([^`]+)`\s+x(\d+)\s*$")
+_CARD_FUNC_RE = re.compile(r"^\[error\]Function\s*:\s*(.*)$", re.I)
+_CARD_DESC_RE = re.compile(r"^\[error\]Description\s*:\s*(.*)$", re.I)
+
+
+def fingerprint_from_card_text(text: str) -> tuple | None:
+    """Отпечаток из markdown-карточки `to_markdown`. None — разобрать нельзя."""
+    lines = text.splitlines()
+    crash_class = ""
+    for line in lines:
+        match = _CARD_CLASS_RE.match(line.strip())
+        if match:
+            crash_class = match.group(1).strip()
+            break
+    if not crash_class:
+        return None
+
+    func = ""
+    desc = ""
+    for line in lines:
+        stripped = line.strip()
+        match = _CARD_FUNC_RE.match(stripped)
+        if match and not func:
+            func = match.group(1).strip()
+        match = _CARD_DESC_RE.match(stripped)
+        if match and not desc:
+            desc = match.group(1).strip()
+    if func or desc:
+        return ("fatal", func, normalize_signature_text(desc))
+
+    if is_clean_session_class(crash_class):
+        return ("clean",)
+
+    groups: list[tuple[str, int, tuple[str, ...]]] = []
+    in_nonfatal = False
+    i = 0
+    while i < len(lines):
+        stripped = lines[i].strip()
+        if stripped.startswith("## "):
+            in_nonfatal = stripped == "## Нефатальные ошибки"
+            i += 1
+            continue
+        if not in_nonfatal:
+            i += 1
+            continue
+        match = _CARD_GROUP_RE.match(stripped)
+        if not match:
+            i += 1
+            continue
+        culprit = match.group(1)
+        count = int(match.group(2))
+        i += 1
+        frames: list[str] = []
+        while i < len(lines) and lines[i].strip() != "```":
+            if _CARD_GROUP_RE.match(lines[i].strip()) or lines[i].strip().startswith("## "):
+                break
+            i += 1
+        if i < len(lines) and lines[i].strip() == "```":
+            i += 1
+            while i < len(lines) and lines[i].strip() != "```":
+                frame = lines[i].strip()
+                if frame:
+                    frames.append(frame)
+                i += 1
+            if i < len(lines) and lines[i].strip() == "```":
+                i += 1
+        signature = tuple(strip_line_numbers(f) for f in frames)
+        groups.append((culprit, count, signature))
+
+    if groups:
+        return ("nonfatal", tuple(sorted(groups)))
+    return None
+
+
+def find_matching_archive_cards(fingerprint: tuple, archive_dir: Path) -> list[Path]:
+    """Карточки в archive_dir с тем же отпечатком (полное совпадение)."""
+    if not archive_dir.is_dir():
+        return []
+    matches: list[Path] = []
+    for path in sorted(archive_dir.glob("*.md")):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        card_fp = fingerprint_from_card_text(text)
+        if card_fp is not None and card_fp == fingerprint:
+            matches.append(path)
+    return matches
+
+
 def write_archive(
     text: str,
     log_path: Path,
@@ -780,6 +907,15 @@ def main(argv: list[str] | None = None) -> int:
                 analyzed_on=analyzed_on,
                 mine_only=args.mine,
             )
+            matches = find_matching_archive_cards(report_fingerprint(report), dest_dir)
+            if matches:
+                shown = ", ".join(rel(path) for path in matches[:5])
+                extra = f" (+{len(matches) - 5})" if len(matches) > 5 else ""
+                print(
+                    f"предупреждение: та же сигнатура уже в архиве: {shown}{extra} "
+                    "— архивирую всё равно",
+                    file=sys.stderr,
+                )
             archive_path = write_archive(card_md, args.log, dest_dir, analyzed_on)
             sink = sys.stderr if args.json else sys.stdout
             print(rel(archive_path), file=sink)

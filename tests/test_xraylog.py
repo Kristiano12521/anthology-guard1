@@ -427,6 +427,100 @@ class ArchiveCardTests(unittest.TestCase):
         )
         self.assertFalse(xraylog.is_clean_session_class("Lua error"))
 
+    def test_fingerprint_roundtrip_via_card_markdown(self):
+        report = parse("crash_lua_nil.log")
+        card = report.to_markdown(max_warnings=10, warnings_only=False)
+        self.assertEqual(
+            xraylog.fingerprint_from_card_text(card),
+            xraylog.report_fingerprint(report),
+        )
+        nonfatal = parse("nonfatal_traceback.log")
+        card_nf = nonfatal.to_markdown(max_warnings=10, warnings_only=False)
+        self.assertEqual(
+            xraylog.fingerprint_from_card_text(card_nf),
+            xraylog.report_fingerprint(nonfatal),
+        )
+        clean = parse("clean_session.log")
+        card_clean = clean.to_markdown(max_warnings=10, warnings_only=False)
+        self.assertEqual(
+            xraylog.fingerprint_from_card_text(card_clean),
+            xraylog.report_fingerprint(clean),
+        )
+        self.assertEqual(xraylog.report_fingerprint(clean), ("clean",))
+
+    def test_fingerprint_changes_when_nonfatal_count_changes(self):
+        report = parse("nonfatal_traceback.log")
+        base = xraylog.report_fingerprint(report)
+        report.nonfatal_errors[0].count += 1
+        self.assertNotEqual(xraylog.report_fingerprint(report), base)
+
+    def test_archive_warns_on_duplicate_signature_but_still_writes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            first_out = io.StringIO()
+            first_err = io.StringIO()
+            with contextlib.redirect_stdout(first_out), contextlib.redirect_stderr(first_err):
+                code = xraylog.main(
+                    [
+                        str(SAMPLES / "crash_lua_nil.log"),
+                        "--archive",
+                        "--archive-dir",
+                        str(dest),
+                    ]
+                )
+            self.assertEqual(code, 0)
+            self.assertNotIn("предупреждение", first_err.getvalue())
+            self.assertEqual(len(list(dest.glob("*.md"))), 1)
+
+            second_out = io.StringIO()
+            second_err = io.StringIO()
+            with contextlib.redirect_stdout(second_out), contextlib.redirect_stderr(second_err):
+                code = xraylog.main(
+                    [
+                        str(SAMPLES / "crash_lua_nil.log"),
+                        "--archive",
+                        "--archive-dir",
+                        str(dest),
+                    ]
+                )
+            self.assertEqual(code, 0)
+            err = second_err.getvalue()
+            self.assertIn("предупреждение", err)
+            self.assertIn("та же сигнатура", err)
+            self.assertIn("архивирую всё равно", err)
+            self.assertEqual(len(list(dest.glob("*.md"))), 2)
+
+    def test_archive_no_warning_for_different_signature(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            err = io.StringIO()
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                self.assertEqual(
+                    xraylog.main(
+                        [
+                            str(SAMPLES / "crash_lua_nil.log"),
+                            "--archive",
+                            "--archive-dir",
+                            str(dest),
+                        ]
+                    ),
+                    0,
+                )
+                self.assertEqual(
+                    xraylog.main(
+                        [
+                            str(SAMPLES / "crash_missing_section.log"),
+                            "--archive",
+                            "--archive-dir",
+                            str(dest),
+                        ]
+                    ),
+                    0,
+                )
+            self.assertNotIn("предупреждение", err.getvalue())
+            self.assertEqual(len(list(dest.glob("*.md"))), 2)
+
     def test_main_survives_cp1251_stdout(self):
         """Консоль Windows часто cp1251: печать карточки не должна давать UnicodeEncodeError."""
         real_out, real_err = sys.stdout, sys.stderr
