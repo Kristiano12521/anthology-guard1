@@ -1,14 +1,13 @@
--- Tosox vanish-fail на общем DRX stash-слоте
+-- Tosox vanish-fail on shared DRX stash slot
 -- Anomaly 1.5.3 / Anthology 2.1
 --
--- Tosox z_task_marker_delivery_fix при stage==0 и мёртвом var.item_id
--- возвращает "fail". На общих слотах 1/2/3 сдача одного заказа
--- (remove_item того же drx_sl_quest_item_N) валит соседний.
--- Ваниль только откатывает stage; этот патч вместо fail перезапускает
--- тайник (новый target_id, stash_created=false, item_id сброшен).
+-- Morning-style fix: Tosox returns "fail" when var.item_id dies after neighbor
+-- turn-in (shared drx_sl_quest_item_N). Instead of fail, rearm with a new
+-- stash (get_random_stash) and leave stage=0. Dual turn-in markers with one
+-- PDA are acceptable - turn in one, second quest gets a fresh stash.
 
 local LOG_TAG = "[fix_quest_item_shared_fail]"
-local VERSION = "1.0.0"
+local VERSION = "1.3.0"
 local EVENT_ID = "fix_quest_item_shared_fail"
 local INSTALL_ACTION = "install_late"
 local INSTALL_DELAY = 0.5
@@ -50,7 +49,6 @@ local function pick_stash_id()
 	if not (treasure_manager and type(treasure_manager.get_random_stash) == "function") then
 		return nil
 	end
-	-- Как drx_sl_create_quest_stash: сначала локальная карта, иначе любая.
 	local ok, stash_id = pcall(treasure_manager.get_random_stash, nil, nil, true, true)
 	if ok and stash_id then
 		return stash_id
@@ -203,7 +201,7 @@ function on_game_start()
 	end
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	callbacks_registered = true
-	log("загружен v%s", VERSION)
+	log("loaded ok v%s", VERSION)
 end
 
 function on_game_end()
