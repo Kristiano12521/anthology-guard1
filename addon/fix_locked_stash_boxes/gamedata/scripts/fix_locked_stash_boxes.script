@@ -1,0 +1,321 @@
+-- Фикс: зелёные тайники не садятся на закрытые сюжетные ящики
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- treasure_manager кладёт случайный лут в любой inventory_box из caches.
+-- Сюжетные ящики с nonscript_usable=false (ключ/код/инфопорция) остаются
+-- в пуле: метка есть, открыть нельзя. DLTX дополняет blacklist_stashes_names
+-- в treasure_manager.ltx и grok_treasure_manager.ltx (новые игры).
+-- caches_blacklist локальный и при get_random_stash проверяется только
+-- при inv_box=true — поэтому оборачиваем get_random_stash и чиним сейвы.
+
+local LOG_TAG = "[fix_locked_stash_boxes]"
+local VERSION = "1.0.0"
+local EVENT_ID = "fix_locked_stash_boxes"
+local REPAIR_ACTION = "repair"
+local REPAIR_DELAY = 1.0
+local SPOTS = { "treasure", "treasure_searched", "treasure_unique" }
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+-- Имена se_obj:name() закрытых/квестовых ящиков (см. CHANGELOG).
+local LOCKED_NAMES = {
+	esc_kkp_sidr_habar = true,
+	esc_inv_out_quest_fee = true,
+	esc_inventory_box_base_bandits = true,
+	esc_inventory_box_quest_fee = true,
+	okr_s1_inventory_box = true,
+	okr_av_1_inv_box = true,
+	okr_av_2_inv_box = true,
+	okr_av_3_inv_box = true,
+	okr_av_4_inv_box = true,
+	okr_av_5_inv_box = true,
+	kn_b1_av_1_inv_box = true,
+	scf_av_1_inv_box = true,
+	scf_d3_box_code = true,
+	scf_v1_shakal_box = true,
+	sad_b1_iliya_treasure = true,
+	sad_b2_maxim_treasure = true,
+	sad_ran_cowboy_treasure = true,
+	inv_box_strelok_mlr = true,
+	mon_blue_box_mlr = true,
+	zat_b12_conteiner = true,
+	topi_i1_killer_code_tainik = true,
+	cit_a2_secret_box = true,
+	az_box_pidor_case_merger = true,
+	caz_bb_heli_container_pilots = true,
+	okr_texnar_util_box = true,
+	sad_b2_util_box = true,
+	jup_b202_snag_treasure = true,
+	jup_b202_actor_treasure = true,
+}
+
+local orig_get_random_stash = nil
+local callbacks_registered = false
+local repair_done = false
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function caches_table()
+	if treasure_manager and type(treasure_manager.caches) == "table" then
+		return treasure_manager.caches
+	end
+	return nil
+end
+
+local function box_name(se_obj)
+	if not se_obj then
+		return nil
+	end
+	local ok, name = pcall(function()
+		return se_obj:name()
+	end)
+	if ok and type(name) == "string" and name ~= "" then
+		return name
+	end
+	return nil
+end
+
+local function is_locked_name(name)
+	return name and LOCKED_NAMES[name] == true
+end
+
+local function has_spot(id, spot)
+	if not (id and level and type(level.map_has_object_spot) == "function") then
+		return false
+	end
+	local ok, result = pcall(level.map_has_object_spot, id, spot)
+	return ok and result ~= 0
+end
+
+local function remove_treasure_spots(id)
+	if not (id and level and type(level.map_remove_object_spot) == "function") then
+		return 0
+	end
+	local removed = 0
+	for i = 1, #SPOTS do
+		local spot = SPOTS[i]
+		if has_spot(id, spot) then
+			pcall(level.map_remove_object_spot, id, spot)
+			removed = removed + 1
+		end
+	end
+	return removed
+end
+
+-- release_stash_by_id игнорирует caches[id]==false (falsy). Поднимаем до true.
+local function drop_cache_entry(id)
+	local caches = caches_table()
+	if not (caches and id ~= nil and caches[id] ~= nil) then
+		return false
+	end
+	if caches[id] == false then
+		caches[id] = true
+	end
+	if treasure_manager and type(treasure_manager.release_stash_by_id) == "function" then
+		pcall(treasure_manager.release_stash_by_id, id)
+		return true
+	end
+	caches[id] = nil
+	return true
+end
+
+local function find_free_stash_id(exclude_id)
+	local caches = caches_table()
+	if not caches then
+		return nil
+	end
+	for id, value in pairs(caches) do
+		if id ~= exclude_id and value == false then
+			local se_obj = alife_object(id)
+			local name = box_name(se_obj)
+			if name and not is_locked_name(name) then
+				return id
+			end
+		end
+	end
+	return nil
+end
+
+local function active_spot_for(id)
+	for i = 1, #SPOTS do
+		if has_spot(id, SPOTS[i]) then
+			return SPOTS[i]
+		end
+	end
+	return nil
+end
+
+local function relocate_pending(old_id, pending, name)
+	local new_id = find_free_stash_id(old_id)
+	local caches = caches_table()
+	if not (new_id and caches and type(pending) == "string") then
+		return false
+	end
+
+	local spot = active_spot_for(old_id) or "treasure"
+	caches[new_id] = pending
+	remove_treasure_spots(old_id)
+	if level and type(level.map_add_object_spot_ser) == "function" and level.map_has_object_spot(new_id, spot) == 0 then
+		pcall(level.map_add_object_spot_ser, new_id, spot, "")
+	end
+	drop_cache_entry(old_id)
+	log(
+		"relocated pending name=%s old_id=%s -> new_id=%s spot=%s",
+		tostring(name),
+		tostring(old_id),
+		tostring(new_id),
+		tostring(spot)
+	)
+	return true
+end
+
+local function repair_locked_caches()
+	local caches = caches_table()
+	if not caches then
+		log("treasure_manager.caches unavailable - repair skipped")
+		return false
+	end
+
+	local doomed = {}
+	for id, value in pairs(caches) do
+		local se_obj = alife_object(id)
+		local name = box_name(se_obj)
+		if is_locked_name(name) then
+			doomed[#doomed + 1] = { id = id, value = value, name = name }
+		end
+	end
+
+	local cleared = 0
+	local relocated = 0
+	local failed_pending = 0
+
+	for i = 1, #doomed do
+		local row = doomed[i]
+		if type(row.value) == "string" then
+			if relocate_pending(row.id, row.value, row.name) then
+				relocated = relocated + 1
+			else
+				-- Нет свободного ящика: снимаем метку/слот и просим новый marked stash.
+				remove_treasure_spots(row.id)
+				drop_cache_entry(row.id)
+				failed_pending = failed_pending + 1
+				log(
+					"dropped pending (no free box) name=%s id=%s — spawn replacement",
+					tostring(row.name),
+					tostring(row.id)
+				)
+				if treasure_manager and type(treasure_manager.create_random_stash) == "function" then
+					pcall(treasure_manager.create_random_stash, nil, nil)
+				end
+			end
+		else
+			remove_treasure_spots(row.id)
+			drop_cache_entry(row.id)
+			cleared = cleared + 1
+			log("removed from pool name=%s id=%s value=%s", tostring(row.name), tostring(row.id), tostring(row.value))
+		end
+	end
+
+	log(
+		"repair done locked=%s relocated=%s cleared=%s dropped_pending=%s",
+		tostring(#doomed),
+		tostring(relocated),
+		tostring(cleared),
+		tostring(failed_pending)
+	)
+	return true
+end
+
+function patched_get_random_stash(no_spot, hint, spawn_local, inv_box)
+	if type(orig_get_random_stash) ~= "function" then
+		return
+	end
+
+	-- Blacklist в оригинале смотрит имя только при inv_box=true.
+	-- Закрытый ящик убираем из пула и пробуем снова.
+	for _ = 1, 16 do
+		local id, a, b, c = orig_get_random_stash(no_spot, hint, spawn_local, inv_box)
+		if not id then
+			return
+		end
+		local se_obj = alife_object(id)
+		local name = box_name(se_obj)
+		if not is_locked_name(name) then
+			return id, a, b, c
+		end
+		log("get_random_stash rejected locked name=%s id=%s", tostring(name), tostring(id))
+		drop_cache_entry(id)
+	end
+	return
+end
+
+local function install()
+	if not (treasure_manager and type(treasure_manager.get_random_stash) == "function") then
+		log("treasure_manager.get_random_stash not found - wrap NOT installed")
+		return false
+	end
+	if treasure_manager.get_random_stash == patched_get_random_stash then
+		return true
+	end
+	if orig_get_random_stash then
+		return true
+	end
+	orig_get_random_stash = treasure_manager.get_random_stash
+	treasure_manager.get_random_stash = patched_get_random_stash
+	log("v%s get_random_stash wrapped", VERSION)
+	return true
+end
+
+local function uninstall()
+	if orig_get_random_stash and treasure_manager and treasure_manager.get_random_stash == patched_get_random_stash then
+		treasure_manager.get_random_stash = orig_get_random_stash
+	end
+	orig_get_random_stash = nil
+end
+
+function repair_tick()
+	install()
+	if not repair_done then
+		repair_done = repair_locked_caches()
+	end
+	return true
+end
+
+local function schedule_repair()
+	RemoveTimeEvent(EVENT_ID, REPAIR_ACTION)
+	CreateTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY, repair_tick)
+end
+
+function actor_on_first_update()
+	install()
+	schedule_repair()
+end
+
+function on_game_load()
+	repair_done = false
+	install()
+end
+
+function on_game_start()
+	install()
+	if callbacks_registered then
+		return
+	end
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("on_game_load", on_game_load)
+	callbacks_registered = true
+	log("loaded v%s", VERSION)
+end
+
+function on_game_end()
+	RemoveTimeEvent(EVENT_ID, REPAIR_ACTION)
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		callbacks_registered = false
+	end
+	uninstall()
+	repair_done = false
+end
