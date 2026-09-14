@@ -4,8 +4,8 @@
 Канон: community/discord-rules.json (человекочитаемый текст — community/RULES.md).
 scan — только кандидаты по ключевым словам, не приговор.
 
-    python tools/modcheck.py lookup 5.1 7.3
-    python tools/modcheck.py scan "а вот в гамме это лучше"
+    python tools/modcheck.py lookup 5.1 8.5
+    python tools/modcheck.py scan "мод говно, авторы криворукие"
     python tools/modcheck.py list --section 8
 """
 
