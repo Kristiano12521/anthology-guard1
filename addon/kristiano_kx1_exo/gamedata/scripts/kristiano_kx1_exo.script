@@ -1,24 +1,37 @@
--- load-order: after aa_load_recipes_Banjaji_CSI, fix_milspec_exo_craft, item_exo_device
+-- load-order: after aa_load_recipes_Banjaji_CSI, fix_milspec_exo_craft, item_exo_device, exo_servo_sounds
 -- Kristiano KX-1: endgame exo craft, fabric scraps, flash decrypt, default recharge PSU.
 
 local LOG_TAG = "[kristiano_kx1_exo]"
-local VERSION = "1.3.0-test"
+local VERSION = "1.4.1-b"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local KX1_SECTION = "kristiano_kx1_exo_outfit"
 local FLASH_ENC = "kristiano_kx1_flash_encrypted"
 local RECIPE_NOTE = "recipe_kristiano_kx1"
+local LORE_ARTICLE = "encyclopedia_items_kristiano_kx1"
+local SMS_FIRST = "st_kristiano_kx1_sms_first_equip"
 local DEFAULT_PSU = "exo_power_supply_proto"
 local EXO_TAB_TITLE = "st_exo_system_craftingtitle"
 local PARTS_TAB_TITLE = "st_OutfitPartsOverhaul_crafting_title"
 local DECRYPT_COST = 75000
 local EVENT_ID = "kristiano_kx1_exo"
 
+-- B5: Exo System servo has no per-suit preset (class = floor(inv_weight/10) only).
+-- Light wrap while KX-1 is worn: quieter + lower step pitch. Not a fork of exo_servo_sounds.
+local SERVO_VOL_MUL = 0.55
+local SERVO_STEP_POWER_MUL = 0.72
+local SERVO_LAND_MUL = 0.70
+
 local orig_is_exobackpack = nil
 local orig_load = nil
+local orig_servo_get_power = nil
+local orig_servo_footstep = nil
+local orig_servo_land = nil
 local installed = false
+local servo_wrapped = false
 local legend_flash_given = false
+local first_sms_sent = false
 local psu_pending = {}
 
 local function log(fmt, ...)
@@ -27,6 +40,118 @@ end
 
 local function is_kx1(obj)
 	return obj and obj.section and obj:section() == KX1_SECTION
+end
+
+local function wearing_kx1()
+	if not db.actor then
+		return false
+	end
+	return is_kx1(db.actor:item_in_slot(7))
+end
+
+local function wrap_servo_sounds()
+	if servo_wrapped then
+		return
+	end
+	if not exo_servo_sounds then
+		log("WARN: exo_servo_sounds missing - KX-1 servo preset skipped")
+		return
+	end
+	if type(UnregisterScriptCallback) ~= "function" then
+		log("WARN: UnregisterScriptCallback missing - KX-1 servo preset skipped")
+		return
+	end
+
+	orig_servo_get_power = exo_servo_sounds.get_power
+	if type(orig_servo_get_power) == "function" then
+		exo_servo_sounds.get_power = function()
+			local p = orig_servo_get_power()
+			if wearing_kx1() then
+				return p * SERVO_VOL_MUL
+			end
+			return p
+		end
+	end
+
+	orig_servo_footstep = exo_servo_sounds.actor_on_footstep
+	if type(orig_servo_footstep) == "function" then
+		UnregisterScriptCallback("actor_on_footstep", orig_servo_footstep)
+		exo_servo_sounds.actor_on_footstep = function(material, power, hud_view, flags)
+			if wearing_kx1() and power then
+				power = power * SERVO_STEP_POWER_MUL
+			end
+			return orig_servo_footstep(material, power, hud_view, flags)
+		end
+		RegisterScriptCallback("actor_on_footstep", exo_servo_sounds.actor_on_footstep)
+	end
+
+	orig_servo_land = exo_servo_sounds.actor_on_land
+	if type(orig_servo_land) == "function" then
+		UnregisterScriptCallback("actor_on_land", orig_servo_land)
+		exo_servo_sounds.actor_on_land = function(landing_speed)
+			if wearing_kx1() and landing_speed then
+				landing_speed = landing_speed * SERVO_LAND_MUL
+			end
+			return orig_servo_land(landing_speed)
+		end
+		RegisterScriptCallback("actor_on_land", exo_servo_sounds.actor_on_land)
+	end
+
+	servo_wrapped = true
+	log("KX-1 servo preset wrapped (quieter / lower pitch)")
+end
+
+local function unwrap_servo_sounds()
+	if not servo_wrapped or not exo_servo_sounds then
+		return
+	end
+	if type(orig_servo_get_power) == "function" then
+		exo_servo_sounds.get_power = orig_servo_get_power
+	end
+	if type(orig_servo_footstep) == "function" then
+		UnregisterScriptCallback("actor_on_footstep", exo_servo_sounds.actor_on_footstep)
+		exo_servo_sounds.actor_on_footstep = orig_servo_footstep
+		RegisterScriptCallback("actor_on_footstep", orig_servo_footstep)
+	end
+	if type(orig_servo_land) == "function" then
+		UnregisterScriptCallback("actor_on_land", exo_servo_sounds.actor_on_land)
+		exo_servo_sounds.actor_on_land = orig_servo_land
+		RegisterScriptCallback("actor_on_land", orig_servo_land)
+	end
+	orig_servo_get_power = nil
+	orig_servo_footstep = nil
+	orig_servo_land = nil
+	servo_wrapped = false
+end
+
+local function unlock_kx1_lore_article()
+	if not (ui_pda_encyclopedia_tab and type(ui_pda_encyclopedia_tab.unlock_article) == "function") then
+		return
+	end
+	if ui_pda_encyclopedia_tab.is_unlocked_article and ui_pda_encyclopedia_tab.is_unlocked_article(LORE_ARTICLE) then
+		return
+	end
+	ui_pda_encyclopedia_tab.unlock_article(LORE_ARTICLE)
+	log("lore article unlocked: %s", LORE_ARTICLE)
+end
+
+local function send_first_kx1_sms()
+	if first_sms_sent or not db.actor then
+		return
+	end
+	local text = game.translate_string(SMS_FIRST)
+	if type(dynamic_news_helper) == "table" and type(dynamic_news_helper.send_tip) == "function" then
+		-- Pattern: addon/kristiano_welcome (sender "kristiano" -> welcome tip icon if installed)
+		dynamic_news_helper.send_tip(SMS_FIRST, nil, 60, 30, "kristiano", "kx1", "gr")
+	elseif news_manager and type(news_manager.send_tip) == "function" then
+		news_manager.send_tip(db.actor, text, nil, "nano", 8000)
+	else
+		log("WARN: no tip API for first KX-1 SMS")
+		return
+	end
+	first_sms_sent = true
+	unlock_kx1_lore_article()
+	log("first KX-1 SMS sent")
 end
 
 function menu_no_patch(obj)
@@ -61,6 +186,7 @@ function action_decrypt_flash(obj)
 	if ui_pda_encyclopedia_tab and type(ui_pda_encyclopedia_tab.unlock_note) == "function" then
 		ui_pda_encyclopedia_tab.unlock_note("encyclopedia__notes_" .. RECIPE_NOTE)
 	end
+	unlock_kx1_lore_article()
 	SendScriptCallback("actor_on_interaction", "notes", nil, RECIPE_NOTE)
 	news_manager.send_tip(db.actor, game.translate_string("st_kristiano_kx1_decrypt_ok"), nil, "nano", 5000)
 	log("flash decrypted for %s", tostring(DECRYPT_COST))
@@ -276,8 +402,15 @@ end
 local function on_kx1_to_slot(obj)
 	if is_kx1(obj) then
 		schedule_default_psu(obj)
+		send_first_kx1_sms()
 	end
 	enforce_backpack_lock()
+end
+
+local function on_kx1_item_take(obj)
+	if is_kx1(obj) then
+		send_first_kx1_sms()
+	end
 end
 
 local function actor_has_section(sec)
@@ -319,6 +452,7 @@ local function ensure_recipe_known()
 	-- Already holding the blueprint item (old save / decrypt before encyclopedia patch).
 	if db.actor and db.actor:object(RECIPE_NOTE) then
 		ui_pda_encyclopedia_tab.unlock_note(note_id)
+		unlock_kx1_lore_article()
 		SendScriptCallback("actor_on_interaction", "notes", nil, RECIPE_NOTE)
 		log("ensured encyclopedia unlock for existing blueprint")
 	end
@@ -343,14 +477,16 @@ end
 
 local function save_state(data)
 	data.kristiano_kx1_exo = {
-		version = 2,
+		version = 3,
 		legend_flash_given = legend_flash_given and true or false,
+		first_sms_sent = first_sms_sent and true or false,
 	}
 end
 
 local function load_state(data)
 	local saved = data.kristiano_kx1_exo or {}
 	legend_flash_given = saved.legend_flash_given and true or false
+	first_sms_sent = saved.first_sms_sent and true or false
 end
 
 local function uninstall()
@@ -401,11 +537,14 @@ end
 
 function on_game_start()
 	install()
+	wrap_servo_sounds()
 	RegisterScriptCallback("actor_on_first_update", enforce_backpack_lock)
 	RegisterScriptCallback("actor_on_first_update", legend_check)
+	RegisterScriptCallback("actor_on_first_update", wrap_servo_sounds)
 	RegisterScriptCallback("actor_item_to_slot", on_kx1_to_slot)
 	RegisterScriptCallback("actor_item_to_ruck", enforce_backpack_lock)
 	RegisterScriptCallback("actor_on_item_drop", enforce_backpack_lock)
+	RegisterScriptCallback("actor_on_item_take", on_kx1_item_take)
 	RegisterScriptCallback("save_state", save_state)
 	RegisterScriptCallback("load_state", load_state)
 end
@@ -413,10 +552,13 @@ end
 function on_game_end()
 	UnregisterScriptCallback("actor_on_first_update", enforce_backpack_lock)
 	UnregisterScriptCallback("actor_on_first_update", legend_check)
+	UnregisterScriptCallback("actor_on_first_update", wrap_servo_sounds)
 	UnregisterScriptCallback("actor_item_to_slot", on_kx1_to_slot)
 	UnregisterScriptCallback("actor_item_to_ruck", enforce_backpack_lock)
 	UnregisterScriptCallback("actor_on_item_drop", enforce_backpack_lock)
+	UnregisterScriptCallback("actor_on_item_take", on_kx1_item_take)
 	UnregisterScriptCallback("save_state", save_state)
 	UnregisterScriptCallback("load_state", load_state)
+	unwrap_servo_sounds()
 	uninstall()
 end

@@ -1,0 +1,45 @@
+# ТЗ: иконка Kristiano KX-1 (B1)
+# Источники: Anomaly Modding Book — Inventory Icons
+# https://anomaly-modding-book.netlify.app/docs/tutorials/configs/inventory-icons
+# + эталон Exo System: icons_texture = ui\ui_icon_exo_backpack, grid 2x3 @ 0,0
+
+## Размер ячейки
+- Сетка инвентаря: **50×50 px** на слот.
+- KX-1 как экзо/рюкзак-каркас: **2×3 слота** → картинка **100×150 px**.
+
+## Файл атласа (после твоей картинки)
+1. Создай DDS (power-of-2, лучше **128×256** или **256×256**), фон **прозрачный**.
+2. Формат: **A8R8G8B8 / ARGB8** (как в Modding Book) или DXT5 с альфой.
+3. Положи в аддон:
+   `gamedata/textures/ui/ui_icon_kristiano_kx1.dds`
+4. (Опционально) textures_descr, если нужен отдельный UI id — для инвентаря обычно хватает `icons_texture`.
+
+## Раскладка на атласе
+- Положи иконку в клетку **(0, 0)** атласа (левый верх).
+- Размер на атласе: 2×3 слота (100×150 px). Остальное атласа — прозрачное.
+
+## Поля в секции костюма
+Файл: `gamedata/configs/mod_system_kristiano_kx1_exo.ltx` → `[kristiano_kx1_exo_outfit]`
+
+```
+icons_texture      = ui\ui_icon_kristiano_kx1
+inv_grid_width     = 2
+inv_grid_height    = 3
+inv_grid_x         = 0
+inv_grid_y         = 0
+```
+
+Сейчас KX-1 наследует иконку Raytheon (`ui\ui_icon_exo_backpack` у родителя) — после DDS эти 4 поля перебьют её.
+
+## Три места проверки в игре
+1. **Инвентарь** — иконка предмета в рюкзаке.
+2. **Слот экипировки (броня)** — та же `icons_texture` + grid.
+3. **Меню крафта (CSI / Exo System)** — обычно берёт ту же секцию предмета; если иконка там пустая — пиши, подправим отдельно.
+
+## Портрет / full_icon (не путать)
+- `character_portrait` / `full_icon_name` — вид актёра в комбинезоне, **не** иконка инвентаря.
+- На тестовом этапе **не меняем** (можно оставить как у Exo System / нейтрал).
+
+## Что прислать мне
+- PNG 100×150 (или 128×256 атлас с иконкой в 0,0).
+- Я конвертирую через `tools/dds_tool.ps1` и пропишу поля в ltx.

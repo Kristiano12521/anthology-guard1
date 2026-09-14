@@ -9,6 +9,8 @@
 %c[d_blue] - %c[ui_gray_2] Built-in Spartan helmet (external helmet slot locked; UI may show headgear available)\n
 %c[d_blue] - %c[ui_gray_2] Nosorog+ bone / ballistic protection\n
 %c[d_blue] - %c[ui_gray_2] Sprint unlocked; Exo System PSU support\n
+%c[d_blue] - %c[ui_gray_2] Efficient suit drain (~28% better than stock Raytheon)\n
+%c[d_blue] - %c[ui_gray_2] Quieter, lower-pitched servos while powered\n
 %c[d_blue] - %c[ui_gray_2] Built-in regen and stronger chemical resist\n
 %c[0,100,255,150] - %c[ui_gray_2] Neutral: faction patches disabled\n
 		</text>
@@ -46,5 +48,15 @@
 	</string>
 	<string id="st_kristiano_kx1_legend_flash">
 		<text>KX-1: Legend rank reward - encrypted schematic flash received.</text>
+	</string>
+
+	<string id="encyclopedia_items_kristiano_kx1">
+		<text>Kristiano KX-1 Exoskeleton</text>
+	</string>
+	<string id="encyclopedia_items_kristiano_kx1_text">
+		<text>A classified field project. A Merc Nosorog chassis was rewired onto an Exo System frame: a logistics power skeleton, joint servos, and an onboard PSU that does not need an external grid.\n\nTwo names appear in the notes. Hydra - the scientist who handled anomaly circuits and power nodes. Kristiano - a Zone researcher who locked the servo and plating scheme into protocol KX.\n\nThis is not a glossy Big Land brochure exo. It is a hard-built hybrid: field autonomy, heavy protection, and Exo System modularity. The blueprint travels closed channels; you will not find it casually on a trader stall.\n\nScattered field notes mention protocol KX, servo trials, and a warning not to strip the integrated helmet loop outside the lab.</text>
+	</string>
+	<string id="st_kristiano_kx1_sms_first_equip">
+		<text>%c[255,248,153,26]Kristiano:\n%c[default]Protocol KX is live. Servo map checked out. Keep the integrated helmet loop sealed and do not dry-fire the PSU outside a safe zone. If the frame starts singing - that is normal. Good hunting.</text>
 	</string>
 </string_table>
