@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="windows-1251" ?>
+<string_table>
+	<string id="st_kristiano_kx1_exo_name">
+		<text>Экзоскелет Кристиано KX-1</text>
+	</string>
+	<string id="st_kristiano_kx1_exo_descr">
+		<text>Секретная разработка научного сотрудника в Зоне отчуждения. Экзоскелет сочетает передовые технологии с Большой земли и полевые доработки, дав уникальный набор характеристик, которого раньше добиться не удавалось. Каркас наёмнического «Носорога» перепрошили под раму Exo System: учёный Гидра отвечал за аномальные контуры и модули питания, а Кристиано — великий научный сотрудник Зоны отчуждения — собрал схему сервоприводов и защиты.\n \n%c[ui_gray_3]ОСОБЕННОСТИ:\n%c[d_blue] - %c[ui_gray_2] Костная/пулевая защита класса «Носорог»\n%c[d_blue] - %c[ui_gray_2] Бег доступен сразу; Exo System БП\n%c[d_blue] - %c[ui_gray_2] Встроенный реген и усиленная химзащита\n%c[0,100,255,150] - %c[ui_gray_2] Нейтральный: нашивки фракций недоступны\n</text>
+	</string>
+	<string id="st_recipe_kristiano_kx1">
+		<text>Чертёж: Кристиано KX-1</text>
+	</string>
+	<string id="st_recipe_kristiano_kx1_descr">
+		<text>Расшифрованные схемы сборки экзоскелета Кристиано KX-1. Нужны на экспертном верстаке во вкладке Exo System.\n \n%c[d_blue] - %c[ui_gray_2] чертёж крафта\n</text>
+	</string>
+	<string id="encyclopedia__notes_recipe_kristiano_kx1">
+		<text>Схемы Кристиано KX-1</text>
+	</string>
+	<string id="encyclopedia__notes_recipe_kristiano_kx1_text">
+		<text>Секретные схемы полевой пересборки экзоскелета KX-1. Работа учёного Гидры и Кристиано — великого научного сотрудника Зоны отчуждения. После изучения доступен крафт во вкладке Exo System.</text>
+	</string>
+	<string id="st_kristiano_kx1_flash_encrypted">
+		<text>Зашифрованная флешка KX-1</text>
+	</string>
+	<string id="st_kristiano_kx1_flash_encrypted_descr">
+		<text>Полевая флешка с фрагментами схем KX-1. Данные закрыты: расшифровка в инвентаре стоит немалых денег и сразу открывает чертёж крафта.\n \n%c[d_orange] - %c[ui_gray_2] требуется расшифровка\n</text>
+	</string>
+	<string id="st_kristiano_kx1_decrypt_menu">
+		<text>Расшифровать чертёж KX-1</text>
+	</string>
+	<string id="st_kristiano_kx1_decrypt_nomoney">
+		<text>KX-1: недостаточно денег на расшифровку флешки.</text>
+	</string>
+	<string id="st_kristiano_kx1_decrypt_ok">
+		<text>KX-1: флешка расшифрована, чертёж изучен.</text>
+	</string>
+	<string id="st_kristiano_kx1_legend_flash">
+		<text>KX-1: за ранг «Легенда» получена зашифрованная флешка со схемами.</text>
+	</string>
+</string_table>

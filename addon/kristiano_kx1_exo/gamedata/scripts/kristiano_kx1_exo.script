@@ -1,0 +1,420 @@
+-- load-order: after aa_load_recipes_Banjaji_CSI, fix_milspec_exo_craft, item_exo_device
+-- Kristiano KX-1: endgame exo craft, fabric scraps, flash decrypt, default recharge PSU.
+
+local LOG_TAG = "[kristiano_kx1_exo]"
+local VERSION = "1.1.1"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local KX1_SECTION = "kristiano_kx1_exo_outfit"
+local FLASH_ENC = "kristiano_kx1_flash_encrypted"
+local RECIPE_NOTE = "recipe_kristiano_kx1"
+local DEFAULT_PSU = "exo_power_supply_proto"
+local EXO_TAB_TITLE = "st_exo_system_craftingtitle"
+local PARTS_TAB_TITLE = "st_OutfitPartsOverhaul_crafting_title"
+local DECRYPT_COST = 75000
+local EVENT_ID = "kristiano_kx1_exo"
+
+local orig_is_exobackpack = nil
+local orig_load = nil
+local installed = false
+local legend_flash_given = false
+local psu_pending = {}
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function is_kx1(obj)
+	return obj and obj.section and obj:section() == KX1_SECTION
+end
+
+function menu_no_patch(obj)
+	return false
+end
+
+function action_no_patch(obj)
+end
+
+function menu_decrypt_flash(obj)
+	local parent = obj and obj:parent()
+	if not (parent and db.actor and parent:id() == db.actor:id()) then
+		return false
+	end
+	local tip = game.translate_string("st_kristiano_kx1_decrypt_menu")
+	return string.format("%s (%s)", tip, tostring(DECRYPT_COST))
+end
+
+function action_decrypt_flash(obj)
+	if not (obj and db.actor) then
+		return
+	end
+	local money = db.actor:money()
+	if not money or money < DECRYPT_COST then
+		news_manager.send_tip(db.actor, game.translate_string("st_kristiano_kx1_decrypt_nomoney"), nil, "nano", 4000)
+		return
+	end
+	db.actor:give_money(-DECRYPT_COST)
+	alife_create_item(RECIPE_NOTE, db.actor)
+	alife_release_id(obj:id())
+	-- Unlock craft knowledge immediately (encyclopedia note for CSI).
+	if ui_pda_encyclopedia_tab and type(ui_pda_encyclopedia_tab.unlock_note) == "function" then
+		ui_pda_encyclopedia_tab.unlock_note("encyclopedia__notes_" .. RECIPE_NOTE)
+	end
+	SendScriptCallback("actor_on_interaction", "notes", nil, RECIPE_NOTE)
+	news_manager.send_tip(db.actor, game.translate_string("st_kristiano_kx1_decrypt_ok"), nil, "nano", 5000)
+	log("flash decrypted for %s", tostring(DECRYPT_COST))
+end
+
+local function tab_index_by_title(tabs, title)
+	if not tabs then
+		return nil
+	end
+	for i, tab_title in pairs(tabs) do
+		if tab_title == title then
+			return i
+		end
+	end
+	return nil
+end
+
+local function has_identificator(list, identificator)
+	if not list then
+		return false
+	end
+	for i = 1, #list do
+		local recipe = list[i]
+		if recipe and recipe.identificator == identificator then
+			return true
+		end
+	end
+	return false
+end
+
+local function append_recipe(list, recipe)
+	if has_identificator(list, recipe.identificator) then
+		return false
+	end
+	list[#list + 1] = recipe
+	return true
+end
+
+local function kx1_recipe()
+	return {
+		identificator = KX1_SECTION,
+		results = {[KX1_SECTION] = 1},
+		notes = {[RECIPE_NOTE] = 1},
+		tools = {["itm_expertkit"] = 1},
+		components = {
+			["merc_nosorog_outfit"] = 1,
+			["exo_power_supply_tank"] = 1,
+			["exo_power_supply_sprint"] = 1,
+			["prt_i_capacitors"] = 80,
+			["prt_i_transistors"] = 80,
+			["prt_i_resistors"] = 80,
+			["prt_i_textolite"] = 25,
+			["prt_i_copper"] = 40,
+			["prt_i_scrap"] = 50,
+			["prt_i_fasteners"] = 40,
+			["prt_i_ceramic"] = 20,
+			["prt_i_rubber"] = 15,
+			["prt_o_basic_retardant"] = 30,
+			["prt_o_basic_ballistic"] = 30,
+			["heavy_sewing_thread"] = 5,
+			["af_aam"] = 1,
+			["af_dummy_pellicle"] = 1,
+			["af_electra_flash"] = 1,
+			["af_gold_fish"] = 2,
+			["af_fuzz_kolobok"] = 1,
+			["af_fireball"] = 1,
+			["af_surge_up"] = 1,
+			["af_cooler"] = 1,
+			["af_dummy_battery_af_aam"] = 1,
+			["af_full_empty_af_aam"] = 1,
+		},
+	}
+end
+
+local function retardant_recipe()
+	return {
+		identificator = "prt_o_basic_retardant",
+		results = {["prt_o_basic_retardant"] = 5},
+		notes = {["recipe_advanced_1"] = 1},
+		tools = {["itm_advancedkit"] = 1},
+		components = {
+			["prt_o_fabrics_2"] = 3,
+			["glue_a"] = 1,
+			["solvent"] = 1,
+			["sewing_thread"] = 1,
+		},
+	}
+end
+
+local function inject_recipes()
+	local csi = aa_load_recipes_Banjaji_CSI
+	local recipes = csi and csi.all_recipes
+	local tabs = csi and csi.all_recipe_tabs
+	if not (recipes and tabs) then
+		log("ABORT: all_recipes/all_recipe_tabs missing after LoadRecipesLTX")
+		return
+	end
+
+	local added = 0
+
+	local exo_tab = tab_index_by_title(tabs, EXO_TAB_TITLE)
+	if not exo_tab then
+		exo_tab = #tabs + 1
+		tabs[exo_tab] = EXO_TAB_TITLE
+	end
+	recipes[exo_tab] = recipes[exo_tab] or {}
+	if append_recipe(recipes[exo_tab], kx1_recipe()) then
+		added = added + 1
+	end
+
+	local parts_tab = tab_index_by_title(tabs, PARTS_TAB_TITLE)
+	if parts_tab then
+		recipes[parts_tab] = recipes[parts_tab] or {}
+		if append_recipe(recipes[parts_tab], retardant_recipe()) then
+			added = added + 1
+		end
+	else
+		log("WARN: Outfit Parts tab %s not found", PARTS_TAB_TITLE)
+	end
+
+	log("injected %s new recipes", tostring(added))
+end
+
+local function wrapped_LoadRecipesLTX(...)
+	local result = orig_load(...)
+	inject_recipes()
+	return result
+end
+
+local function wrapped_is_exobackpack(obj)
+	if is_kx1(obj) then
+		return true
+	end
+	if orig_is_exobackpack then
+		return orig_is_exobackpack(obj)
+	end
+	return false
+end
+
+local function enforce_backpack_lock()
+	if not (db and db.actor) then
+		return
+	end
+	local outfit = db.actor:item_in_slot(7)
+	if not is_kx1(outfit) then
+		return
+	end
+	local backpack = db.actor:item_in_slot(13)
+	if backpack then
+		db.actor:move_to_ruck(backpack)
+	end
+end
+
+local function try_install_default_psu(suit_id, psu_id)
+	if not (item_exo_device and type(item_exo_device.install_psu) == "function") then
+		return true
+	end
+	local suit = level.object_by_id(suit_id)
+	local psu = level.object_by_id(psu_id)
+	if not (suit and psu and is_kx1(suit)) then
+		return false
+	end
+	local data = item_exo_device.get_data(suit_id)
+	if data and data.supply then
+		alife_release_id(psu_id)
+		return true
+	end
+	data = data or {power = 0}
+	item_exo_device.install_psu(suit, data, psu)
+	log("default recharge PSU installed on KX-1 id %s", tostring(suit_id))
+	return true
+end
+
+function psu_install_tick()
+	local left = false
+	for suit_id, psu_id in pairs(psu_pending) do
+		if try_install_default_psu(suit_id, psu_id) then
+			psu_pending[suit_id] = nil
+		else
+			left = true
+		end
+	end
+	if left then
+		ResetTimeEvent(EVENT_ID, "psu_tick", 0.1)
+		return false
+	end
+	return true
+end
+
+local function schedule_default_psu(suit)
+	if not (suit and item_exo_device) then
+		return
+	end
+	local suit_id = suit:id()
+	local data = item_exo_device.get_data(suit_id)
+	if data and data.supply then
+		return
+	end
+	if psu_pending[suit_id] then
+		return
+	end
+	local se = alife_create_item(DEFAULT_PSU, db.actor)
+	if not se then
+		log("WARN: failed to spawn default PSU")
+		return
+	end
+	psu_pending[suit_id] = se.id
+	CreateTimeEvent(EVENT_ID, "psu_tick", 0, psu_install_tick)
+end
+
+local function on_kx1_to_slot(obj)
+	if is_kx1(obj) then
+		schedule_default_psu(obj)
+	end
+	enforce_backpack_lock()
+end
+
+local function actor_has_section(sec)
+	if not db.actor then
+		return false
+	end
+	return db.actor:object(sec) ~= nil
+end
+
+local function try_give_legend_flash()
+	if legend_flash_given or not db.actor then
+		return
+	end
+	if not (ranks and ranks.get_obj_rank_name) then
+		return
+	end
+	local rank = ranks.get_obj_rank_name(db.actor)
+	if rank ~= "legend" then
+		return
+	end
+	if actor_has_section(FLASH_ENC) or actor_has_section(RECIPE_NOTE) then
+		legend_flash_given = true
+		return
+	end
+	alife_create_item(FLASH_ENC, db.actor)
+	legend_flash_given = true
+	news_manager.send_tip(db.actor, game.translate_string("st_kristiano_kx1_legend_flash"), nil, "nano", 6000)
+	log("legend rank: encrypted flash granted")
+end
+
+local function ensure_recipe_known()
+	if not (ui_pda_encyclopedia_tab and type(ui_pda_encyclopedia_tab.unlock_note) == "function") then
+		return
+	end
+	local note_id = "encyclopedia__notes_" .. RECIPE_NOTE
+	if ui_pda_encyclopedia_tab.is_unlocked_note and ui_pda_encyclopedia_tab.is_unlocked_note(note_id) then
+		return
+	end
+	-- Already holding the blueprint item (old save / decrypt before encyclopedia patch).
+	if db.actor and db.actor:object(RECIPE_NOTE) then
+		ui_pda_encyclopedia_tab.unlock_note(note_id)
+		SendScriptCallback("actor_on_interaction", "notes", nil, RECIPE_NOTE)
+		log("ensured encyclopedia unlock for existing blueprint")
+	end
+end
+
+local function legend_check()
+	ensure_recipe_known()
+	try_give_legend_flash()
+	if not legend_flash_given then
+		CreateTimeEvent(EVENT_ID, "legend_poll", 30.0, legend_poll)
+	end
+end
+
+function legend_poll()
+	try_give_legend_flash()
+	if legend_flash_given then
+		return true
+	end
+	ResetTimeEvent(EVENT_ID, "legend_poll", 30.0)
+	return false
+end
+
+local function save_state(data)
+	data.kristiano_kx1_exo = {
+		version = 2,
+		legend_flash_given = legend_flash_given and true or false,
+	}
+end
+
+local function load_state(data)
+	local saved = data.kristiano_kx1_exo or {}
+	legend_flash_given = saved.legend_flash_given and true or false
+end
+
+local function uninstall()
+	local csi = aa_load_recipes_Banjaji_CSI
+	if installed and csi and orig_load and csi.LoadRecipesLTX == wrapped_LoadRecipesLTX then
+		csi.LoadRecipesLTX = orig_load
+	end
+	if installed and item_exo_device and orig_is_exobackpack and item_exo_device.is_exobackpack == wrapped_is_exobackpack then
+		item_exo_device.is_exobackpack = orig_is_exobackpack
+	end
+	orig_load = nil
+	orig_is_exobackpack = nil
+	installed = false
+	psu_pending = {}
+end
+
+local function install()
+	if installed then
+		return
+	end
+
+	if not aa_load_recipes_Banjaji_CSI then
+		log("ABORT: aa_load_recipes_Banjaji_CSI not found - guard NOT installed")
+		return
+	end
+	if type(aa_load_recipes_Banjaji_CSI.LoadRecipesLTX) ~= "function" then
+		log("ABORT: LoadRecipesLTX not found - guard NOT installed")
+		return
+	end
+
+	orig_load = aa_load_recipes_Banjaji_CSI.LoadRecipesLTX
+	aa_load_recipes_Banjaji_CSI.LoadRecipesLTX = wrapped_LoadRecipesLTX
+
+	if item_exo_device and type(item_exo_device.is_exobackpack) == "function" then
+		orig_is_exobackpack = item_exo_device.is_exobackpack
+		item_exo_device.is_exobackpack = wrapped_is_exobackpack
+	else
+		log("WARN: item_exo_device.is_exobackpack missing - PSU UI may ignore KX-1")
+	end
+
+	installed = true
+	log("hooks installed v%s", VERSION)
+
+	if aa_load_recipes_Banjaji_CSI.all_recipes and aa_load_recipes_Banjaji_CSI.all_recipe_tabs then
+		inject_recipes()
+	end
+end
+
+function on_game_start()
+	install()
+	RegisterScriptCallback("actor_on_first_update", enforce_backpack_lock)
+	RegisterScriptCallback("actor_on_first_update", legend_check)
+	RegisterScriptCallback("actor_item_to_slot", on_kx1_to_slot)
+	RegisterScriptCallback("actor_item_to_ruck", enforce_backpack_lock)
+	RegisterScriptCallback("actor_on_item_drop", enforce_backpack_lock)
+	RegisterScriptCallback("save_state", save_state)
+	RegisterScriptCallback("load_state", load_state)
+end
+
+function on_game_end()
+	UnregisterScriptCallback("actor_on_first_update", enforce_backpack_lock)
+	UnregisterScriptCallback("actor_on_first_update", legend_check)
+	UnregisterScriptCallback("actor_item_to_slot", on_kx1_to_slot)
+	UnregisterScriptCallback("actor_item_to_ruck", enforce_backpack_lock)
+	UnregisterScriptCallback("actor_on_item_drop", enforce_backpack_lock)
+	UnregisterScriptCallback("save_state", save_state)
+	UnregisterScriptCallback("load_state", load_state)
+	uninstall()
+end

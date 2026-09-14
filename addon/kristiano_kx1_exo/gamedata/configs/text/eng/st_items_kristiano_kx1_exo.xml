@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="windows-1251" ?>
+<string_table>
+	<string id="st_kristiano_kx1_exo_name">
+		<text>Kristiano KX-1 Exoskeleton</text>
+	</string>
+	<string id="st_kristiano_kx1_exo_descr">
+		<text>A classified project by a Zone scientist. This exoskeleton blends Big Land tech with field craft into a mix of traits nobody had locked down before. A Merc Nosorog chassis was rebuilt onto an Exo System frame: the scientist Hydra handled anomaly circuits and power modules, while Kristiano — a renowned scientific researcher of the Exclusion Zone — wired the servo and plating scheme.\n \n
+%c[ui_gray_3]FEATURES:\n
+%c[d_blue] - %c[ui_gray_2] Nosorog-class bone / ballistic protection\n
+%c[d_blue] - %c[ui_gray_2] Sprint unlocked; Exo System PSU support\n
+%c[d_blue] - %c[ui_gray_2] Built-in regen and stronger chemical resist\n
+%c[0,100,255,150] - %c[ui_gray_2] Neutral: faction patches disabled\n
+		</text>
+	</string>
+	<string id="st_recipe_kristiano_kx1">
+		<text>Blueprint: Kristiano KX-1</text>
+	</string>
+	<string id="st_recipe_kristiano_kx1_descr">
+		<text>Decrypted assembly plans for the Kristiano KX-1 exoskeleton. Required at an expert workbench under the Exo System tab.\n \n
+%c[d_blue] - %c[ui_gray_2] craft recipe\n
+		</text>
+	</string>
+	<string id="encyclopedia__notes_recipe_kristiano_kx1">
+		<text>Kristiano KX-1 Schematics</text>
+	</string>
+	<string id="encyclopedia__notes_recipe_kristiano_kx1_text">
+		<text>Classified field-rebuild schematics for the KX-1 exoskeleton. Work by the scientist Hydra and Kristiano, a renowned scientific researcher of the Exclusion Zone. Studying this unlocks the craft under the Exo System tab.</text>
+	</string>
+	<string id="st_kristiano_kx1_flash_encrypted">
+		<text>Encrypted KX-1 flash drive</text>
+	</string>
+	<string id="st_kristiano_kx1_flash_encrypted_descr">
+		<text>A field flash with KX-1 schematic fragments. Data is locked: decrypting it from inventory costs a serious fee and unlocks the craft blueprint immediately.\n \n
+%c[d_orange] - %c[ui_gray_2] decryption required\n
+		</text>
+	</string>
+	<string id="st_kristiano_kx1_decrypt_menu">
+		<text>Decrypt KX-1 blueprint</text>
+	</string>
+	<string id="st_kristiano_kx1_decrypt_nomoney">
+		<text>KX-1: not enough money to decrypt the flash drive.</text>
+	</string>
+	<string id="st_kristiano_kx1_decrypt_ok">
+		<text>KX-1: flash decrypted, blueprint learned.</text>
+	</string>
+	<string id="st_kristiano_kx1_legend_flash">
+		<text>KX-1: Legend rank reward - encrypted schematic flash received.</text>
+	</string>
+</string_table>

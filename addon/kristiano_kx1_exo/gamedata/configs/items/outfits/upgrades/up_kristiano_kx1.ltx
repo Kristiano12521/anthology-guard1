@@ -1,0 +1,45 @@
+; KX-1 upgrades: first slot = psi +20% (replaces wound); fifth = arty (sprint is default on suit).
+
+[up_sect_firsta_kx1_1]:up_sect_prop_telepatic_20
+
+[up_firsta_kx1_1]
+scheme_index            = 0, 0
+known                   = 1
+effects                 = up_gr_firstcd_exolight_1
+section                 = up_sect_firsta_kx1_1
+precondition_functor    = inventory_upgrades.precondition_functor_a
+precondition_parameter  = a & b
+effect_functor          = inventory_upgrades.effect_functor_a
+effect_parameter        = something_here
+prereq_functor          = inventory_upgrades.prereq_functor_a
+prereq_tooltip_functor  = inventory_upgrades.prereq_tooltip_functor_a
+prereq_params           =
+property                = prop_psy
+name                    = st_up_tele_1_name
+description             = st_up_tele_1_descr
+icon                    = ui_inGame2_upgrade_outfit_psi_1
+
+[up_gr_firstab_kx1_1]
+elements                = up_firsta_kx1_1
+
+[up_sect_fiftha_kx1_1]:up_sect_prop_arty_1
+
+[up_fiftha_kx1_1]
+scheme_index            = 0, 4
+known                   = 1
+effects                 = up_gr_fifthcd_exo_1
+section                 = up_sect_fiftha_kx1_1
+precondition_functor    = inventory_upgrades.precondition_functor_a
+precondition_parameter  = a & b
+effect_functor          = inventory_upgrades.effect_functor_a
+effect_parameter        = something_here
+prereq_functor          = inventory_upgrades.prereq_functor_a
+prereq_tooltip_functor  = inventory_upgrades.prereq_tooltip_functor_a
+prereq_params           =
+property                = prop_artefact
+name                    = st_up_arty_1_name
+description             = st_up_arty_1_descr
+icon                    = ui_inGame2_upgrade_outfit_arty_1
+
+[up_gr_fifthab_kx1_1]
+elements                = up_fiftha_kx1_1
