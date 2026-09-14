@@ -1,5 +1,6 @@
-; Legacy KX-1 upgrade groups (psi / arty). Outfit no longer references these;
-; kept so old saves with installed_upgrades do not lose section lookups.
+; KX-1 upgrades.
+; Legacy psi/arty groups kept for old saves.
+; TEST: 5th slot = carry +10 (sprint is free on the suit; mag pouches are base mag_limit_*).
 
 [up_sect_firsta_kx1_1]:up_sect_prop_telepatic_20
 
@@ -44,3 +45,25 @@ icon                    = ui_inGame2_upgrade_outfit_arty_1
 
 [up_gr_fifthab_kx1_1]
 elements                = up_fiftha_kx1_1
+
+[up_sect_fiftha_kx1_carry]:up_sect_prop_carryweight_10
+
+[up_fiftha_kx1_carry]
+scheme_index            = 0, 4
+known                   = 1
+effects                 = up_gr_fifthcd_exo_1
+section                 = up_sect_fiftha_kx1_carry
+precondition_functor    = inventory_upgrades.precondition_functor_a
+precondition_parameter  = a & b
+effect_functor          = inventory_upgrades.effect_functor_a
+effect_parameter        = something_here
+prereq_functor          = inventory_upgrades.prereq_functor_a
+prereq_tooltip_functor  = inventory_upgrades.prereq_tooltip_functor_a
+prereq_params           =
+property                = prop_tonnage
+name                    = st_up_carry_1_name
+description             = st_up_carry_1_descr
+icon                    = ui_inGame2_upgrade_outfit_carry_1
+
+[up_gr_fifthab_kx1_carry]
+elements                = up_fiftha_kx1_carry

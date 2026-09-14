@@ -6,7 +6,7 @@
 	<string id="st_kristiano_kx1_exo_descr">
 		<text>A classified project by a Zone scientist. This exoskeleton blends Big Land tech with field craft into a mix of traits nobody had locked down before. A Merc Nosorog chassis was rebuilt onto an Exo System frame: the scientist Hydra handled anomaly circuits and power modules, while Kristiano — a renowned scientific researcher of the Exclusion Zone — wired the servo and plating scheme.\n \n
 %c[ui_gray_3]FEATURES:\n
-%c[d_blue] - %c[ui_gray_2] Built-in Spartan helmet (external helmet slot locked)\n
+%c[d_blue] - %c[ui_gray_2] Built-in Spartan helmet (external helmet slot locked; UI may show headgear available)\n
 %c[d_blue] - %c[ui_gray_2] Nosorog+ bone / ballistic protection\n
 %c[d_blue] - %c[ui_gray_2] Sprint unlocked; Exo System PSU support\n
 %c[d_blue] - %c[ui_gray_2] Built-in regen and stronger chemical resist\n
