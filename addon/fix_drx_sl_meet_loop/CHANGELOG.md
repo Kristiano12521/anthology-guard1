@@ -1,5 +1,27 @@
 # Fix DRX SL Meet Loop
 
+## [1.0.1] — 2026-09-14
+
+**Изменено**
+
+- Правка `drx_sl_honchos_table`: второй ряд `cit_killers_merc_mechanic_stalker` (комментарий Vector) → `zat_stancia_trader_merc`.
+- Выбор следующего хончо предпочитает ту же фракцию, что у текущего.
+- Перед выдачей нового meet снимается залипший meet текущего.
+
+**Причина**
+
+Диалог `default_task` обещает следующего контакта, но ванильная таблица дублирует Кабана вместо Вектора (`zat_stancia_trader_merc`). После Грифона у наёмника часто пустой список кандидатов — 1.0.0 только рвал self-meet без новой метки.
+
+**Не затронуто**
+
+- запрет self-meet при реально пустом списке
+- LTX заданий, `fix_grifon_visibility`
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_drx_sl_meet_loop`
+- В игре: не прогонялось
+
 ## [1.0.0] — 2026-09-14
 
 **Изменено**
@@ -34,4 +56,4 @@
 **Проверено**
 
 - lint: `python tools/lint_addon.py fix_drx_sl_meet_loop`
-- В игре: не прогонялось. Ожидаемый лог: `wrapped: drx_sl_meet_random_honcho`; при обрыве — `no valid next honcho ... skip self-meet loop` / `forced complete stuck ...`
+- В игре: не прогонялось. Ожидаемый лог: `wrapped: drx_sl_meet_random_honcho`; при обрыве — `no valid next honcho ... skip self-meet loop`

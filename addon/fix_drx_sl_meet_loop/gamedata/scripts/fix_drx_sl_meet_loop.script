@@ -7,19 +7,24 @@
 -- That meet is often still inprocess -> TASK ALREADY EXISTS / PDA stuck on
 -- "meet X" while dialog flashes "get next task" new+complete.
 --
--- Monkey-patch: never self-meet on empty candidate list; skip give_task if
--- meet already active; clear stuck meet info/task for current on abort.
+-- Also: drx_sl_honchos_table lists Vector as cit_killers_merc_mechanic_stalker
+-- (Hog duplicate). Meet tasks exist for zat_stancia_trader_merc — without that
+-- id mercs often have zero next targets after Griffith.
+--
+-- Monkey-patch: fix Vector id; prefer same-faction next; never self-meet on
+-- empty list; skip already-active meet; clear stuck meet for current.
 
 -- load-order: after xr_effects / axr_task_manager (wraps at on_game_start)
 
 local LOG_TAG = "[fix_drx_sl_meet_loop]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local orig = {}
 local installed = false
 local callbacks_registered = false
+local table_fixed = false
 
 local function log(fmt, ...)
 	printf(LOG_TAG .. " " .. fmt, ...)
@@ -62,7 +67,6 @@ local function clear_stuck_meet_for(honcho)
 		local ok, has = pcall(has_alife_info, info_id)
 		if ok and has then
 			pcall(disable_info, info_id)
-			log("cleared stuck meet info %s", info_id)
 		end
 	end
 
@@ -83,10 +87,60 @@ local function clear_stuck_meet_for(honcho)
 			pcall(function()
 				mgr:set_task_completed(task_id)
 			end)
-			log("forced complete stuck %s", task_id)
 		end
 		i = i + 1
 	end
+end
+
+-- Vanilla table: second merc mechanic row is meant to be Vector (Zaton).
+local function fix_honchos_table()
+	local atm = rawget(_G, "axr_task_manager")
+	local t = atm and atm.drx_sl_honchos_table
+	if not t then
+		log("drx_sl_honchos_table not found - Vector id NOT fixed")
+		return false
+	end
+
+	local seen_hog = false
+	for i = 1, #t do
+		if t[i][1] == "cit_killers_merc_mechanic_stalker" then
+			if seen_hog then
+				t[i][1] = "zat_stancia_trader_merc"
+			else
+				seen_hog = true
+			end
+		elseif t[i][1] == "zat_stancia_trader_merc" then
+			seen_hog = true
+		end
+	end
+
+	table_fixed = true
+	return true
+end
+
+local function faction_of(table_ref, honcho)
+	for i = 1, #table_ref do
+		if table_ref[i][1] == honcho then
+			return table_ref[i][2]
+		end
+	end
+	return nil
+end
+
+local function pick_next(honcho_list, table_ref, current_honcho)
+	local current_faction = faction_of(table_ref, current_honcho)
+	if current_faction then
+		local same = {}
+		for i = 1, #honcho_list do
+			if faction_of(table_ref, honcho_list[i]) == current_faction then
+				same[#same + 1] = honcho_list[i]
+			end
+		end
+		if #same > 0 then
+			return same[math.random(#same)]
+		end
+	end
+	return honcho_list[math.random(#honcho_list)]
 end
 
 -- Corrected copy of xr_effects.drx_sl_meet_random_honcho (vanilla ~704-780).
@@ -98,6 +152,10 @@ local function patched_meet_random_honcho(actor, npc, p)
 		return
 	end
 
+	if not table_fixed then
+		fix_honchos_table()
+	end
+
 	local current_honcho = ""
 	if db and db.actor and type(load_var) == "function" then
 		current_honcho = load_var(db.actor, "drx_sl_current_honcho", "") or ""
@@ -106,6 +164,8 @@ local function patched_meet_random_honcho(actor, npc, p)
 	local honcho_list = {}
 	local size_t = 0
 	local cond = rawget(_G, "xr_conditions")
+	local actor_se = alife() and alife():actor()
+	local actor_comm = actor_se and actor_se:community()
 
 	for i = 1, #drx_sl_honchos_table do
 		local honcho = drx_sl_honchos_table[i][1]
@@ -119,11 +179,13 @@ local function patched_meet_random_honcho(actor, npc, p)
 
 		if alive and honcho ~= current_honcho then
 			local is_enemy = false
-			local actor_se = alife() and alife():actor()
-			local actor_comm = actor_se and actor_se:community()
 			if actor_comm and relation_registry and relation_registry.community_relation then
 				for j = 2, #drx_sl_honchos_table[i] do
-					local ok, rel = pcall(relation_registry.community_relation, drx_sl_honchos_table[i][j], actor_comm)
+					local ok, rel = pcall(
+						relation_registry.community_relation,
+						drx_sl_honchos_table[i][j],
+						actor_comm
+					)
 					if ok and rel and rel <= -1000 then
 						is_enemy = true
 						break
@@ -144,7 +206,9 @@ local function patched_meet_random_honcho(actor, npc, p)
 		return
 	end
 
-	local next_honcho = honcho_list[math.random(size_t)]
+	clear_stuck_meet_for(current_honcho)
+
+	local next_honcho = pick_next(honcho_list, drx_sl_honchos_table, current_honcho)
 	if db and db.actor and type(save_var) == "function" then
 		save_var(db.actor, "drx_sl_current_honcho", next_honcho)
 		local n = load_var(db.actor, "drx_sl_current_task_number", 1) + 1
@@ -168,8 +232,6 @@ local function patched_meet_random_honcho(actor, npc, p)
 			if not meet_task_active(honcho_task_id) then
 				size_t = size_t + 1
 				honcho_task_list[size_t] = honcho_task_id
-			else
-				log("exclude already-active %s", honcho_task_id)
 			end
 			i = i + 1
 		else
@@ -202,6 +264,7 @@ end
 
 local function install()
 	if installed then
+		fix_honchos_table()
 		return
 	end
 
@@ -210,6 +273,8 @@ local function install()
 		log("xr_effects.drx_sl_meet_random_honcho not found - guard NOT installed")
 		return
 	end
+
+	fix_honchos_table()
 
 	orig.drx_sl_meet_random_honcho = effects.drx_sl_meet_random_honcho
 	effects.drx_sl_meet_random_honcho = patched_meet_random_honcho
@@ -220,6 +285,7 @@ end
 local function uninstall()
 	if not installed then
 		orig = {}
+		table_fixed = false
 		return
 	end
 
@@ -230,10 +296,11 @@ local function uninstall()
 
 	orig = {}
 	installed = false
+	table_fixed = false
 end
 
 function on_game_load()
-	-- no save state
+	table_fixed = false
 end
 
 function actor_on_first_update()
@@ -242,7 +309,10 @@ function actor_on_first_update()
 	if not installed or not ok then
 		installed = false
 		orig = {}
+		table_fixed = false
 		install()
+	else
+		fix_honchos_table()
 	end
 end
 
