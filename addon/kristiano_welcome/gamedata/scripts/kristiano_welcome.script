@@ -1,0 +1,39 @@
+-- Kristiano Welcome
+-- Anomaly 1.5.3 / Anthology 2.1
+-- One-shot tip on new game / first load without the info-portion.
+-- Pattern: reference/anomaly/scripts/anthology_sms.script
+
+local LOG_TAG = "[kristiano_welcome]"
+local VERSION = "1.0.0"
+local INFO_ID = "dynamic_news_welcome_to_kristiano"
+local SMS_ID = "st_kristiano_welcome_sms"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local function sms_kristiano()
+	if has_alife_info(INFO_ID) then
+		return
+	end
+	if not (db and db.actor) then
+		printf("%s skipped: db.actor not ready", LOG_TAG)
+		return
+	end
+	if type(dynamic_news_helper) ~= "table" or type(dynamic_news_helper.send_tip) ~= "function" then
+		printf("%s dynamic_news_helper.send_tip not found - tip NOT sent", LOG_TAG)
+		return
+	end
+
+	-- header nil -> st_tip (MESSAGE), same as anthology_sms (undefined Se)
+	-- sender "kristiano" -> plugins/mod_news_tips_icons_kristiano_welcome.ltx
+	dynamic_news_helper.send_tip(SMS_ID, nil, 60, 30, "kristiano", "welcome", "gr")
+	db.actor:give_info_portion(INFO_ID)
+	printf("%s welcome tip sent", LOG_TAG)
+end
+
+function on_game_start()
+	RegisterScriptCallback("on_loading_screen_dismissed", sms_kristiano)
+end
+
+function on_game_end()
+	UnregisterScriptCallback("on_loading_screen_dismissed", sms_kristiano)
+end

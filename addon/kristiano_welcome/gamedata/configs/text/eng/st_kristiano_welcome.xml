@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="windows-1251" ?>
+<string_table>
+
+<string id="st_kristiano_welcome_sms">
+<text>%c[255,248,153,26]Kristiano:\n%c[default]A set of Anthology service fixes is active for this session (scripts, tasks, traders). This is not a separate gameplay mod - bugfixes only. If you run into problems, contact the Anomaly ANTHOLOGY Discord server, channel bug-reports-2_1_eng. Good hunting, stalker!</text>
+</string>
+
+</string_table>
