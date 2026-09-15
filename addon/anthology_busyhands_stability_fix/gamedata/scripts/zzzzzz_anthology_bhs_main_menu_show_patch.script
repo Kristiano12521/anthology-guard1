@@ -1,0 +1,131 @@
+-- Anthology Busy Hands Stability Fix v0.6.14 - main_menu.Show / SetVisibleMagnifier
+-- load-order: после ui_main_menu / ui_options
+--
+-- BusyHands on destroyed CUIMMShniaga is NOT catchable by pcall (Modded Exes).
+-- xray_mg9000(3) stack: SetVisibleMagnifier -> our pcall wrapper -> still BusyHands.
+--
+-- Fix: before UIOptions.On_Cancel runs owner:Show after Accept (Change_Done),
+-- drop owner.shniaga (Lua nil assign, no C call). safe_show then no-ops.
+-- Cancel without pending changes keeps shniaga and normal magnifier behaviour.
+--
+-- Vendor ui_main_menu / ui_options untouched.
+
+local VERSION = "0.6.14"
+
+local logged_skip = false
+
+local function add_target(list, seen, obj, via)
+	if obj == nil then
+		return
+	end
+	if seen[obj] then
+		for i = 1, #list do
+			if list[i].obj == obj then
+				list[i].via = list[i].via .. " + " .. via
+				return
+			end
+		end
+		return
+	end
+	seen[obj] = true
+	list[#list + 1] = { obj = obj, via = via }
+end
+
+local function safe_show(self, f)
+	-- Never probe shniaga with C methods: BusyHands is fatal even under pcall.
+	if not self or self.shniaga == nil then
+		return
+	end
+	self.shniaga:SetVisibleMagnifier(f)
+end
+
+local menu_targets = {}
+local menu_seen = {}
+add_target(menu_targets, menu_seen, main_menu, "bare main_menu")
+if type(_G) == "table" then
+	add_target(menu_targets, menu_seen, _G.main_menu, "_G.main_menu")
+end
+if type(ui_main_menu) == "table" then
+	add_target(menu_targets, menu_seen, ui_main_menu.main_menu, "ui_main_menu.main_menu")
+end
+
+local show_installed = false
+for i = 1, #menu_targets do
+	local cls = menu_targets[i].obj
+	local via = menu_targets[i].via
+	if cls and type(cls.Show) == "function" then
+		cls.Show = safe_show
+		show_installed = true
+		printf(
+			"[BusyHandsFix v%s] main_menu.Show patched via %s (nil-shniaga skip, no pcall)",
+			VERSION,
+			via
+		)
+	end
+end
+
+if not show_installed then
+	printf(
+		"[BusyHandsFix v%s] main_menu.Show was not found - guard NOT installed",
+		VERSION
+	)
+end
+
+------------------------------------------------------------------------
+-- UIOptions.On_Cancel: drop shniaga after Accept before owner:Show
+------------------------------------------------------------------------
+local function wrap_on_cancel(original)
+	return function(self, ...)
+		-- Change_Done still true here when called from On_Accept (functors /
+		-- reload_language / ReloadUI may have already destroyed CUIMMShniaga).
+		local drop = self
+			and (self.Change_Done or self.Need_VidRestart or self.Need_Restart)
+		if drop and self.owner then
+			self.owner.shniaga = nil
+			if not logged_skip then
+				logged_skip = true
+				printf(
+					"[BusyHandsFix v%s] cleared owner.shniaga before On_Cancel Show (post-Accept UI reload)",
+					VERSION
+				)
+			end
+		end
+		return original(self, ...)
+	end
+end
+
+local opt_targets = {}
+local opt_seen = {}
+add_target(opt_targets, opt_seen, UIOptions, "bare UIOptions")
+if type(_G) == "table" then
+	add_target(opt_targets, opt_seen, _G.UIOptions, "_G.UIOptions")
+end
+if type(ui_options) == "table" then
+	add_target(opt_targets, opt_seen, ui_options.UIOptions, "ui_options.UIOptions")
+end
+
+local cancel_installed = false
+for i = 1, #opt_targets do
+	local cls = opt_targets[i].obj
+	local via = opt_targets[i].via
+	if cls and type(cls.On_Cancel) == "function" then
+		cls.On_Cancel = wrap_on_cancel(cls.On_Cancel)
+		cancel_installed = true
+		printf(
+			"[BusyHandsFix v%s] UIOptions.On_Cancel patched via %s (drop shniaga on Accept)",
+			VERSION,
+			via
+		)
+	end
+end
+
+if not cancel_installed then
+	printf(
+		"[BusyHandsFix v%s] UIOptions.On_Cancel was not found - guard NOT installed",
+		VERSION
+	)
+end
+
+if show_installed or cancel_installed then
+	ANTHOLOGY_BHS_MAIN_MENU_SHOW_PATCH_VERSION = VERSION
+end

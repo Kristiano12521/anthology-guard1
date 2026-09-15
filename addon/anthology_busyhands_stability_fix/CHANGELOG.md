@@ -1,5 +1,37 @@
 # Anthology Busy Hands Stability Fix
 
+## [0.6.14] — 2026-09-15
+
+**Изменено**
+
+- `zzzzzz_anthology_bhs_main_menu_show_patch.script`: убран pcall; `UIOptions.On_Cancel` обнуляет `owner.shniaga` при Accept (`Change_Done` / vid/restart) до `Show`; `Show` no-op если `shniaga == nil`.
+- `zzzzzz_anthology_bhs_dotmarks_quickhelp_patch.script`: убран pcall; `get/set_quickhelp_text` заменены на свежий `ActorMenu.get_maingame()` + suspend 2.5s после `on_option_change` (не вызывают оригинальный GetText по stale local).
+- Версия → 0.6.14.
+
+**Причина**
+
+0.6.13 не помог: BusyHands на destroyed UI **не ловится pcall**. Стек `xray_mg9000(3)`: `GetText` / `SetVisibleMagnifier` → `pcall` → наш патч → всё равно `[BusyHandsDebug]`.
+
+**Не затронуто**
+
+- Вендорские файлы, сейвы, остальные гарды BHS.
+
+**Проверено**
+
+- `lint_addon.py`
+- В игре: не прогонялось — ждать `0.6.14`, `cleared owner.shniaga`, `QuickHelp suspended`, смена языка/разрешения без BusyHands
+
+## [0.6.13] — 2026-09-15
+
+**Изменено**
+
+- Новый `zzzzzz_anthology_bhs_main_menu_show_patch.script`: pcall вокруг `SetVisibleMagnifier`.
+- Новый `zzzzzz_anthology_bhs_dotmarks_quickhelp_patch.script`: pcall вокруг `get/set_quickhelp_text`.
+
+**Проверено**
+
+- В игре **отклонено** (`xray_mg9000(3)`): BusyHands сквозь pcall — см. 0.6.14.
+
 ## [0.6.12] — 2026-09-14
 
 **Изменено**

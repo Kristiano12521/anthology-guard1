@@ -1,6 +1,10 @@
--- Anthology Busy Hands Stability Fix v0.6.12
+-- Anthology Busy Hands Stability Fix v0.6.14
+-- v0.6.14: BusyHands is NOT catchable by pcall on destroyed UI userdata
+-- (xray_mg9000(3)). Show: drop shniaga before On_Cancel; QuickHelp: fresh
+-- get_maingame + suspend after on_option_change (never call stale GetText).
+-- v0.6.13: first attempt used pcall ? rejected in game (same BusyHands).
 -- v0.6.12: weight/IsInvOwner lookup like SortingPlus (luabind class, not table).
--- v0.6.11: UIInventory.UpdateWeight / IsInvOwner ù destroyed loot partner
+-- v0.6.11: UIInventory.UpdateWeight / IsInvOwner destroyed loot partner
 -- on level change (talents endurance_weight_upd -> BusyHands IsStalker).
 -- v0.6.10: bind arti_outfits helpers in repair recursion reconstruct (has_parts nil CTD).
 --
@@ -11,9 +15,9 @@
 -- v0.6.4: FDDA idle must not reopen loot after Esc. Re-entry during an
 -- active body_search is a vendor no-op; idle sets is_ui_enabled if GUI
 -- is already shown.
--- v0.6.3: sequential_load_magazine ù one gradual load at a time; pcall
+-- v0.6.3: sequential_load_magazine one gradual load at a time; pcall
 -- ammo_get_count (two jobs shared a released ammo box).
--- v0.6.2: FDDA loot window ù patch functions on liz_fdda_redone_body_search
+-- v0.6.2: FDDA loot window patch functions on liz_fdda_redone_body_search
 -- module table; open loot via LMode_Init, not wrapped ui_inventory.start.
 -- Verify markers via patch-script module tables (env is not always _G).
 --
@@ -21,7 +25,7 @@
 -- documented full-file exceptions (mon_sleep, guaranteed_loot,
 -- sequential_load_magazine).
 
-local VERSION = "0.6.12"
+local VERSION = "0.6.14"
 local installed = false
 
 local function safe_object_id(obj)
@@ -183,6 +187,8 @@ function on_game_start()
 	local repair_chain_guard_count = verify_marker(read_marker("ANTHOLOGY_BHS_REPAIR_CHAIN_PATCH_VERSION", zzzzzz_anthology_bhs_repair_recursion_fix), "item_repair OnItemSelect recursion")
 	local furniture_distance_count = verify_marker(read_marker("ANTHOLOGY_BHS_TRADER_FURNITURE_DISTANCE_PATCH_VERSION", zzzzzz_anthology_bhs_trader_furniture_distance_patch), "trader furniture distance (optional, not a crash fix)")
 	local inventory_weight_guard_count = verify_marker(read_marker("ANTHOLOGY_BHS_INVENTORY_WEIGHT_PATCH_VERSION", zzzzzz_anthology_bhs_inventory_weight_patch), "UIInventory UpdateWeight/IsInvOwner")
+	local main_menu_show_guard_count = verify_marker(read_marker("ANTHOLOGY_BHS_MAIN_MENU_SHOW_PATCH_VERSION", zzzzzz_anthology_bhs_main_menu_show_patch), "main_menu.Show SetVisibleMagnifier")
+	local dotmarks_quickhelp_guard_count = verify_marker(read_marker("ANTHOLOGY_BHS_DOTMARKS_QUICKHELP_PATCH_VERSION", zzzzzz_anthology_bhs_dotmarks_quickhelp_patch), "DotMarks get/set_quickhelp_text")
 
 	printf("[BusyHandsFix v%s] Western Goods guards installed: %s", VERSION, guard_count)
 	printf("[BusyHandsFix v%s] trader_autoinject guards installed: %s", VERSION, trader_autoinject_guard_count)
@@ -198,4 +204,6 @@ function on_game_start()
 	printf("[BusyHandsFix v%s] item_repair OnItemSelect recursion fix installed: %s", VERSION, repair_chain_guard_count)
 	printf("[BusyHandsFix v%s] trader furniture distance guards installed: %s", VERSION, furniture_distance_count)
 	printf("[BusyHandsFix v%s] UIInventory UpdateWeight/IsInvOwner guards installed: %s", VERSION, inventory_weight_guard_count)
+	printf("[BusyHandsFix v%s] main_menu.Show SetVisibleMagnifier guards installed: %s", VERSION, main_menu_show_guard_count)
+	printf("[BusyHandsFix v%s] DotMarks QuickHelp guards installed: %s", VERSION, dotmarks_quickhelp_guard_count)
 end

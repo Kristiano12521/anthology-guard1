@@ -1,0 +1,170 @@
+-- Anthology Busy Hands Stability Fix v0.6.14 - DotMarks QuickHelp
+-- load-order: после ui_hud_dotmarks / dotmarks_main
+--
+-- BusyHands on destroyed UIStaticQuickHelp is NOT catchable by pcall.
+-- xray_mg9000(3): GetText -> ui_hud_dotmarks:1776 -> pcall -> our wrapper -> BusyHands.
+--
+-- DotMarks caches ActorMenu.get_maingame() only in actor_on_first_update.
+-- After vid_restart that local still holds a destroyed HUD; GetText fatals.
+--
+-- Fix: replace get/set_quickhelp_text with implementations that
+-- 1) refuse C calls for a short window after on_option_change
+-- 2) fetch a fresh maingame via ActorMenu.get_maingame() (never the stale local)
+-- Never call the original closed-over GetText path.
+--
+-- Vendor DotMarks files untouched.
+
+local VERSION = "0.6.14"
+
+local SUSPEND_MS = 2500
+local suspend_until = 0
+local logged_suspend = false
+local logged_skip_get = false
+local logged_skip_set = false
+local callbacks_registered = false
+
+local function now()
+	if type(time_global) == "function" then
+		return time_global()
+	end
+	return 0
+end
+
+local function suspend(reason)
+	suspend_until = now() + SUSPEND_MS
+	if not logged_suspend then
+		logged_suspend = true
+		printf(
+			"[BusyHandsFix v%s] QuickHelp suspended %sms after %s (stale HUD after vid_restart)",
+			VERSION,
+			tostring(SUSPEND_MS),
+			tostring(reason)
+		)
+	end
+end
+
+local function suspended()
+	return now() < suspend_until
+end
+
+local function fresh_maingame()
+	if type(ActorMenu) ~= "table" or type(ActorMenu.get_maingame) ~= "function" then
+		return nil
+	end
+	-- get_maingame itself is widely used; do not wrap in pcall (BusyHands theater).
+	return ActorMenu.get_maingame()
+end
+
+local function safe_get_quickhelp_text()
+	if suspended() then
+		if not logged_skip_get then
+			logged_skip_get = true
+			printf(
+				"[BusyHandsFix v%s] get_quickhelp_text skipped (suspend window)",
+				VERSION
+			)
+		end
+		return nil
+	end
+	local ui = fresh_maingame()
+	if not ui then
+		return nil
+	end
+	local help = ui.UIStaticQuickHelp
+	if help == nil then
+		return nil
+	end
+	local text = help:GetText()
+	if text and text ~= "" and text ~= " " then
+		return text
+	end
+	return nil
+end
+
+local function safe_set_quickhelp_text(text)
+	if suspended() then
+		if not logged_skip_set then
+			logged_skip_set = true
+			printf(
+				"[BusyHandsFix v%s] set_quickhelp_text skipped (suspend window)",
+				VERSION
+			)
+		end
+		return
+	end
+	local ui = fresh_maingame()
+	if not ui or ui.UIStaticQuickHelp == nil then
+		return
+	end
+	ui.UIStaticQuickHelp:SetText(text or "")
+end
+
+local function try_replace(mod, label)
+	local n = 0
+	if type(mod) ~= "table" then
+		return 0
+	end
+	if type(mod.get_quickhelp_text) == "function" then
+		mod.get_quickhelp_text = safe_get_quickhelp_text
+		n = n + 1
+		printf(
+			"[BusyHandsFix v%s] get_quickhelp_text replaced via %s (fresh get_maingame, no pcall)",
+			VERSION,
+			label
+		)
+	end
+	if type(mod.set_quickhelp_text) == "function" then
+		mod.set_quickhelp_text = safe_set_quickhelp_text
+		n = n + 1
+		printf(
+			"[BusyHandsFix v%s] set_quickhelp_text replaced via %s (fresh get_maingame, no pcall)",
+			VERSION,
+			label
+		)
+	end
+	return n
+end
+
+local installed = 0
+installed = installed + try_replace(ui_hud_dotmarks, "ui_hud_dotmarks")
+installed = installed + try_replace(dotmarks_main, "dotmarks_main")
+
+local function on_option_change()
+	suspend("on_option_change")
+end
+
+local function on_game_load()
+	logged_suspend = false
+	logged_skip_get = false
+	logged_skip_set = false
+	suspend_until = 0
+end
+
+function on_game_start()
+	if installed == 0 then
+		printf(
+			"[BusyHandsFix v%s] get_quickhelp_text was not found via ui_hud_dotmarks / dotmarks_main - guard NOT installed",
+			VERSION
+		)
+		return
+	end
+	ANTHOLOGY_BHS_DOTMARKS_QUICKHELP_PATCH_VERSION = VERSION
+	if not callbacks_registered then
+		RegisterScriptCallback("on_option_change", on_option_change)
+		RegisterScriptCallback("on_game_load", on_game_load)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("on_option_change", on_option_change)
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		callbacks_registered = false
+	end
+end
+
+-- File-load install marker when functions were replaced (callbacks in on_game_start).
+if installed > 0 then
+	ANTHOLOGY_BHS_DOTMARKS_QUICKHELP_PATCH_VERSION = VERSION
+end
