@@ -1,0 +1,162 @@
+-- load-order: after aaa_sound_object_patch.script
+-- Sound Object Missing Guard
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- aaa_sound_object_patch replaces _G.sound_object with my_sound_object.
+-- Missing .ogg under $game_sounds$ makes C++ super(path) print
+--   File not found ...
+--   aaa_sound_object_patch.script(18) : super
+-- (amb_main via xr_sound.get_safe_sound_object, tb_angry_chimera_growls, etc.).
+-- Spam stub only: skip constructor when the file is absent; return nil.
+-- Does not restore missing assets.
+
+local LOG_TAG = "[fix_sound_object_missing]"
+local VERSION = "1.0.0"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local RealSound = nil
+local orig_get_safe = nil
+local proxy_installed = false
+local safe_installed = false
+local callbacks_registered = false
+local missing_logged = {}
+local skip_count = 0
+local unique_missing = 0
+
+local function sound_file_exists(path)
+	if type(path) ~= "string" or path == "" then
+		return false
+	end
+	local fs = getFS()
+	if not fs then
+		return true
+	end
+	return fs:exist("$game_sounds$", path .. ".ogg") ~= nil
+end
+
+local function log_missing(path)
+	skip_count = skip_count + 1
+	if missing_logged[path] then
+		return
+	end
+	missing_logged[path] = true
+	unique_missing = unique_missing + 1
+	printf(
+		"%s skip missing sound path=%s (unique=%d total_skips=%d)",
+		LOG_TAG,
+		tostring(path),
+		unique_missing,
+		skip_count
+	)
+end
+
+local function make_sound(path)
+	if not sound_file_exists(path) then
+		log_missing(path)
+		return nil
+	end
+	return RealSound(path)
+end
+
+local function install_proxy()
+	if proxy_installed then
+		return true
+	end
+
+	local cls = rawget(_G, "sound_object")
+	if cls == nil then
+		printf("%s sound_object not found - guard NOT installed", LOG_TAG)
+		return false
+	end
+
+	RealSound = cls
+	local proxy = {}
+	setmetatable(proxy, {
+		__index = function(_, key)
+			return RealSound[key]
+		end,
+		__call = function(_, path)
+			return make_sound(path)
+		end,
+	})
+	_G.sound_object = proxy
+	proxy_installed = true
+	printf("%s sound_object proxy installed v%s", LOG_TAG, VERSION)
+	return true
+end
+
+local function guarded_get_safe(path)
+	if not sound_file_exists(path) then
+		log_missing(path)
+		return nil
+	end
+	return orig_get_safe(path)
+end
+
+local function install_get_safe()
+	if safe_installed then
+		return true
+	end
+	local xr = rawget(_G, "xr_sound")
+	if not (xr and type(xr.get_safe_sound_object) == "function") then
+		return false
+	end
+	if xr.get_safe_sound_object == guarded_get_safe then
+		safe_installed = true
+		return true
+	end
+	orig_get_safe = xr.get_safe_sound_object
+	xr.get_safe_sound_object = guarded_get_safe
+	safe_installed = true
+	printf("%s xr_sound.get_safe_sound_object wrapped", LOG_TAG)
+	return true
+end
+
+local function uninstall()
+	if proxy_installed and RealSound ~= nil then
+		_G.sound_object = RealSound
+	end
+	local xr = rawget(_G, "xr_sound")
+	if safe_installed and xr and orig_get_safe then
+		xr.get_safe_sound_object = orig_get_safe
+	end
+	orig_get_safe = nil
+	RealSound = nil
+	proxy_installed = false
+	safe_installed = false
+end
+
+function actor_on_first_update()
+	if not proxy_installed then
+		install_proxy()
+	end
+	if not safe_installed then
+		if not install_get_safe() then
+			printf("%s xr_sound.get_safe_sound_object not found - proxy only", LOG_TAG)
+		end
+	end
+end
+
+-- aaa_sound_object_patch runs at file load (aaa_* before fix_*).
+install_proxy()
+
+function on_game_start()
+	install_proxy()
+	install_get_safe()
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
+	uninstall()
+	missing_logged = {}
+	skip_count = 0
+	unique_missing = 0
+end
