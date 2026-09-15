@@ -1,5 +1,11 @@
 # Kristiano KX-1 Exo Craft
 
+## [1.4.2] — 2026-09-15
+
+**Исправлено**
+
+- `gamedata/configs/text/rus/st_items_kristiano_kx1_exo.xml`: убраны UTF-8 replacement (`U+FFFD`), из‑за которых линтер валил CI (ENC-004). Русские строки восстановлены из последнего целого коммита (`c1adeba`), encyclopedia/SMS — из `lore/kx1_encyclopedia.txt` и ENG; в описание добавлены строки про расход БП и тихие серво (как в ENG).
+
 ## [1.4.1-b] — 2026-09-14
 
 **Вау-пакет: звук + БП**
