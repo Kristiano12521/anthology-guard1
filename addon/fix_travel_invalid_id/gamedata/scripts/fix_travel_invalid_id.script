@@ -1,0 +1,196 @@
+-- Travel Invalid Alife ID Guard
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Placeable waypoints / empty map spots use sentinel id 65535.
+-- game_backpack_travel and game_fast_travel call alife_object(id) from
+-- map_spot_menu_* without a valid-id guard. _g.alife_object then prints
+--   !ALIFE OBJECT ID IS 65535!
+-- and dumps a nonfatal stack (pda property click after task_placeable_waypoint).
+-- Monkey-patch: wrap their RegisterScriptCallback handlers; skip invalid ids.
+-- File name fix_* loads before game_*, so the RegisterScriptCallback hook
+-- is installed in on_game_start before travel scripts register.
+
+local LOG_TAG = "[fix_travel_invalid_id]"
+local VERSION = "1.0.0"
+local INVALID_ID = 65535
+local CB_ADD = "map_spot_menu_add_property"
+local CB_CLICK = "map_spot_menu_property_clicked"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local orig_register = nil
+local hook_installed = false
+local callbacks_registered = false
+local wrappers = {}
+local wrap_count = 0
+local skip_count = 0
+local last_log_tg = 0
+local LOG_INTERVAL_MS = 1000
+
+local function valid_spot_id(id)
+	return type(id) == "number" and id > 0 and id < INVALID_ID
+end
+
+local function is_travel_source(fn)
+	if type(fn) ~= "function" or not (debug and type(debug.getinfo) == "function") then
+		return false
+	end
+	local info = debug.getinfo(fn, "S")
+	local src = info and (info.short_src or info.source) or ""
+	return string.find(src, "game_backpack_travel", 1, true) ~= nil
+		or string.find(src, "game_fast_travel", 1, true) ~= nil
+end
+
+local function log_skip(id, which)
+	skip_count = skip_count + 1
+	local now = time_global()
+	if (now - last_log_tg) < LOG_INTERVAL_MS then
+		return
+	end
+	last_log_tg = now
+	printf(
+		"%s skip invalid id=%s via %s (batch_total=%d)",
+		LOG_TAG,
+		tostring(id),
+		which,
+		skip_count
+	)
+end
+
+local function make_guarded(orig, which)
+	if wrappers[orig] then
+		return wrappers[orig]
+	end
+	local guarded
+	function guarded(property_ui, id, ...)
+		if not valid_spot_id(id) then
+			log_skip(id, which)
+			return
+		end
+		return orig(property_ui, id, ...)
+	end
+	wrappers[orig] = guarded
+	wrap_count = wrap_count + 1
+	return guarded
+end
+
+local function hooked_register(name, fn)
+	if (name == CB_ADD or name == CB_CLICK) and is_travel_source(fn) then
+		fn = make_guarded(fn, name)
+	end
+	return orig_register(name, fn)
+end
+
+local function install_register_hook()
+	if hook_installed then
+		return true
+	end
+	if type(RegisterScriptCallback) ~= "function" then
+		printf("%s RegisterScriptCallback missing - guard NOT installed", LOG_TAG)
+		return false
+	end
+	orig_register = RegisterScriptCallback
+	RegisterScriptCallback = hooked_register
+	hook_installed = true
+	printf("%s RegisterScriptCallback hook installed v%s", LOG_TAG, VERSION)
+	return true
+end
+
+-- Late path if travel registered before our hook (or re-registered).
+local function try_wrap_existing()
+	if not (debug and type(debug.getupvalue) == "function" and type(debug.getinfo) == "function") then
+		return 0
+	end
+	local axr = rawget(_G, "axr_main")
+	if not (axr and type(axr.callback_set) == "function") then
+		return 0
+	end
+
+	local intercepts = nil
+	local i = 1
+	while true do
+		local uname, val = debug.getupvalue(axr.callback_set, i)
+		if not uname then
+			break
+		end
+		if uname == "intercepts" and type(val) == "table" then
+			intercepts = val
+			break
+		end
+		i = i + 1
+	end
+	if not intercepts then
+		return 0
+	end
+
+	local wrapped_now = 0
+	for _, cb_name in ipairs({ CB_ADD, CB_CLICK }) do
+		local bucket = intercepts[cb_name]
+		if type(bucket) == "table" then
+			local to_replace = {}
+			for fn, _ in pairs(bucket) do
+				if type(fn) == "function" and is_travel_source(fn) and not wrappers[fn] then
+					-- Skip if this fn is already one of our guards.
+					local is_guard = false
+					for _, g in pairs(wrappers) do
+						if g == fn then
+							is_guard = true
+							break
+						end
+					end
+					if not is_guard then
+						table.insert(to_replace, fn)
+					end
+				end
+			end
+			for _, fn in ipairs(to_replace) do
+				local guarded = make_guarded(fn, cb_name)
+				if type(UnregisterScriptCallback) == "function" then
+					UnregisterScriptCallback(cb_name, fn)
+				end
+				orig_register(cb_name, guarded)
+				wrapped_now = wrapped_now + 1
+			end
+		end
+	end
+	return wrapped_now
+end
+
+local function uninstall()
+	if hook_installed and orig_register then
+		RegisterScriptCallback = orig_register
+	end
+	hook_installed = false
+	orig_register = nil
+	wrappers = {}
+	wrap_count = 0
+end
+
+function actor_on_first_update()
+	local n = try_wrap_existing()
+	if n > 0 then
+		printf("%s late-wrapped %d travel callback(s)", LOG_TAG, n)
+	elseif wrap_count == 0 then
+		printf("%s travel callbacks not wrapped - guard NOT installed", LOG_TAG)
+	end
+end
+
+function on_game_start()
+	install_register_hook()
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		if type(UnregisterScriptCallback) == "function" then
+			UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		end
+		callbacks_registered = false
+	end
+	uninstall()
+	skip_count = 0
+	last_log_tg = 0
+end
