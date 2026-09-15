@@ -155,10 +155,10 @@ local function send_first_kx1_sms()
 	end
 	local text = game.translate_string(SMS_FIRST)
 	if type(dynamic_news_helper) == "table" and type(dynamic_news_helper.send_tip) == "function" then
-		-- Pattern: addon/kristiano_welcome (sender "kristiano" -> welcome tip icon if installed)
-		dynamic_news_helper.send_tip(SMS_FIRST, nil, 60, 30, "kristiano", "kx1", "gr")
+		-- Own tip icon (news_tips_icons.kristiano_kx1); not welcome's "kristiano"
+		dynamic_news_helper.send_tip(SMS_FIRST, nil, 60, 30, "kristiano_kx1", "kx1", "gr")
 	elseif news_manager and type(news_manager.send_tip) == "function" then
-		news_manager.send_tip(db.actor, text, nil, "nano", 8000)
+		news_manager.send_tip(db.actor, text, nil, "kristiano_kx1", 8000)
 	else
 		log("WARN: no tip API for first KX-1 SMS")
 		return

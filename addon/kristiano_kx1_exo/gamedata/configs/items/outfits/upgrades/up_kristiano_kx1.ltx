@@ -1,6 +1,6 @@
 ; KX-1 upgrades.
-; Legacy psi/arty groups kept for old saves.
-; TEST: 5th slot = carry +10 (sprint is free on the suit; mag pouches are base mag_limit_*).
+; Legacy firsta/fiftha_arty groups kept for old saves.
+; 5th column: carry -> custom cd/ef (vanilla exo fifth used helm strings + tiny props).
 
 [up_sect_firsta_kx1_1]:up_sect_prop_telepatic_20
 
@@ -29,7 +29,7 @@ elements                = up_firsta_kx1_1
 [up_fiftha_kx1_1]
 scheme_index            = 0, 4
 known                   = 1
-effects                 = up_gr_fifthcd_exo_1
+effects                 = up_gr_fifthcd_kx1
 section                 = up_sect_fiftha_kx1_1
 precondition_functor    = inventory_upgrades.precondition_functor_a
 precondition_parameter  = a & b
@@ -46,12 +46,13 @@ icon                    = ui_inGame2_upgrade_outfit_arty_1
 [up_gr_fifthab_kx1_1]
 elements                = up_fiftha_kx1_1
 
+; --- 5th column: carry (ab) ---
 [up_sect_fiftha_kx1_carry]:up_sect_prop_carryweight_10
 
 [up_fiftha_kx1_carry]
 scheme_index            = 0, 4
 known                   = 1
-effects                 = up_gr_fifthcd_exo_1
+effects                 = up_gr_fifthcd_kx1
 section                 = up_sect_fiftha_kx1_carry
 precondition_functor    = inventory_upgrades.precondition_functor_a
 precondition_parameter  = a & b
@@ -67,3 +68,68 @@ icon                    = ui_inGame2_upgrade_outfit_carry_1
 
 [up_gr_fifthab_kx1_carry]
 elements                = up_fiftha_kx1_carry
+
+; --- 5th column lower (cd): psi / rad (outfit props, stronger than vanilla exo helm chain) ---
+[up_sect_fifthc_kx1]:up_sect_prop_telepatic_20
+
+[up_fifthc_kx1]
+scheme_index            = 1, 7
+known                   = 1
+effects                 = up_gr_fifthef_kx1
+section                 = up_sect_fifthc_kx1
+precondition_functor    = inventory_upgrades.precondition_functor_a
+precondition_parameter  = a & b
+effect_functor          = inventory_upgrades.effect_functor_a
+effect_parameter        = something_here
+prereq_functor          = inventory_upgrades.prereq_functor_a
+prereq_tooltip_functor  = inventory_upgrades.prereq_tooltip_functor_a
+prereq_params           =
+property                = prop_psy
+name                    = st_up_tele_1_name
+description             = st_up_tele_1_descr
+icon                    = ui_inGame2_upgrade_outfit_psi_1
+
+[up_sect_fifthd_kx1]:up_sect_prop_radiation_10
+
+[up_fifthd_kx1]
+scheme_index            = 1, 8
+known                   = 1
+effects                 = up_gr_fifthef_kx1
+section                 = up_sect_fifthd_kx1
+precondition_functor    = inventory_upgrades.precondition_functor_a
+precondition_parameter  = a & b
+effect_functor          = inventory_upgrades.effect_functor_a
+effect_parameter        = something_here
+prereq_functor          = inventory_upgrades.prereq_functor_a
+prereq_tooltip_functor  = inventory_upgrades.prereq_tooltip_functor_a
+prereq_params           =
+property                = prop_radio
+name                    = st_up_rad_3_name
+description             = st_up_rad_3_descr
+icon                    = ui_inGame2_upgrade_outfit_rad_1
+
+[up_gr_fifthcd_kx1]
+elements                = up_fifthc_kx1, up_fifthd_kx1
+
+; --- 5th column bottom (ef): +1 arty slot (was vanilla up_fifthe_exo_1) ---
+[up_sect_fifthe_kx1]:up_sect_prop_arty_1
+
+[up_fifthe_kx1]
+scheme_index            = 2, 7
+known                   = 1
+effects                 =
+section                 = up_sect_fifthe_kx1
+precondition_functor    = inventory_upgrades.precondition_functor_a
+precondition_parameter  = a & b
+effect_functor          = inventory_upgrades.effect_functor_a
+effect_parameter        = something_here
+prereq_functor          = inventory_upgrades.prereq_functor_a
+prereq_tooltip_functor  = inventory_upgrades.prereq_tooltip_functor_a
+prereq_params           =
+property                = prop_artefact
+name                    = st_up_arty_2_name
+description             = st_up_arty_2_descr
+icon                    = ui_inGame2_upgrade_outfit_arty_1
+
+[up_gr_fifthef_kx1]
+elements                = up_fifthe_kx1

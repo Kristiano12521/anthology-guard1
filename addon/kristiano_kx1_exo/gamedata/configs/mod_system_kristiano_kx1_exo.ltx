@@ -50,14 +50,17 @@ upgrades                      = up_gr_firstab_exolight_1, up_gr_seconab_exolight
 installed_upgrades            =
 upgrade_scheme                = up_scheme_exo_1
 
+; Durability vs condition damage: lower = tougher.
+; Inherited exobackpack values (strike 0.2 / wound 0.3) were paper vs mutants;
+; must beat merc Nosorog (strike 0.0015 / wound 0.01 / explosion 0.04).
 [kristiano_kx1_exo_outfit_immunities]
-burn_immunity                            = 0.0
-strike_immunity                          = 0.2
-shock_immunity                           = 0.0
-wound_immunity                           = 0.3
-wound_2_immunity                         = 0.15
+burn_immunity                            = 0.012
+chemical_burn_immunity                   = 0.004
+explosion_immunity                       = 0.025
+fire_wound_immunity                      = 0.003
 radiation_immunity                       = 0.0
+shock_immunity                           = 0.006
+strike_immunity                          = 0.001
 telepatic_immunity                       = 0.0
-chemical_burn_immunity                   = 0.0
-explosion_immunity                       = 0.25
-fire_wound_immunity                      = 0.0
+wound_immunity                           = 0.006
+wound_2_immunity                         = 0.008

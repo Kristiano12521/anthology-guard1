@@ -4,15 +4,16 @@
 		<text>Kristiano KX-1 Exoskeleton</text>
 	</string>
 	<string id="st_kristiano_kx1_exo_descr">
-		<text>A classified project by a Zone scientist. This exoskeleton blends Big Land tech with field craft into a mix of traits nobody had locked down before. A Merc Nosorog chassis was rebuilt onto an Exo System frame: the scientist Hydra handled anomaly circuits and power modules, while Kristiano â€” a renowned scientific researcher of the Exclusion Zone â€” wired the servo and plating scheme.\n \n
+		<text>A classified project by a Zone scientist. This exoskeleton blends Big Land tech with field craft into a mix of traits nobody had locked down before. A Merc Nosorog chassis was rebuilt onto an Exo System frame: the scientist Hydra handled anomaly circuits and power modules, while Kristiano — a renowned scientific researcher of the Exclusion Zone — wired the servo and plating scheme.\n \n
 %c[ui_gray_3]FEATURES:\n
-%c[d_blue] - %c[ui_gray_2] Built-in Spartan helmet (external helmet slot locked; UI may show headgear available)\n
-%c[d_blue] - %c[ui_gray_2] Nosorog+ bone / ballistic protection\n
-%c[d_blue] - %c[ui_gray_2] Sprint unlocked; Exo System PSU support\n
-%c[d_blue] - %c[ui_gray_2] Efficient suit drain (~28% better than stock Raytheon)\n
-%c[d_blue] - %c[ui_gray_2] Quieter, lower-pitched servos while powered\n
-%c[d_blue] - %c[ui_gray_2] Built-in regen and stronger chemical resist\n
-%c[0,100,255,150] - %c[ui_gray_2] Neutral: faction patches disabled\n
+%c[d_blue] • %c[ui_gray_2] Built-in Spartan helmet - external helmet cannot be equipped (UI "headwear: available" = already in the suit)\n
+%c[d_blue] • %c[ui_gray_2] Body protection at Nosorog level and above\n
+%c[d_blue] • %c[ui_gray_2] Sprint allowed; powered by Exo System battery\n
+%c[d_blue] • %c[ui_gray_2] Battery drains slower than stock Raytheon (~28%)\n
+%c[d_blue] • %c[ui_gray_2] Quieter, lower-pitched servos while powered\n
+%c[d_blue] • %c[ui_gray_2] Mild health regen and stronger chemical resist\n
+%c[d_blue] • %c[ui_gray_2] At full battery charge, slowly clears radiation\n
+%c[0,100,255,150] • %c[ui_gray_2] Neutral look — faction patches disabled\n
 		</text>
 	</string>
 	<string id="st_recipe_kristiano_kx1">
