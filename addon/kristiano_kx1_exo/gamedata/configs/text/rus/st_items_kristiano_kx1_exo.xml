@@ -46,4 +46,20 @@
 	<string id="st_kristiano_kx1_sms_first_equip">
 		<text>%c[255,248,153,26]Кристиано:\n%c[default]Протокол KX активен. Карта серво проверена. Встроенный шлемный контур не вскрывать и не гонять БП вхолостую вне безопасной зоны. Если рама начинает петь — это нормально. Удачной охоты.</text>
 	</string>
+
+	<string id="st_kristiano_kx1_frame_name">
+		<text>Каркас шасси KX-1</text>
+	</string>
+	<string id="st_kristiano_kx1_frame_descr">
+		<text>Промежуточный каркас Kristiano KX-1: Носорог наёмников, пересобранный на раму Exo System. Не надевается - финальная сборка на expert-верстаке: БП, ПМА и артефакты.\n \n%c[d_blue] - %c[ui_gray_2] Крафт, шаг 1 из 2\n</text>
+	</string>
+	<string id="st_kristiano_kx1_stash_hint">
+		<text>Схрон Кристиано</text>
+	</string>
+	<string id="st_kristiano_kx1_stash_tip">
+		<text>KX-1: в отмеченном схроне может быть зашифрованная флешка.</text>
+	</string>
+	<string id="st_kristiano_kx1_disassemble_bonus">
+		<text>KX-1: из ядра каркаса извлечён редкий лом.</text>
+	</string>
 </string_table>

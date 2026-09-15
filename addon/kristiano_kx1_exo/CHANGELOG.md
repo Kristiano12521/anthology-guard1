@@ -1,5 +1,33 @@
 # Kristiano KX-1 Exo Craft
 
+## [1.5.1-b] — 2026-09-15
+
+**Ревью перед тестом**
+
+- Схрон: флаг успеха только если `get_random_stash` нашёл ящик (иначе ретрай, без ложного SMS).
+- Tips через guard `news_manager` (decrypt / legend / stash / disassemble).
+- `actor_on_update` троттл 1 с (не каждый кадр).
+- `is_kx1` без лишней проверки `obj.section`.
+
+## [1.5.0-b] — 2026-09-15
+
+**Остаток блока B**
+
+- B3: одноразовый схрон с зашифрованной флешкой (`treasure_manager.create_random_stash`), флаг в сейве.
+- B4: `can_trade = false` на костюм / флешку / чертёж / каркас (в trade-листах и так не было).
+- B7: `con_parts_list` с `prt_o_retardant_3`; при разборке гарантированный бонус (БП + текстолит + конденсаторы).
+- B8: двухшаговый крафт — `kristiano_kx1_frame` → готовый KX-1.
+- БП: на полном заряде лёгкий scrub радиации (`change_radiation`).
+- B10 баллоны: **не сделано** (нет verified API на костюмах).
+
+## [1.4.3-b] — 2026-09-15
+
+**B1 иконка**
+
+- Своя `ui\ui_icon_kristiano_kx1` (атлас 128×256 DXT5, слот 2×3).
+- Взят UI S.T.A.L.K.E.R. 2 **нейтрального** экзо (`Exoskeleton_Neutral`), не Monolith Diamond — под одиночек/нейтрал.
+- В секции костюма прописаны `icons_texture` / `inv_grid_*`.
+
 ## [1.4.2] — 2026-09-15
 
 **Исправлено**
@@ -21,7 +49,7 @@
 - B2: статья PDA `encyclopedia_items_kristiano_kx1` + лор-файл `lore/kx1_encyclopedia.txt` (править лор там).
 - B9: одноразовое SMS от Кристиано при первом получении/надевании KX-1 (`dynamic_news_helper` / fallback `news_manager`), флаг в сейве.
 
-Не сделано: B3/B4/B7/B8/B10; сама DDS-иконка ждёт твою картинку.
+Не сделано: B3/B4/B7/B8/B10.
 
 ## [1.3.0-test] — 2026-09-14
 

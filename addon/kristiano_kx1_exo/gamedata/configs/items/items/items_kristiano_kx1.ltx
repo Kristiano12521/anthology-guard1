@@ -1,4 +1,5 @@
 ; Encrypted flash -> recipe note for KX-1 craft unlock.
+; Intermediate chassis for two-step craft (B8).
 
 [recipe_kristiano_kx1]:tch_letter
 inv_grid_width                           = 1
@@ -12,6 +13,7 @@ description                              = st_recipe_kristiano_kx1_descr
 inv_name                                 = st_recipe_kristiano_kx1
 inv_name_short                           = st_recipe_kristiano_kx1
 recipe                                   = true
+can_trade                                = false
 snd_on_take                              = pda
 
 [kristiano_kx1_flash_encrypted]:tch_letter
@@ -27,7 +29,25 @@ description                              = st_kristiano_kx1_flash_encrypted_desc
 inv_name                                 = st_kristiano_kx1_flash_encrypted
 inv_name_short                           = st_kristiano_kx1_flash_encrypted
 recipe                                   = false
+can_trade                                = false
 snd_on_take                              = pda
 use1_functor                             = kristiano_kx1_exo.menu_decrypt_flash
 use1_action_functor                      = kristiano_kx1_exo.action_decrypt_flash
 use1_allow_db                            = true
+
+; Step-1 craft result: Nosorog chassis rebuilt onto Exo System frame (not wearable).
+[kristiano_kx1_frame]:tch_letter
+inv_grid_width                           = 2
+inv_grid_height                          = 2
+inv_grid_x                               = 0
+inv_grid_y                               = 0
+icons_texture                            = ui\ui_icon_exo_backpack
+cost                                     = 120000
+inv_weight                               = 18.0
+visual                                   = dynamics\outfit\exo_outfit
+description                              = st_kristiano_kx1_frame_descr
+inv_name                                 = st_kristiano_kx1_frame_name
+inv_name_short                           = st_kristiano_kx1_frame_name
+recipe                                   = false
+can_trade                                = false
+snd_on_take                              = item_use

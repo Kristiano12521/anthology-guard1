@@ -1,12 +1,13 @@
--- load-order: after aa_load_recipes_Banjaji_CSI, fix_milspec_exo_craft, item_exo_device, exo_servo_sounds
+-- load-order: after aa_load_recipes_Banjaji_CSI, fix_milspec_exo_craft, item_exo_device, exo_servo_sounds, item_parts
 -- Kristiano KX-1: endgame exo craft, fabric scraps, flash decrypt, default recharge PSU.
 
 local LOG_TAG = "[kristiano_kx1_exo]"
-local VERSION = "1.4.1-b"
+local VERSION = "1.5.1-b"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local KX1_SECTION = "kristiano_kx1_exo_outfit"
+local KX1_FRAME = "kristiano_kx1_frame"
 local FLASH_ENC = "kristiano_kx1_flash_encrypted"
 local RECIPE_NOTE = "recipe_kristiano_kx1"
 local LORE_ARTICLE = "encyclopedia_items_kristiano_kx1"
@@ -16,6 +17,8 @@ local EXO_TAB_TITLE = "st_exo_system_craftingtitle"
 local PARTS_TAB_TITLE = "st_OutfitPartsOverhaul_crafting_title"
 local DECRYPT_COST = 75000
 local EVENT_ID = "kristiano_kx1_exo"
+local FULL_CHARGE_RAD_SCRUB = -0.0008
+local FULL_CHARGE_EPS = 0.5
 
 -- B5: Exo System servo has no per-suit preset (class = floor(inv_weight/10) only).
 -- Light wrap while KX-1 is worn: quieter + lower step pitch. Not a fork of exo_servo_sounds.
@@ -28,25 +31,36 @@ local orig_load = nil
 local orig_servo_get_power = nil
 local orig_servo_footstep = nil
 local orig_servo_land = nil
+local orig_disassembly_outfit = nil
 local installed = false
 local servo_wrapped = false
 local legend_flash_given = false
 local first_sms_sent = false
+local flash_stash_given = false
 local psu_pending = {}
+local full_charge_next_t = 0
+local stash_try_next_t = 0
 
 local function log(fmt, ...)
 	printf(LOG_TAG .. " " .. fmt, ...)
 end
 
 local function is_kx1(obj)
-	return obj and obj.section and obj:section() == KX1_SECTION
+	return obj ~= nil and obj:section() == KX1_SECTION
 end
 
 local function wearing_kx1()
-	if not db.actor then
+	if not (db and db.actor) then
 		return false
 	end
 	return is_kx1(db.actor:item_in_slot(7))
+end
+
+local function send_tip(string_id, delay)
+	if not (db and db.actor and news_manager and type(news_manager.send_tip) == "function") then
+		return
+	end
+	news_manager.send_tip(db.actor, game.translate_string(string_id), nil, "nano", delay or 5000)
 end
 
 local function wrap_servo_sounds()
@@ -176,7 +190,7 @@ function action_decrypt_flash(obj)
 	end
 	local money = db.actor:money()
 	if not money or money < DECRYPT_COST then
-		news_manager.send_tip(db.actor, game.translate_string("st_kristiano_kx1_decrypt_nomoney"), nil, "nano", 4000)
+		send_tip("st_kristiano_kx1_decrypt_nomoney", 4000)
 		return
 	end
 	db.actor:give_money(-DECRYPT_COST)
@@ -188,7 +202,7 @@ function action_decrypt_flash(obj)
 	end
 	unlock_kx1_lore_article()
 	SendScriptCallback("actor_on_interaction", "notes", nil, RECIPE_NOTE)
-	news_manager.send_tip(db.actor, game.translate_string("st_kristiano_kx1_decrypt_ok"), nil, "nano", 5000)
+	send_tip("st_kristiano_kx1_decrypt_ok", 5000)
 	log("flash decrypted for %s", tostring(DECRYPT_COST))
 end
 
@@ -225,30 +239,56 @@ local function append_recipe(list, recipe)
 	return true
 end
 
+local function kx1_frame_recipe()
+	-- B8 step 1: Nosorog + wiring/fabrics -> non-wearable chassis
+	return {
+		identificator = KX1_FRAME,
+		results = {[KX1_FRAME] = 1},
+		notes = {[RECIPE_NOTE] = 1},
+		tools = {["itm_expertkit"] = 1},
+		components = {
+			["merc_nosorog_outfit"] = 1,
+			["prt_i_capacitors"] = 40,
+			["prt_i_transistors"] = 40,
+			["prt_i_resistors"] = 40,
+			["prt_i_textolite"] = 15,
+			["prt_i_copper"] = 20,
+			["prt_i_scrap"] = 25,
+			["prt_i_fasteners"] = 20,
+			["prt_i_ceramic"] = 10,
+			["prt_i_rubber"] = 8,
+			["prt_o_basic_retardant"] = 15,
+			["prt_o_basic_ballistic"] = 15,
+			["heavy_sewing_thread"] = 3,
+		},
+	}
+end
+
 local function kx1_recipe()
+	-- B8 step 2: chassis + PSUs + arts + IAM modules -> finished KX-1
 	return {
 		identificator = KX1_SECTION,
 		results = {[KX1_SECTION] = 1},
 		notes = {[RECIPE_NOTE] = 1},
 		tools = {["itm_expertkit"] = 1},
 		components = {
-			["merc_nosorog_outfit"] = 1,
+			[KX1_FRAME] = 1,
 			["exo_power_supply_tank"] = 1,
 			["exo_power_supply_sprint"] = 1,
 			-- af_iam count = artefact_count on kristiano_kx1_exo_outfit (TEST: 7); keep in sync
 			["af_iam"] = 7,
-			["prt_i_capacitors"] = 80,
-			["prt_i_transistors"] = 80,
-			["prt_i_resistors"] = 80,
-			["prt_i_textolite"] = 25,
-			["prt_i_copper"] = 40,
-			["prt_i_scrap"] = 50,
-			["prt_i_fasteners"] = 40,
-			["prt_i_ceramic"] = 20,
-			["prt_i_rubber"] = 15,
-			["prt_o_basic_retardant"] = 30,
-			["prt_o_basic_ballistic"] = 30,
-			["heavy_sewing_thread"] = 5,
+			["prt_i_capacitors"] = 40,
+			["prt_i_transistors"] = 40,
+			["prt_i_resistors"] = 40,
+			["prt_i_textolite"] = 10,
+			["prt_i_copper"] = 20,
+			["prt_i_scrap"] = 25,
+			["prt_i_fasteners"] = 20,
+			["prt_i_ceramic"] = 10,
+			["prt_i_rubber"] = 7,
+			["prt_o_basic_retardant"] = 15,
+			["prt_o_basic_ballistic"] = 15,
+			["heavy_sewing_thread"] = 2,
 			["af_aam"] = 1,
 			["af_dummy_pellicle"] = 1,
 			["af_electra_flash"] = 1,
@@ -295,6 +335,9 @@ local function inject_recipes()
 		tabs[exo_tab] = EXO_TAB_TITLE
 	end
 	recipes[exo_tab] = recipes[exo_tab] or {}
+	if append_recipe(recipes[exo_tab], kx1_frame_recipe()) then
+		added = added + 1
+	end
 	if append_recipe(recipes[exo_tab], kx1_recipe()) then
 		added = added + 1
 	end
@@ -326,6 +369,88 @@ local function wrapped_is_exobackpack(obj)
 		return orig_is_exobackpack(obj)
 	end
 	return false
+end
+
+-- B7: guaranteed rare salvage on top of con_parts_list rolls
+local function wrapped_disassembly_outfit(obj, obj_d)
+	local was_kx = is_kx1(obj)
+	local result = orig_disassembly_outfit(obj, obj_d)
+	if was_kx and db.actor then
+		alife_create_item("exo_power_supply", db.actor)
+		alife_create_item("prt_i_textolite", db.actor)
+		alife_create_item("prt_i_textolite", db.actor)
+		alife_create_item("prt_i_capacitors", db.actor)
+		send_tip("st_kristiano_kx1_disassemble_bonus", 5000)
+		log("legendary disassemble bonus granted")
+	end
+	return result
+end
+
+-- B3: one-shot stash with encrypted flash (no all.spawn).
+-- Uses get/set_random_stash so we only mark success when a box was found.
+local function try_place_flash_stash()
+	if flash_stash_given or not db.actor then
+		return
+	end
+	if db.actor:object(FLASH_ENC) or db.actor:object(RECIPE_NOTE) or db.actor:object(KX1_SECTION) then
+		flash_stash_given = true
+		return
+	end
+	if not (treasure_manager
+		and type(treasure_manager.get_random_stash) == "function"
+		and type(treasure_manager.set_random_stash) == "function") then
+		log("WARN: treasure_manager stash API missing - flash stash skipped")
+		flash_stash_given = true
+		return
+	end
+	local hint = game.translate_string("st_kristiano_kx1_stash_hint")
+	local id, name, desc, stash_hint = treasure_manager.get_random_stash(nil, hint, true)
+	if not id then
+		-- No suitable box yet (level/caches not ready) — retry later, do not burn the flag.
+		log("flash stash: no suitable box yet, will retry")
+		return
+	end
+	local str = name or hint
+	if desc and stash_hint then
+		str = "%c[255,255,160,0]" .. name .. "\\n%c[default]" .. desc .. "\\n%c[160,100,100,200]" .. (stash_hint or "")
+	end
+	treasure_manager.set_random_stash(nil, str, {FLASH_ENC}, id)
+	flash_stash_given = true
+	send_tip("st_kristiano_kx1_stash_tip", 7000)
+	log("placed random stash with encrypted flash id=%s", tostring(id))
+end
+
+-- Full-charge PSU buff: mild radiation scrub while KX-1 power is at max
+local function on_full_charge_update()
+	if not wearing_kx1() or not item_exo_device or type(item_exo_device.get_data) ~= "function" then
+		return
+	end
+	local outfit = db.actor:item_in_slot(7)
+	if not outfit then
+		return
+	end
+	local data = item_exo_device.get_data(outfit:id())
+	if not (data and data.power and data.supply and data.supply.max) then
+		return
+	end
+	if data.power + FULL_CHARGE_EPS < data.supply.max then
+		return
+	end
+	db.actor:change_radiation(FULL_CHARGE_RAD_SCRUB)
+end
+
+-- Throttle all per-tick work; actor_on_update fires every frame.
+local function on_actor_update()
+	local now = time_global()
+	if now < full_charge_next_t then
+		return
+	end
+	full_charge_next_t = now + 1000
+	on_full_charge_update()
+	if (not flash_stash_given) and now >= stash_try_next_t then
+		stash_try_next_t = now + 15000
+		try_place_flash_stash()
+	end
 end
 
 local function enforce_backpack_lock()
@@ -437,7 +562,7 @@ local function try_give_legend_flash()
 	end
 	alife_create_item(FLASH_ENC, db.actor)
 	legend_flash_given = true
-	news_manager.send_tip(db.actor, game.translate_string("st_kristiano_kx1_legend_flash"), nil, "nano", 6000)
+	send_tip("st_kristiano_kx1_legend_flash", 6000)
 	log("legend rank: encrypted flash granted")
 end
 
@@ -477,9 +602,10 @@ end
 
 local function save_state(data)
 	data.kristiano_kx1_exo = {
-		version = 3,
+		version = 4,
 		legend_flash_given = legend_flash_given and true or false,
 		first_sms_sent = first_sms_sent and true or false,
+		flash_stash_given = flash_stash_given and true or false,
 	}
 end
 
@@ -487,6 +613,7 @@ local function load_state(data)
 	local saved = data.kristiano_kx1_exo or {}
 	legend_flash_given = saved.legend_flash_given and true or false
 	first_sms_sent = saved.first_sms_sent and true or false
+	flash_stash_given = saved.flash_stash_given and true or false
 end
 
 local function uninstall()
@@ -497,8 +624,12 @@ local function uninstall()
 	if installed and item_exo_device and orig_is_exobackpack and item_exo_device.is_exobackpack == wrapped_is_exobackpack then
 		item_exo_device.is_exobackpack = orig_is_exobackpack
 	end
+	if installed and item_parts and orig_disassembly_outfit and item_parts.disassembly_outfit == wrapped_disassembly_outfit then
+		item_parts.disassembly_outfit = orig_disassembly_outfit
+	end
 	orig_load = nil
 	orig_is_exobackpack = nil
+	orig_disassembly_outfit = nil
 	installed = false
 	psu_pending = {}
 end
@@ -527,6 +658,13 @@ local function install()
 		log("WARN: item_exo_device.is_exobackpack missing - PSU UI may ignore KX-1")
 	end
 
+	if item_parts and type(item_parts.disassembly_outfit) == "function" then
+		orig_disassembly_outfit = item_parts.disassembly_outfit
+		item_parts.disassembly_outfit = wrapped_disassembly_outfit
+	else
+		log("WARN: item_parts.disassembly_outfit missing - legendary salvage skipped")
+	end
+
 	installed = true
 	log("hooks installed v%s", VERSION)
 
@@ -541,6 +679,7 @@ function on_game_start()
 	RegisterScriptCallback("actor_on_first_update", enforce_backpack_lock)
 	RegisterScriptCallback("actor_on_first_update", legend_check)
 	RegisterScriptCallback("actor_on_first_update", wrap_servo_sounds)
+	RegisterScriptCallback("actor_on_update", on_actor_update)
 	RegisterScriptCallback("actor_item_to_slot", on_kx1_to_slot)
 	RegisterScriptCallback("actor_item_to_ruck", enforce_backpack_lock)
 	RegisterScriptCallback("actor_on_item_drop", enforce_backpack_lock)
@@ -553,6 +692,7 @@ function on_game_end()
 	UnregisterScriptCallback("actor_on_first_update", enforce_backpack_lock)
 	UnregisterScriptCallback("actor_on_first_update", legend_check)
 	UnregisterScriptCallback("actor_on_first_update", wrap_servo_sounds)
+	UnregisterScriptCallback("actor_on_update", on_actor_update)
 	UnregisterScriptCallback("actor_item_to_slot", on_kx1_to_slot)
 	UnregisterScriptCallback("actor_item_to_ruck", enforce_backpack_lock)
 	UnregisterScriptCallback("actor_on_item_drop", enforce_backpack_lock)
