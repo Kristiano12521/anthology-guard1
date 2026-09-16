@@ -1,5 +1,29 @@
 # Smart Terrain STATE_Write Nil Guard
 
+## [1.0.1] — 2026-09-16
+
+**Изменено**
+
+- `gamedata/scripts/fix_smart_terrain_state_write.script` — в `printf` heal `total` формат `%d` заменён на `%s` + `tostring`.
+
+**Причина**
+
+`printf` этой сборки подставляет `%s`, не `%d`. При heal лог мог обрезаться, как у travel 1.0.1.
+
+**Не затронуто**
+
+- Heal `npc_info` / `arriving_npc` / `already_spawned`, wrap `STATE_Write` / `STATE_Read`
+
+**Совместимость**
+
+- Как 1.0.0
+- Сейвы: без изменений
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_smart_terrain_state_write`
+- в игре: не подтверждено. Ожидание: heal пишет `total=<число>`.
+
 ## [1.0.0] — 2026-09-11
 
 **Изменено**

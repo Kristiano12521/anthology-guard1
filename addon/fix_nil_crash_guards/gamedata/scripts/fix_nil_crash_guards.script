@@ -29,7 +29,7 @@ local GUARD_SPAWN_FAST = true
 local GUARD_VID_MODE = true
 
 local LOG_TAG = "[fix_nil_crash_guards]"
-local VERSION = "1.1.0"
+local VERSION = "1.1.1"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -426,22 +426,60 @@ local function patched_cont_vid_mode_safe()
 	return cont
 end
 
-local function install_vid_mode()
-	if installed.vid_mode then
-		return true
+-- reverse_resolution_list_mcm.patch_ress_list copies the function value into
+-- ui_options.options[...].content. Wrapping only the module field is a no-op
+-- if that copy already happened (on_game_start order: fix_nil then reverse_*).
+-- Walk the same tree reverse_resolution uses: options[].gr[].cmd == "vid_mode".
+local function retarget_vid_mode_content(fn)
+	if type(fn) ~= "function" then
+		return 0
 	end
+	local opts = module_of("ui_options")
+	if not (opts and type(opts.options) == "table") then
+		return 0
+	end
+	local replaced = 0
+	local function walk(node)
+		if type(node) ~= "table" then
+			return
+		end
+		if node.cmd == "vid_mode" and type(node.content) == "table" then
+			for i = 1, #node.content do
+				if type(node.content[i]) == "function" and node.content[i] ~= fn then
+					node.content[i] = fn
+					replaced = replaced + 1
+				end
+			end
+		end
+		if type(node.gr) == "table" then
+			for i = 1, #node.gr do
+				walk(node.gr[i])
+			end
+		end
+	end
+	for i = 1, #opts.options do
+		walk(opts.options[i])
+	end
+	return replaced
+end
+
+local function install_vid_mode()
 	local mod = module_of("reverse_resolution_list_mcm")
 	if not (mod and type(mod.cont_vid_mode) == "function") then
 		return false
 	end
-	if mod.cont_vid_mode == patched_cont_vid_mode_safe then
-		installed.vid_mode = true
-		return true
+	if mod.cont_vid_mode ~= patched_cont_vid_mode_safe then
+		orig.cont_vid_mode = orig.cont_vid_mode or mod.cont_vid_mode
+		mod.cont_vid_mode = patched_cont_vid_mode_safe
+		log("wrapped reverse_resolution_list_mcm.cont_vid_mode")
 	end
-	orig.cont_vid_mode = mod.cont_vid_mode
-	mod.cont_vid_mode = patched_cont_vid_mode_safe
 	installed.vid_mode = true
-	log("wrapped reverse_resolution_list_mcm.cont_vid_mode")
+	-- Always retarget: first on_game_start wrap is overwritten when
+	-- reverse_resolution later assigns content = { cont_vid_mode }.
+	local n = retarget_vid_mode_content(patched_cont_vid_mode_safe)
+	if n > 0 then
+		log_once("vid_content", "retargeted ui_options vid_mode content slots=%s", tostring(n))
+	end
 	return true
 end
 
@@ -537,6 +575,7 @@ local function uninstall_all()
 	local rrm = module_of("reverse_resolution_list_mcm")
 	if rrm and orig.cont_vid_mode then
 		rrm.cont_vid_mode = orig.cont_vid_mode
+		retarget_vid_mode_content(orig.cont_vid_mode)
 	end
 
 	orig = {}

@@ -11,7 +11,7 @@
 -- Guard restores empty tables before Write/Read; job logic unchanged.
 
 local LOG_TAG = "[fix_smart_terrain_state_write]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local MODULE_NAME = "smart_terrain"
 local LOG_INTERVAL_MS = 1000
 
@@ -58,12 +58,12 @@ local function log_heal(self, fields)
 	last_log_tg = now
 	local name, id = smart_label(self)
 	printf(
-		"%s healed nil tables [%s] name=%s id=%s total=%d",
+		"%s healed nil tables [%s] name=%s id=%s total=%s",
 		LOG_TAG,
 		fields,
 		name,
 		id,
-		heal_count
+		tostring(heal_count)
 	)
 end
 

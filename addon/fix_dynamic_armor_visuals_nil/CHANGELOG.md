@@ -1,5 +1,29 @@
 # Dynamic Armor Visuals Nil Guard
 
+## [1.0.2] — 2026-09-16
+
+**Изменено**
+
+- `gamedata/scripts/fix_dynamic_armor_visuals_nil.script` — в `printf` `batch_total` формат `%d` заменён на `%s` + `tostring`.
+
+**Причина**
+
+`printf` этой сборки подставляет `%s`, не `%d`. При skip лог мог обрезаться, как у travel 1.0.1.
+
+**Не затронуто**
+
+- Отсев `item == nil`, steal callback, retry на `actor_on_first_update`
+
+**Совместимость**
+
+- Как 1.0.1
+- Сейвы: без изменений
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_dynamic_armor_visuals_nil`
+- в игре: не подтверждено. Ожидание: skip пишет `batch_total=<число>`.
+
 ## [1.0.1] — 2026-09-13
 
 **Изменено**

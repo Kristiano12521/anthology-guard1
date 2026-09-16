@@ -1,5 +1,30 @@
 # Nil Crash Guards
 
+## [1.1.1] — 2026-09-16
+
+**Изменено**
+
+- `gamedata/scripts/fix_nil_crash_guards.script` — `GUARD_VID_MODE` после wrap модуля пишет обёртку в `ui_options.options` слот `cmd=vid_mode` / `content`. Повтор на `actor_on_first_update`, даже если wrap уже стоял. Uninstall возвращает orig в content.
+
+**Причина**
+
+`reverse_resolution_list_mcm.patch_ress_list` копирует function value в `content = { cont_vid_mode }`. `on_game_start` идёт по алфавиту: `fix_nil_*` раньше `reverse_*`, поэтому поздний patch перезаписывал слот оригиналом — меню разрешений звало не обёртку.
+
+**Не затронуто**
+
+- Остальные семь гардов, тумблеры `GUARD_*`
+- Логика skip битых токенов / fallback-список
+
+**Совместимость**
+
+- Как 1.1.0
+- Сейвы: ничего не пишет
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_nil_crash_guards`
+- в игре: не прогонялось. Ожидание: `wrapped reverse_resolution_list_mcm.cont_vid_mode` и `retargeted ui_options vid_mode content`; Settings → resolution без FATAL на битом токене.
+
 ## [1.1.0] — 2026-09-13
 
 **Изменено**

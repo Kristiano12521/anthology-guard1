@@ -11,7 +11,7 @@
 -- AttachmentWheelOption:OnClick already guards wpn; ammo/mag paths did not.
 
 local LOG_TAG = "[fix_qaw_ammo_nil]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local LOG_INTERVAL_MS = 1000
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -30,10 +30,10 @@ local function log_skip(kind)
 	end
 	last_log_tg = now
 	printf(
-		"%s skip %s LoadInActiveWeapon: no active item (batch_total=%d)",
+		"%s skip %s LoadInActiveWeapon: no active item (batch_total=%s)",
 		LOG_TAG,
-		kind,
-		skip_count
+		tostring(kind),
+		tostring(skip_count)
 	)
 end
 
