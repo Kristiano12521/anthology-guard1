@@ -1,5 +1,30 @@
 # Fix DRX SL Meet Loop
 
+## [1.0.2] — 2026-09-16
+
+**Изменено**
+
+- `gamedata/scripts/fix_drx_sl_meet_loop.script` — `save_var` для `drx_sl_current_honcho` / `drx_sl_current_task_number` / `drx_sl_current_task` только после успешного `give_task`. `give_info` по-прежнему до выдачи (condlist meet).
+
+**Причина**
+
+1.0.1 (и ваниль) писали хончо и счётчик до проверки `task_ini` и свободных meet. Abort / `no free meet tasks` оставлял в сейве следующего хончо без выданного задания — на следующем вызове он исключался как `current`.
+
+**Не затронуто**
+
+- Запрет self-meet, правка Vector, выбор той же фракции, снятие залипшего meet
+- LTX заданий, `fix_grifon_visibility`
+
+**Совместимость**
+
+- Как 1.0.1
+- Сейвы: без миграции; `load_var` с теми же ключами и дефолтами
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_drx_sl_meet_loop`
+- в игре: не прогонялось. Ожидание: при `no free meet tasks` `drx_sl_current_honcho` не меняется; после выдачи meet — лог `DRX SL current storyline task`.
+
 ## [1.0.1] — 2026-09-14
 
 **Изменено**

@@ -17,7 +17,7 @@
 -- load-order: after xr_effects / axr_task_manager (wraps at on_game_start)
 
 local LOG_TAG = "[fix_drx_sl_meet_loop]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -209,12 +209,6 @@ local function patched_meet_random_honcho(actor, npc, p)
 	clear_stuck_meet_for(current_honcho)
 
 	local next_honcho = pick_next(honcho_list, drx_sl_honchos_table, current_honcho)
-	if db and db.actor and type(save_var) == "function" then
-		save_var(db.actor, "drx_sl_current_honcho", next_honcho)
-		local n = load_var(db.actor, "drx_sl_current_task_number", 1) + 1
-		save_var(db.actor, "drx_sl_current_task_number", n)
-		printf("DRX SL task count: " .. tostring(n))
-	end
 
 	local tm = rawget(_G, "task_manager")
 	local task_ltx_file = tm and tm.task_ini
@@ -245,21 +239,38 @@ local function patched_meet_random_honcho(actor, npc, p)
 	end
 
 	local honcho_task_id = honcho_task_list[math.random(size_t)]
-	if db and db.actor and type(save_var) == "function" then
-		save_var(db.actor, "drx_sl_current_task", honcho_task_id)
+	local mgr = tm.get_task_manager and tm.get_task_manager()
+	if not (mgr and type(mgr.give_task) == "function") then
+		log("task_manager:give_task missing - meet not issued")
+		return
 	end
-	printf("DRX SL current storyline task: " .. honcho_task_id)
 
+	-- Persist only after give_task returns: abort on missing task_ini / empty
+	-- meet list used to advance drx_sl_current_honcho without issuing a meet.
+	-- give_info MUST run first: meet condlist_0 is {-drx_sl_meet_honcho_*} complete.
 	if type(give_info) == "function" then
 		give_info("drx_sl_meet_honcho_" .. next_honcho)
 	end
 
-	local mgr = tm.get_task_manager and tm.get_task_manager()
-	if mgr and type(mgr.give_task) == "function" then
+	local ok, err = pcall(function()
 		mgr:give_task(honcho_task_id)
-	else
-		log("task_manager:give_task missing - meet not issued")
+	end)
+	if not ok then
+		log("give_task failed for %s: %s", tostring(honcho_task_id), tostring(err))
+		if type(disable_info) == "function" then
+			pcall(disable_info, "drx_sl_meet_honcho_" .. next_honcho)
+		end
+		return
 	end
+
+	if db and db.actor and type(save_var) == "function" then
+		save_var(db.actor, "drx_sl_current_honcho", next_honcho)
+		local n = load_var(db.actor, "drx_sl_current_task_number", 1) + 1
+		save_var(db.actor, "drx_sl_current_task_number", n)
+		save_var(db.actor, "drx_sl_current_task", honcho_task_id)
+		printf("DRX SL task count: " .. tostring(n))
+	end
+	printf("DRX SL current storyline task: " .. honcho_task_id)
 end
 
 local function install()

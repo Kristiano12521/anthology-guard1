@@ -1,33 +1,58 @@
 # Travel Invalid Alife ID Guard
 
-## [1.0.0] - 2026-09-15
+## [1.0.1] - 2026-09-16
 
-**Изменено**
+**РР·РјРµРЅРµРЅРѕ**
 
-- `gamedata/scripts/fix_travel_invalid_id.script` - wrap `map_spot_menu_add_property` / `map_spot_menu_property_clicked` у `game_backpack_travel` и `game_fast_travel`: при `id == nil` / `id <= 0` / `id >= 65535` ранний выход без `alife_object`.
+- `gamedata/scripts/fix_travel_invalid_id.script` вЂ” РІ `printf` `batch_total` Рё `late-wrapped` С„РѕСЂРјР°С‚ `%d` Р·Р°РјРµРЅС‘РЅ РЅР° `%s` + `tostring`.
 
-**Причина**
+**РџСЂРёС‡РёРЅР°**
 
-Клики по PDA spot для `task_placeable_waypoint` / пустой карты передают sentinel `65535`. Travel-скрипты зовут `alife_object(id)` без проверки -> `!ALIFE OBJECT ID IS 65535!` и нефатальный traceback (baseline mg9000).
+`printf` СЌС‚РѕР№ СЃР±РѕСЂРєРё РїРѕРґСЃС‚Р°РІР»СЏРµС‚ `%s`, РЅРµ `%d`. РџСЂРё skip / late-wrap Р»РѕРі РјРѕРі РѕР±СЂРµР·Р°С‚СЊСЃСЏ РёР»Рё РІСЂР°С‚СЊ, РєР°Рє Сѓ sound 1.0.1.
 
-**Как исправлено**
+**РќРµ Р·Р°С‚СЂРѕРЅСѓС‚Рѕ**
 
-Monkey-patch: hook `RegisterScriptCallback` до регистрации travel (имя `fix_*` грузится раньше `game_*`) + late-wrap через `axr_main` `intercepts` на `actor_on_first_update`.
+- Р›РѕРіРёРєР° РІР°Р»РёРґР°С†РёРё `id` (nil / `<= 0` / `>= 65535`)
+- Hook `RegisterScriptCallback` Рё late-wrap С‡РµСЂРµР· `axr_main` `intercepts`
 
-**Не затронуто**
+**РЎРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ**
 
-- `tasks_placeable_waypoints` / PAW логика пинов
-- `pda.script`, меню spot кроме travel-опций
-- `alife_object` глобально (диагностика для других вызывающих остаётся)
-- sound / FDDA
+- РљР°Рє 1.0.0
+- РЎРµР№РІС‹: Р±РµР· РёР·РјРµРЅРµРЅРёР№
 
-**Совместимость**
-
-- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
-- Сейвы: совместим, состояние не пишется
-- В MO2 после Anthology base
-
-**Проверено**
+**РџСЂРѕРІРµСЂРµРЅРѕ**
 
 - lint: `python tools/lint_addon.py fix_travel_invalid_id`
-- в игре: не подтверждено. Ожидание: ПКМ по placeable waypoint / пустой карте без `!ALIFE OBJECT ID IS 65535!` от travel; в логе при skip - `skip invalid id=65535`.
+- РІ РёРіСЂРµ: РЅРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРѕ. РћР¶РёРґР°РЅРёРµ: skip РїРёС€РµС‚ `batch_total=<С‡РёСЃР»Рѕ>` Р±РµР· СЃР»РѕРјР°РЅРЅРѕРіРѕ С„РѕСЂРјР°С‚Р°.
+
+## [1.0.0] - 2026-09-15
+
+**РР·РјРµРЅРµРЅРѕ**
+
+- `gamedata/scripts/fix_travel_invalid_id.script` - wrap `map_spot_menu_add_property` / `map_spot_menu_property_clicked` Сѓ `game_backpack_travel` Рё `game_fast_travel`: РїСЂРё `id == nil` / `id <= 0` / `id >= 65535` СЂР°РЅРЅРёР№ РІС‹С…РѕРґ Р±РµР· `alife_object`.
+
+**РџСЂРёС‡РёРЅР°**
+
+РљР»РёРєРё РїРѕ PDA spot РґР»СЏ `task_placeable_waypoint` / РїСѓСЃС‚РѕР№ РєР°СЂС‚С‹ РїРµСЂРµРґР°СЋС‚ sentinel `65535`. Travel-СЃРєСЂРёРїС‚С‹ Р·РѕРІСѓС‚ `alife_object(id)` Р±РµР· РїСЂРѕРІРµСЂРєРё -> `!ALIFE OBJECT ID IS 65535!` Рё РЅРµС„Р°С‚Р°Р»СЊРЅС‹Р№ traceback (baseline mg9000).
+
+**РљР°Рє РёСЃРїСЂР°РІР»РµРЅРѕ**
+
+Monkey-patch: hook `RegisterScriptCallback` РґРѕ СЂРµРіРёСЃС‚СЂР°С†РёРё travel (РёРјСЏ `fix_*` РіСЂСѓР·РёС‚СЃСЏ СЂР°РЅСЊС€Рµ `game_*`) + late-wrap С‡РµСЂРµР· `axr_main` `intercepts` РЅР° `actor_on_first_update`.
+
+**РќРµ Р·Р°С‚СЂРѕРЅСѓС‚Рѕ**
+
+- `tasks_placeable_waypoints` / PAW Р»РѕРіРёРєР° РїРёРЅРѕРІ
+- `pda.script`, РјРµРЅСЋ spot РєСЂРѕРјРµ travel-РѕРїС†РёР№
+- `alife_object` РіР»РѕР±Р°Р»СЊРЅРѕ (РґРёР°РіРЅРѕСЃС‚РёРєР° РґР»СЏ РґСЂСѓРіРёС… РІС‹Р·С‹РІР°СЋС‰РёС… РѕСЃС‚Р°С‘С‚СЃСЏ)
+- sound / FDDA
+
+**РЎРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- РЎРµР№РІС‹: СЃРѕРІРјРµСЃС‚РёРј, СЃРѕСЃС‚РѕСЏРЅРёРµ РЅРµ РїРёС€РµС‚СЃСЏ
+- Р’ MO2 РїРѕСЃР»Рµ Anthology base
+
+**РџСЂРѕРІРµСЂРµРЅРѕ**
+
+- lint: `python tools/lint_addon.py fix_travel_invalid_id`
+- РІ РёРіСЂРµ: РЅРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРѕ. РћР¶РёРґР°РЅРёРµ: РџРљРњ РїРѕ placeable waypoint / РїСѓСЃС‚РѕР№ РєР°СЂС‚Рµ Р±РµР· `!ALIFE OBJECT ID IS 65535!` РѕС‚ travel; РІ Р»РѕРіРµ РїСЂРё skip - `skip invalid id=65535`.

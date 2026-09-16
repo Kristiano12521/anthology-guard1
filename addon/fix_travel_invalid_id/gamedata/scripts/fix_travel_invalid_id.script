@@ -11,7 +11,7 @@
 -- is installed in on_game_start before travel scripts register.
 
 local LOG_TAG = "[fix_travel_invalid_id]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local INVALID_ID = 65535
 local CB_ADD = "map_spot_menu_add_property"
 local CB_CLICK = "map_spot_menu_property_clicked"
@@ -49,11 +49,11 @@ local function log_skip(id, which)
 	end
 	last_log_tg = now
 	printf(
-		"%s skip invalid id=%s via %s (batch_total=%d)",
+		"%s skip invalid id=%s via %s (batch_total=%s)",
 		LOG_TAG,
 		tostring(id),
 		which,
-		skip_count
+		tostring(skip_count)
 	)
 end
 
@@ -169,7 +169,7 @@ end
 function actor_on_first_update()
 	local n = try_wrap_existing()
 	if n > 0 then
-		printf("%s late-wrapped %d travel callback(s)", LOG_TAG, n)
+		printf("%s late-wrapped %s travel callback(s)", LOG_TAG, tostring(n))
 	elseif wrap_count == 0 then
 		printf("%s travel callbacks not wrapped - guard NOT installed", LOG_TAG)
 	end
