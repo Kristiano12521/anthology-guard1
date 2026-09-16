@@ -50,8 +50,8 @@
 	<string id="st_kristiano_kx1_frame_name">
 		<text>Каркас шасси KX-1</text>
 	</string>
-	<string id="st_kristiano_kx1_frame_descr">
-		<text>Промежуточный каркас Kristiano KX-1: Носорог наёмников, пересобранный на раму Exo System. Не надевается - финальная сборка на expert-верстаке: БП, ПМА и артефакты.\n \n%c[d_blue] - %c[ui_gray_2] Крафт, шаг 1 из 2\n</text>
+		<string id="st_kristiano_kx1_frame_descr">
+		<text>Промежуточный каркас Kristiano KX-1: наёмнический «Носорог», пересобранный на раму Exo System. Надеть нельзя — это шаг перед готовым костюмом.\n \n%c[ui_gray_3]ОСОБЕННОСТИ:\n%c[d_blue] • %c[ui_gray_2] Не надевается, только для крафта\n%c[d_blue] • %c[ui_gray_2] Основа — каркас «Носорога» под Exo System\n%c[d_blue] • %c[ui_gray_2] Финальная сборка на экспертном верстаке (вкладка Exo System)\n%c[d_blue] • %c[ui_gray_2] Нужны БП Exo System, 7 прикладных модулей и артефакты\n%c[0,100,255,150] • %c[ui_gray_2] Крафт, шаг 1 из 2\n</text>
 	</string>
 	<string id="st_kristiano_kx1_stash_hint">
 		<text>Схрон Кристиано</text>

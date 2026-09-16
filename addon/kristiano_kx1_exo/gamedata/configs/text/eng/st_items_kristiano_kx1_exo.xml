@@ -64,8 +64,8 @@
 	<string id="st_kristiano_kx1_frame_name">
 		<text>KX-1 Chassis Frame</text>
 	</string>
-	<string id="st_kristiano_kx1_frame_descr">
-		<text>Intermediate Kristiano KX-1 chassis: a Merc Nosorog rebuilt onto an Exo System frame. Not wearable - finish the suit at an expert workbench with power modules, IAM slots and artefacts.\n \n%c[d_blue] - %c[ui_gray_2] Craft step 1 of 2\n</text>
+		<string id="st_kristiano_kx1_frame_descr">
+		<text>Intermediate Kristiano KX-1 chassis: a Merc Nosorog rebuilt onto an Exo System frame. Cannot be worn - this is the step before the finished suit.\n \n%c[ui_gray_3]FEATURES:\n%c[d_blue] • %c[ui_gray_2] Not wearable - craft component only\n%c[d_blue] • %c[ui_gray_2] Built from a Nosorog chassis for Exo System\n%c[d_blue] • %c[ui_gray_2] Finish at an expert workbench (Exo System tab)\n%c[d_blue] • %c[ui_gray_2] Needs Exo System PSUs, 7 applied artefact modules and artefacts\n%c[0,100,255,150] • %c[ui_gray_2] Craft step 1 of 2\n</text>
 	</string>
 	<string id="st_kristiano_kx1_stash_hint">
 		<text>Kristiano cache</text>

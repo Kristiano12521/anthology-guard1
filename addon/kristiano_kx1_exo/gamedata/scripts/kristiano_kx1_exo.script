@@ -275,8 +275,8 @@ local function kx1_recipe()
 			[KX1_FRAME] = 1,
 			["exo_power_supply_tank"] = 1,
 			["exo_power_supply_sprint"] = 1,
-			-- af_iam count = artefact_count on kristiano_kx1_exo_outfit (TEST: 7); keep in sync
-			["af_iam"] = 7,
+			-- af_aac count = artefact_count on kristiano_kx1_exo_outfit (7 applied modules)
+			["af_aac"] = 7,
 			["prt_i_capacitors"] = 40,
 			["prt_i_transistors"] = 40,
 			["prt_i_resistors"] = 40,

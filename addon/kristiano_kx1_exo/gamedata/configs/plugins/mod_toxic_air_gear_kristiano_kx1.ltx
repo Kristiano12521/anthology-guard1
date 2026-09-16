@@ -1,0 +1,20 @@
+; KX-1 Toxic Air: filters (all tiers) on the suit + tanks via script gate (hud_sci).
+; toxic_air.script loads plugins\toxic_air_gear.ltx — DLTX merges this file.
+; Mode stays "filter" so drag-drop filters work; tanks enabled by
+; zzz_kristiano_kx1_toxic_air.script (get_active_tank_gear wrap).
+
+![settings_gear]
+kristiano_kx1_exo_outfit           = hud_kx1, filter, true
+
+; Union of filter consumables from hud_gass / hud_hard / hud_mil / hud_exo.
+[hud_kx1]
+af_mask_filter_1                   = true, 0.30, 0.30, 1, T1
+af_mask_filter_1sci                = true, 0.30, 0.30, 1, T1
+af_mask_filter_ms4                 = true, 0.25, 0.30, 1, T1
+af_mask_filter_dp1                 = true, 0.25, 0.30, 1, T1
+af_mask_filter_2                   = true, 0.40, 0.88, 1, T2
+af_mask_filter_mof6                = true, 0.35, 0.88, 1, T2
+af_mask_filter_2dolg               = true, 0.40, 0.88, 1, T2
+af_mask_filter_3                   = true, 0.50, 0.95, 2, T3
+af_mask_filter_3isg                = true, 0.50, 0.95, 2, T3
+af_mask_filter_r18                 = true, 0.45, 0.95, 2, T3

@@ -1,0 +1,128 @@
+-- load-order: после toxic_air
+-- KX-1: Toxic Air tanks on exo that is registered as filter-mode gear.
+-- Filters work via settings_gear (hud_kx1, filter). Tanks need mode=="tank"
+-- in get_active_tank_gear (local) Ч wrap it through tank_in_belt upvalue.
+-- Verified: toxic_air.tank_in_belt -> get_active_tank_entry -> get_active_tank_gear;
+-- hud_sci tank list already loaded by scientific outfits.
+
+local LOG_TAG = "[kristiano_kx1_toxic_air]"
+local VERSION = "1.0.0"
+local KX1 = "kristiano_kx1_exo_outfit"
+local TANK_HUD = "hud_sci"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local patched = false
+local orig_get_active_tank_gear = nil
+local owner_fn = nil
+local owner_idx = nil
+
+local function find_upvalue(fn, name)
+	if type(fn) ~= "function" or not (debug and type(debug.getupvalue) == "function") then
+		return nil, nil
+	end
+	local i = 1
+	while true do
+		local n, v = debug.getupvalue(fn, i)
+		if not n then
+			return nil, nil
+		end
+		if n == name then
+			return v, i
+		end
+		i = i + 1
+	end
+end
+
+local function find_upvalue_deep(fn, name, depth, seen)
+	depth = depth or 0
+	seen = seen or {}
+	if type(fn) ~= "function" or depth > 6 or seen[fn] then
+		return nil, nil, nil
+	end
+	seen[fn] = true
+	local i = 1
+	while true do
+		local n, v = debug.getupvalue(fn, i)
+		if not n then
+			break
+		end
+		if n == name and type(v) == "function" then
+			return v, i, fn
+		end
+		if type(v) == "function" then
+			local vv, ii, owner = find_upvalue_deep(v, name, depth + 1, seen)
+			if type(vv) == "function" then
+				return vv, ii, owner
+			end
+		end
+		i = i + 1
+	end
+	return nil, nil, nil
+end
+
+local function wrapped_get_active_tank_gear()
+	local gear, def = orig_get_active_tank_gear()
+	if gear then
+		return gear, def
+	end
+	if not (db and db.actor) then
+		return nil, nil
+	end
+	local outfit = db.actor:item_in_slot(7)
+	if outfit and outfit:section() == KX1 then
+		-- Same shape as toxic_air airgear_items entries; hud_sci lists all tanks.
+		return outfit, { hud = TANK_HUD, mode = "tank", respi = true }
+	end
+	return nil, nil
+end
+
+local function install_tank_gate()
+	if patched then
+		return true
+	end
+	if not (toxic_air and type(toxic_air.tank_in_belt) == "function") then
+		printf("%s WARN: toxic_air.tank_in_belt missing - tank gate skipped", LOG_TAG)
+		return false
+	end
+	if not (debug and type(debug.setupvalue) == "function") then
+		printf("%s WARN: debug.setupvalue missing - tank gate skipped", LOG_TAG)
+		return false
+	end
+
+	local fn, idx, owner = find_upvalue_deep(toxic_air.tank_in_belt, "get_active_tank_gear")
+	if type(fn) ~= "function" or not idx or type(owner) ~= "function" then
+		printf("%s WARN: get_active_tank_gear upvalue not found - tank gate skipped", LOG_TAG)
+		return false
+	end
+
+	orig_get_active_tank_gear = fn
+	owner_fn = owner
+	owner_idx = idx
+	debug.setupvalue(owner, idx, wrapped_get_active_tank_gear)
+	patched = true
+	printf("%s tank gate installed (KX-1 uses %s tanks)", LOG_TAG, TANK_HUD)
+	return true
+end
+
+local function uninstall_tank_gate()
+	if patched and owner_fn and owner_idx and orig_get_active_tank_gear and debug and type(debug.setupvalue) == "function" then
+		debug.setupvalue(owner_fn, owner_idx, orig_get_active_tank_gear)
+	end
+	patched = false
+	orig_get_active_tank_gear = nil
+	owner_fn = nil
+	owner_idx = nil
+end
+
+function on_game_start()
+	-- toxic_air registers callbacks in its on_game_start; we load after it.
+	if not install_tank_gate() then
+		RegisterScriptCallback("actor_on_first_update", install_tank_gate)
+	end
+end
+
+function on_game_end()
+	UnregisterScriptCallback("actor_on_first_update", install_tank_gate)
+	uninstall_tank_gate()
+end
