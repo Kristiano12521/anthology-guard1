@@ -11,7 +11,7 @@
 -- and clears ghosts when the engine CGameTask is gone (or status completed/fail).
 
 local LOG_TAG = "[fix_stale_fetch_marker]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 local DELAY_EVENT = "fix_stale_fetch_marker_delay"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -88,10 +88,15 @@ local function is_stale(actor, task_id, info)
 
 	local status = info.status
 	local stage = info.stage
+	-- Utjans fetch_item_icon gates on last_check_task, not status.
+	local last = info.last_check_task
 	local engine = has_engine_task(actor, task_id)
 
 	if status == "completed" or status == "fail" then
 		return true, "status_" .. tostring(status)
+	end
+	if last == "complete" or last == "fail" then
+		return true, "last_check_" .. tostring(last)
 	end
 	if stage == 255 then
 		return true, "stage_255"
@@ -116,37 +121,25 @@ local function sweep_stale_fetch(reason)
 
 	each_actor_pstor(function(stor_id, pstor, label)
 		pstor_seen = pstor_seen + 1
-		local fetch_keys = 0
 		for key, sec in pairs(pstor) do
 			if type(key) == "string" and string.sub(key, -6) == "_fetch" and type(sec) == "string" then
-				fetch_keys = fetch_keys + 1
 				probed = probed + 1
 				local task_id = string.sub(key, 1, -7)
 				local info = task_info and task_info[task_id] or nil
-				local status = info and info.status or nil
-				local stage = info and info.stage or nil
-				local engine = has_engine_task(actor, task_id)
-
-				log(
-					"probe stor=%s/%s task=%s status=%s stage=%s engine=%s sec=%s",
-					tostring(stor_id),
-					tostring(label),
-					tostring(task_id),
-					tostring(status),
-					tostring(stage),
-					tostring(engine),
-					tostring(sec)
-				)
-
 				local stale, why = is_stale(actor, task_id, info)
 				if stale then
 					clear_fetch_keys(pstor, task_id)
 					cleared = cleared + 1
-					log("cleared fetch pstor task=%s why=%s sec=%s stor=%s", tostring(task_id), tostring(why), tostring(sec), tostring(label))
+					log(
+						"cleared fetch pstor task=%s why=%s sec=%s stor=%s",
+						tostring(task_id),
+						tostring(why),
+						tostring(sec),
+						tostring(label)
+					)
 				end
 			end
 		end
-		log("pstor scan id=%s label=%s fetch_keys=%s", tostring(stor_id), tostring(label), tostring(fetch_keys))
 	end)
 
 	log(

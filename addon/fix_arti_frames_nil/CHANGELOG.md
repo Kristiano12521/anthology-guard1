@@ -1,5 +1,29 @@
 # Arti Frames Nil Guard
 
+## [1.0.1] — 2026-09-16
+
+**Изменено**
+
+- `gamedata/scripts/fix_arti_frames_nil.script` — в `printf` `batch_total` формат `%d` заменён на `%s` + `tostring`.
+
+**Причина**
+
+`printf` этой сборки подставляет `%s`, не `%d`. При skip лог мог обрезаться, как у DAV 1.0.2.
+
+**Не затронуто**
+
+- Отсев `obj == nil`, steal callback, retry на `actor_on_first_update`
+
+**Совместимость**
+
+- Как 1.0.0
+- Сейвы: без изменений
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_arti_frames_nil`
+- в игре: не подтверждено. Ожидание: skip пишет `batch_total=<число>`.
+
 ## [1.0.0] — 2026-09-08
 
 **Изменено**

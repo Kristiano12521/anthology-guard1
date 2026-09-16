@@ -1,5 +1,29 @@
 # Misc Script Error Fixes
 
+## [1.0.4] — 2026-09-16
+
+**Изменено**
+
+- `gamedata/scripts/fix_misc_script_errors.script` — в `printf` `batch_total` формат `%d` заменён на `%s` + `tostring`.
+
+**Причина**
+
+`printf` этой сборки подставляет `%s`, не `%d`. При skip after_move лог мог обрезаться, как у DAV 1.0.2.
+
+**Не затронуто**
+
+- MAS wrap / late getupvalue, dummy `actor_on_item_use`, tutorial `getText`
+
+**Совместимость**
+
+- Как 1.0.3
+- Сейвы: без изменений
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_misc_script_errors`
+- в игре: не подтверждено. Ожидание: skip пишет `batch_total=<число>`.
+
 ## [1.0.3] — 2026-09-11
 
 **Изменено**

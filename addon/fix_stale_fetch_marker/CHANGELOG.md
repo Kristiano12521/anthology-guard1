@@ -1,5 +1,10 @@
 # fix_stale_fetch_marker
 
+## 1.0.3
+
+- `is_stale`: учитывает Utjans `last_check_task` (`complete` / `fail`), не только `status` / `stage` / engine.
+- Убран per-key `probe` и per-pstor `fetch_keys` лог; остаются `cleared …` и итоговый `sweep`.
+
 ## 1.0.2
 
 - v1.0.1: `probed=0` при живом `eloquent_task_8_fetch` у diag — `load_var` + обход только `task_info` не видели ключи.

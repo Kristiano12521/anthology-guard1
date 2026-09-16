@@ -16,7 +16,7 @@
 -- move is local - wrap at RegisterScriptCallback during on_game_start.
 
 local LOG_TAG = "[fix_misc_script_errors]"
-local VERSION = "1.0.3"
+local VERSION = "1.0.4"
 local MODULE_NAME = "mas_scope_detach"
 local AFTER_MOVE = "ActorMenu_on_item_after_move"
 local LOG_INTERVAL_MS = 1000
@@ -47,10 +47,10 @@ local function log_skip(npc_id)
 	end
 	last_log_tg = now
 	printf(
-		"%s skip nil obj after_move (npc_id=%s, batch_total=%d)",
+		"%s skip nil obj after_move (npc_id=%s, batch_total=%s)",
 		LOG_TAG,
 		tostring(npc_id),
-		skip_count
+		tostring(skip_count)
 	)
 end
 
