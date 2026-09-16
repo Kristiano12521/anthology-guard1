@@ -1,5 +1,29 @@
 # WTF fetch counter
 
+## [1.0.1] — 2026-09-16
+
+**Изменено**
+
+- `gamedata/scripts/fix_wtf_fetch_counter.script` — на `actor_on_first_update` переустанавливает wrap, если `igi_description.get_description` уже не наша обёртка (MT reload). Uninstall возвращает orig только если слот ещё наш.
+
+**Причина**
+
+1.0.0 при `installed=true` не проверял указатель. После замены таблицы WTF счётчик снова залипал на закэшированном N. Тот же паттерн, что у `fix_hostage_task_collision`.
+
+**Не затронуто**
+
+- Логика сброса `CACHE.description` для Fetch + `utjan_fetch_thing`
+
+**Совместимость**
+
+- Как 1.0.0
+- Сейвы: без изменений
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_wtf_fetch_counter`
+- в игре: не прогонялось. Ожидание: после load счётчик в PDA снова живой.
+
 ## [1.0.0] — 2026-09-05
 
 **Изменено**

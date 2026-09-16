@@ -10,7 +10,7 @@
 -- CACHE.description only for tasks that still need a live Fetch counter.
 
 local LOG_TAG = "[fix_wtf_fetch_counter]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -84,6 +84,11 @@ local function install()
 		return false
 	end
 
+	if desc.get_description == patched_get_description then
+		installed = true
+		return true
+	end
+
 	orig.get_description = desc.get_description
 	desc.get_description = patched_get_description
 	installed = true
@@ -93,7 +98,7 @@ end
 
 local function uninstall()
 	local desc = desc_table()
-	if desc and orig.get_description then
+	if desc and orig.get_description and desc.get_description == patched_get_description then
 		desc.get_description = orig.get_description
 	end
 	orig = {}
@@ -101,7 +106,12 @@ local function uninstall()
 end
 
 function actor_on_first_update()
-	if not installed then
+	-- MT reload can replace igi_description after on_game_start.
+	local desc = desc_table()
+	local ok = desc and desc.get_description == patched_get_description
+	if not installed or not ok then
+		installed = false
+		orig = {}
 		install()
 	end
 end
