@@ -1,0 +1,112 @@
+-- AOL Sprint HUD Motion Guard
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- R.A.K aol_sprint_cancel calls game.stop_hud_motion() when cancelling
+-- walk2sprint / sprint2walk. If no script HUD motion is active, the engine
+-- logs: player_hud::StopScriptAnim() invalid script_anim_part 255.
+-- Only stop when hud_motion_allowed() is false (a motion is blocking).
+--
+-- Callback stores the function reference at RegisterScriptCallback time,
+-- so we Unregister the original and Register the guard.
+
+local LOG_TAG = "[fix_aol_sprint_hud]"
+local VERSION = "1.0.0"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local orig_movement = nil
+local installed = false
+local callbacks_registered = false
+local skip_count = 0
+local last_log_tg = 0
+local LOG_INTERVAL_MS = 5000
+
+local function log_skip()
+	skip_count = skip_count + 1
+	local now = time_global()
+	if (now - last_log_tg) < LOG_INTERVAL_MS then
+		return
+	end
+	last_log_tg = now
+	printf("%s skip stop_hud_motion (no active hud motion, total=%s)", LOG_TAG, tostring(skip_count))
+end
+
+local function safe_stop_hud_motion()
+	if game and game.hud_motion_allowed and game.hud_motion_allowed() then
+		log_skip()
+		return
+	end
+	game.stop_hud_motion()
+end
+
+function guarded_aol_movement(num)
+	if not orig_movement then
+		return
+	end
+	local prev = game.stop_hud_motion
+	game.stop_hud_motion = safe_stop_hud_motion
+	local ok, err = pcall(orig_movement, num)
+	game.stop_hud_motion = prev
+	if not ok then
+		printf("%s movement handler error: %s", LOG_TAG, tostring(err))
+	end
+end
+
+local function install()
+	if installed then
+		return true
+	end
+	local mod = rawget(_G, "aol_sprint_cancel")
+	if not (mod and type(mod.actor_on_movement_changed) == "function") then
+		printf("%s aol_sprint_cancel.actor_on_movement_changed not found - guard NOT installed", LOG_TAG)
+		return false
+	end
+	if mod.actor_on_movement_changed == guarded_aol_movement then
+		installed = true
+		return true
+	end
+	orig_movement = mod.actor_on_movement_changed
+	UnregisterScriptCallback("actor_on_movement_changed", orig_movement)
+	mod.actor_on_movement_changed = guarded_aol_movement
+	RegisterScriptCallback("actor_on_movement_changed", guarded_aol_movement)
+	installed = true
+	printf("%s wrapped aol_sprint_cancel.actor_on_movement_changed", LOG_TAG)
+	return true
+end
+
+local function uninstall()
+	local mod = rawget(_G, "aol_sprint_cancel")
+	if installed and orig_movement then
+		UnregisterScriptCallback("actor_on_movement_changed", guarded_aol_movement)
+		if mod then
+			mod.actor_on_movement_changed = orig_movement
+		end
+		RegisterScriptCallback("actor_on_movement_changed", orig_movement)
+	end
+	orig_movement = nil
+	installed = false
+end
+
+function actor_on_first_update()
+	if not installed then
+		install()
+	end
+end
+
+function on_game_start()
+	install()
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
+	uninstall()
+	skip_count = 0
+	last_log_tg = 0
+end

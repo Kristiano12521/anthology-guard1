@@ -1,0 +1,62 @@
+-- load-order: replaces HarukaSkillSystem utjan_mag_skill.script when Magazines Redux is absent
+-- Utjan Mag Skill Magazines Guard
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- FULL-FILE OVERRIDE of utjan_mag_skill.script (HarukaSkillSystem).
+-- Original main chunk does magazines.load_magazine at load time.
+-- Without Magazines Redux: SCRIPT ERROR attempt to index global 'magazines' (a nil value).
+-- With Magazines: same wrappers as upstream.
+
+local LOG_TAG = "[fix_utjan_mag_skill]"
+local VERSION = "1.0.0"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+mag_loading_bonus = 0
+mag_unloading_bonus = 0
+
+if not magazines then
+	printf("%s magazines module missing - mag skill wrappers NOT installed", LOG_TAG)
+else
+	base_load_magazine = magazines.load_magazine
+	function magazines.load_magazine(magazine, capacity, delay)
+		local mag_data = magazines.get_mag_data(magazine:id())
+		local prev_loaded = mag_data.loaded
+
+		local newdelay = delay / (1 + haru_skills.skills_stats["magloading"].loadspeed + mag_loading_bonus)
+
+		local bool = base_load_magazine(magazine, capacity, newdelay)
+
+		mag_data = magazines.get_mag_data(magazine:id())
+		if #mag_data.loaded > #prev_loaded and haru_skills.skills_levels["magloading"].experience < get_xp_cap() then
+			haru_skills.increase_skill("magloading", 8 * delay / 400)
+		end
+
+		return bool
+	end
+
+	base_unload_magazine = magazines.unload_magazine
+	function magazines.unload_magazine(magazine, delay)
+		local mag_data = magazines.get_mag_data(magazine:id())
+		local prev_loaded = mag_data.loaded
+
+		local newdelay = delay / (1 + haru_skills.skills_stats["magloading"].loadspeed + mag_unloading_bonus)
+
+		local bool = base_unload_magazine(magazine, newdelay)
+
+		mag_data = magazines.get_mag_data(magazine:id())
+		if #mag_data.loaded < #prev_loaded and haru_skills.skills_levels["magloading"].experience < get_xp_cap() then
+			haru_skills.increase_skill("magloading", 4 * delay / 400)
+		end
+
+		return bool
+	end
+
+	printf("%s magazines wrappers installed", LOG_TAG)
+end
+
+function get_xp_cap()
+	local str_xp = haru_skills.skills_levels["strength"].experience
+	local end_xp = haru_skills.skills_levels["endurance"].experience
+	return math.max(str_xp + end_xp, 751)
+end
