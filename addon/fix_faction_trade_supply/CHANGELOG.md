@@ -1,5 +1,29 @@
 # Faction Trade UI supply_level crash fix
 
+## [1.0.1] — 2026-09-17
+
+**Изменено**
+
+- `fix_faction_trade_supply.script` — если `trader_autoinject.supply_level` вернул `nil`, уровень не показывается (раньше подставлялась «1»).
+
+**Причина**
+
+SUPPLIER/MEDIC/MECHANIC без `buy_supplies` получал ложный уровень 1. Ваниль в этом случае ничего не рисует.
+
+**Не затронуто**
+
+- Защита от concatenate function `supply_level`, вызов `trader_autoinject.supply_level(npc, true)`
+
+**Совместимость**
+
+- Как 1.0.0
+- Сейвы: без изменений
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_faction_trade_supply`
+- в игре: не прогонялось
+
 ## [1.0.0] — 2026-09-03
 
 **Изменено**

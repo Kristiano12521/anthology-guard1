@@ -11,7 +11,7 @@
 -- entry points with the engine pcall and rejects only the broken candidate.
 
 local LOG_TAG = "[fix_wtf_taskboard_guard]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -233,8 +233,61 @@ local function wrap(slot, owner, name, patched)
 	if owner[name] == patched then
 		return true
 	end
-	orig[slot] = orig[slot] or owner[name]
+	orig[slot] = owner[name]
 	owner[name] = patched
+	return true
+end
+
+local function our_wraps_ok()
+	if orig.macro_resolve then
+		if not (type(igi_text_processor) == "table" and type(igi_text_processor.Macro) == "table"
+			and igi_text_processor.Macro.resolve == patched_macro_resolve) then
+			return false
+		end
+	end
+	if orig.try_prepare_quest then
+		if not (type(igi_generic_task) == "table"
+			and igi_generic_task.try_prepare_quest == patched_try_prepare_quest) then
+			return false
+		end
+	end
+	if orig.is_low_condition then
+		if not (type(igi_actions) == "table" and igi_actions.is_low_condition == patched_is_low_condition) then
+			return false
+		end
+	end
+	if orig.set_condition then
+		if not (type(igi_actions) == "table" and igi_actions.set_condition == patched_set_condition) then
+			return false
+		end
+	end
+	if orig.change_faction then
+		if not (type(igi_actions) == "table" and igi_actions.change_faction == patched_change_faction) then
+			return false
+		end
+	end
+	if orig.is_valid_quest then
+		if not (type(igi_task_manager) == "table"
+			and igi_task_manager.is_valid_quest == patched_is_valid_quest) then
+			return false
+		end
+	end
+	if orig.generate_available_tasks then
+		if not (type(axr_task_manager) == "table"
+			and axr_task_manager.generate_available_tasks == patched_generate_available_tasks) then
+			return false
+		end
+	end
+	if orig.refresh_tasks then
+		if not (type(pda_taskboard) == "table" and pda_taskboard.refresh_tasks == patched_refresh_tasks) then
+			return false
+		end
+	end
+	if orig.prepare_task then
+		if not (type(pda_taskboard) == "table" and pda_taskboard.prepare_task == patched_prepare_task) then
+			return false
+		end
+	end
 	return true
 end
 
@@ -347,12 +400,22 @@ function on_game_load()
 	reset_log_cache()
 end
 
+function actor_on_first_update()
+	-- MT reload can replace WTF / Taskboard module tables after on_game_start.
+	if not installed or not our_wraps_ok() then
+		orig = {}
+		installed = false
+		install()
+	end
+end
+
 local callbacks_registered = false
 
 function on_game_start()
 	install()
 	if not callbacks_registered then
 		RegisterScriptCallback("on_game_load", on_game_load)
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 		callbacks_registered = true
 	end
 end
@@ -360,6 +423,7 @@ end
 function on_game_end()
 	if callbacks_registered then
 		UnregisterScriptCallback("on_game_load", on_game_load)
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
 		callbacks_registered = false
 	end
 	uninstall()

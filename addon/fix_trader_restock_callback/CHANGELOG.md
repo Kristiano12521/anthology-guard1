@@ -1,5 +1,29 @@
 # Trader Restock Callback Fix
 
+## [1.0.5] — 2026-09-17
+
+**Изменено**
+
+- `aaa_fix_trader_restock_callback.script` — `install_wrap` сверяет указатель `timed_update` с нашей обёрткой (не ранний выход по `orig_timed`); на `actor_on_first_update` переустанавливает wrap после MT reload. VERSION/meta синхронизированы (раньше script/meta 1.0.3 при CHANGELOG 1.0.4).
+
+**Причина**
+
+После замены `trader_autoinject.timed_update` Send от Campfires снова пропадал. Дрейф версий путал pack/meta.
+
+**Не затронуто**
+
+- declare / `_G.printf` / `callback_add` no-op / probe `make_callback`
+
+**Совместимость**
+
+- Как 1.0.4
+- Сейвы: без изменений
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_trader_restock_callback`
+- в игре: не прогонялось
+
 ## [1.0.4] — 2026-09-01
 
 **Изменено**

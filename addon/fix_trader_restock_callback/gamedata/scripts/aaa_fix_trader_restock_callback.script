@@ -9,7 +9,7 @@
 -- axr_main.callback_add wrap.
 
 local LOG_TAG = "[fix_trader_restock_callback]"
-local VERSION = "1.0.3"
+local VERSION = "1.0.5"
 local CALLBACK = "trader_on_restock"
 
 local declare_result = "pending"
@@ -178,15 +178,16 @@ local function patched_timed_update(npc)
 end
 
 local function install_wrap()
-	if orig_timed then
-		return "already"
-	end
 	if type(trader_autoinject) ~= "table" then
 		return "skipped: no trader_autoinject"
 	end
 	if type(trader_autoinject.timed_update) ~= "function" then
 		return "skipped: no timed_update"
 	end
+	if trader_autoinject.timed_update == patched_timed_update then
+		return "already"
+	end
+	-- MT reload / later patch may replace timed_update; re-capture current.
 	orig_timed = trader_autoinject.timed_update
 	trader_autoinject.timed_update = patched_timed_update
 	return "installed"
@@ -210,16 +211,30 @@ function on_game_start()
 	if type(RegisterScriptCallback) == "function" then
 		RegisterScriptCallback(CALLBACK, on_restock_probe)
 		RegisterScriptCallback("on_game_load", reset_session)
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	end
 
 	wrap_status = install_wrap()
 	printf("%s Send wrap %s", LOG_TAG, wrap_status)
 end
 
+function actor_on_first_update()
+	-- MT reload can replace trader_autoinject.timed_update after on_game_start.
+	if type(trader_autoinject) ~= "table"
+		or trader_autoinject.timed_update ~= patched_timed_update then
+		orig_timed = nil
+		local status = install_wrap()
+		if status ~= "already" then
+			printf("%s Send wrap %s (first_update)", LOG_TAG, status)
+		end
+	end
+end
+
 function on_game_end()
 	if type(UnregisterScriptCallback) == "function" then
 		UnregisterScriptCallback(CALLBACK, on_restock_probe)
 		UnregisterScriptCallback("on_game_load", reset_session)
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	end
 	uninstall_wrap()
 	unwrap_callback_add()

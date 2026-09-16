@@ -1,5 +1,29 @@
 # Фикс миграции типов квестовых тайников
 
+## [1.0.5] — 2026-09-17
+
+**Изменено**
+
+- `fix_quest_stash.script` — `install_status_wrap` больше не выходит рано по `orig_status`; на `actor_on_first_update` переустанавливает wrap, если `drx_sl_quest_item_task_status` уже не наша обёртка (MT reload).
+
+**Причина**
+
+1.0.4 при уже записанном `orig_status` не сверял указатель. После замены таблицы функтора миграция и `accept_legacy_item` снова отваливались. Тот же паттерн, что у `fix_hostage_task_collision` / `fix_wtf_fetch_counter`.
+
+**Не затронуто**
+
+- Логика `stash_type_legacy`, recover при открытом кэше, DLTX секций
+
+**Совместимость**
+
+- Как 1.0.4
+- Сейвы: без изменений
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_quest_stash`
+- в игре: не прогонялось. Ожидание: после load status-функтор снова обёрнут.
+
 ## [1.0.4] — 2026-09-03
 
 **Изменено**

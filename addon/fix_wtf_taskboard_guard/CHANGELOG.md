@@ -1,5 +1,29 @@
 # WTF / PDA Taskboard Macro Guard
 
+## [1.0.3] — 2026-09-17
+
+**Изменено**
+
+- `fix_wtf_taskboard_guard.script` — на `actor_on_first_update` переустанавливает wrap'ы, если любой сохранённый слот уже не наша обёртка (MT reload). `wrap()` всегда перезаписывает `orig[slot]` текущим указателем.
+
+**Причина**
+
+1.0.2 при `installed=true` не сверял указатели. После замены таблиц WTF/PDA guard (pcall / offline object) отваливался. Тот же паттерн, что у `fix_wtf_fetch_counter`.
+
+**Не затронуто**
+
+- Семантика pcall / dup_deep / safe_online_object
+
+**Совместимость**
+
+- Как 1.0.2
+- Сейвы: без изменений
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_wtf_taskboard_guard`
+- в игре: не прогонялось
+
 ## [1.0.2] — 2026-09-01
 
 **Изменено**

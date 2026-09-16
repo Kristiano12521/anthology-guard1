@@ -20,7 +20,7 @@
 -- treasure_manager.get_random_stash не оборачивается.
 
 local LOG_TAG = "[fix_quest_stash]"
-local VERSION = "1.0.4"
+local VERSION = "1.0.5"
 local EVENT_ID = "fix_quest_stash"
 
 printf("%s загружен v%s", LOG_TAG, VERSION)
@@ -463,9 +463,7 @@ local function install_status_wrap()
 	if task_status_functor.drx_sl_quest_item_task_status == patched_status then
 		return true
 	end
-	if orig_status then
-		return true
-	end
+	-- MT reload may replace the functor after our first wrap; always re-capture.
 	orig_status = task_status_functor.drx_sl_quest_item_task_status
 	task_status_functor.drx_sl_quest_item_task_status = patched_status
 	log("v%s status-функтор обёрнут", VERSION)
@@ -509,7 +507,13 @@ local function schedule_repair()
 end
 
 function actor_on_first_update()
-	install_status_wrap()
+	-- MT reload can replace task_status_functor after on_game_start.
+	local ok = task_status_functor
+		and task_status_functor.drx_sl_quest_item_task_status == patched_status
+	if not ok then
+		orig_status = nil
+		install_status_wrap()
+	end
 	schedule_repair()
 end
 
