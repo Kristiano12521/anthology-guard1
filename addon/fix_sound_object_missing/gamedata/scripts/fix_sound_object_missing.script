@@ -8,13 +8,13 @@
 --   aaa_sound_object_patch.script(18) : super
 -- (amb_main via xr_sound.get_safe_sound_object, tb_angry_chimera_growls, etc.).
 --
--- sound_object(path): skip C++ ctor when file absent; return a no-op stub
+-- sound_object(path[, type]): skip C++ ctor when file absent; return a no-op stub
 -- (vanilla callers like sound_ambient assume the ctor always returns an object).
--- xr_sound.get_safe_sound_object: still returns nil when absent.
+-- xr_sound.get_safe_sound_object: same stub (vanilla caches an object, not nil).
 -- Does not restore missing assets.
 
 local LOG_TAG = "[fix_sound_object_missing]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -24,28 +24,65 @@ local proxy_installed = false
 local safe_installed = false
 local callbacks_registered = false
 local missing_logged = {}
+local stub_cache = {}
 local skip_count = 0
 local unique_missing = 0
 
 local function noop()
 end
 
+local function stub_playing()
+	return false
+end
+
+local function stub_length()
+	return 0
+end
+
+local function stub_get_position()
+	return vector():set(0, 0, 0)
+end
+
+local stub_mt = {
+	__index = function()
+		return noop
+	end,
+}
+
 local function make_stub(path)
 	local stub = {
 		my_sound_object_path = path,
 		volume = 0,
+		frequency = 1,
+		min_distance = 1,
+		max_distance = 1,
+		play = noop,
+		play_at_pos = noop,
+		play_no_feedback = noop,
+		stop = noop,
+		stop_deffered = noop,
+		set_position = noop,
+		attach_tail = noop,
+		playing = stub_playing,
+		length = stub_length,
+		get_position = stub_get_position,
 	}
-	stub.play = noop
-	stub.play_at_pos = noop
-	stub.stop = noop
-	stub.set_position = noop
-	stub.playing = function()
-		return false
-	end
-	stub.length = function()
-		return 0
-	end
+	setmetatable(stub, stub_mt)
 	return stub
+end
+
+local function get_stub(path)
+	local key = path
+	if type(path) ~= "string" then
+		key = tostring(path)
+	end
+	local cached = stub_cache[key]
+	if cached then
+		return cached
+	end
+	cached = make_stub(path)
+	stub_cache[key] = cached
+	return cached
 end
 
 local function sound_file_exists(path)
@@ -75,12 +112,12 @@ local function log_missing(path)
 	)
 end
 
-local function make_sound(path)
+local function make_sound(path, ...)
 	if not sound_file_exists(path) then
 		log_missing(path)
-		return make_stub(path)
+		return get_stub(path)
 	end
-	return RealSound(path)
+	return RealSound(path, ...)
 end
 
 local function install_proxy()
@@ -100,8 +137,8 @@ local function install_proxy()
 		__index = function(_, key)
 			return RealSound[key]
 		end,
-		__call = function(_, path)
-			return make_sound(path)
+		__call = function(_, path, ...)
+			return make_sound(path, ...)
 		end,
 	})
 	_G.sound_object = proxy
@@ -113,7 +150,7 @@ end
 local function guarded_get_safe(path)
 	if not sound_file_exists(path) then
 		log_missing(path)
-		return nil
+		return get_stub(path)
 	end
 	return orig_get_safe(path)
 end
@@ -181,6 +218,7 @@ function on_game_end()
 	end
 	uninstall()
 	missing_logged = {}
+	stub_cache = {}
 	skip_count = 0
 	unique_missing = 0
 end

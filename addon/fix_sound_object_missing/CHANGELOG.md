@@ -1,5 +1,31 @@
 # Sound Object Missing Guard
 
+## [1.0.2] - 2026-09-16
+
+**Изменено**
+
+- `gamedata/scripts/fix_sound_object_missing.script` — stub с полным no-op API (`play_no_feedback`, `stop_deffered`, `attach_tail`, `get_position`, `frequency` / `min_distance` / `max_distance` + `__index` на неизвестные методы). `get_safe_sound_object` на missing тоже возвращает stub, не `nil`. Stub кэшируется по path. Второй аргумент конструктора (`s2d`/`s3d`) пробрасывается в реальный ctor.
+
+**Причина**
+
+v1.0.1 закрыл CTD ambient, но `get_safe` + `:play_no_feedback` (как в `xr_effects`) падал бы на missing file: ваниль отдаёт объект, мы отдавали `nil`. Неполный stub и новый table на каждый skip — лишний риск и GC в `sound_ambient` (`playing()` всегда false).
+
+**Не затронуто**
+
+- `aaa_sound_object_patch.script`
+- сами `.ogg` / sound-моды
+- пустые слоты в `sounds=` каналов (корневой конфиг не чистим)
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: совместим, состояние не пишется
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_sound_object_missing`
+- в игре: не подтверждено. Ожидание: нет CTD ambient; нет SCRIPT ERROR на `get_safe`+`play_no_feedback` для missing path; разовые `skip missing sound path=...`.
+
 ## [1.0.1] - 2026-09-16
 
 **Изменено**
