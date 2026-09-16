@@ -275,8 +275,8 @@ local function kx1_recipe()
 			[KX1_FRAME] = 1,
 			["exo_power_supply_tank"] = 1,
 			["exo_power_supply_sprint"] = 1,
-			-- af_aac count = artefact_count on kristiano_kx1_exo_outfit (7 applied modules)
-			["af_aac"] = 7,
+			-- af_aam = прикладной модуль (7 = artefact_count); af_aac контейнер не нужен
+			["af_aam"] = 7,
 			["prt_i_capacitors"] = 40,
 			["prt_i_transistors"] = 40,
 			["prt_i_resistors"] = 40,
@@ -289,7 +289,6 @@ local function kx1_recipe()
 			["prt_o_basic_retardant"] = 15,
 			["prt_o_basic_ballistic"] = 15,
 			["heavy_sewing_thread"] = 2,
-			["af_aam"] = 1,
 			["af_dummy_pellicle"] = 1,
 			["af_electra_flash"] = 1,
 			["af_gold_fish"] = 2,
@@ -406,7 +405,7 @@ local function try_place_flash_stash()
 	local hint = game.translate_string("st_kristiano_kx1_stash_hint")
 	local id, name, desc, stash_hint = treasure_manager.get_random_stash(nil, hint, true)
 	if not id then
-		-- No suitable box yet (level/caches not ready) вАФ retry later, do not burn the flag.
+		-- No suitable box yet (level/caches not ready) Ч retry later, do not burn the flag.
 		log("flash stash: no suitable box yet, will retry")
 		return
 	end

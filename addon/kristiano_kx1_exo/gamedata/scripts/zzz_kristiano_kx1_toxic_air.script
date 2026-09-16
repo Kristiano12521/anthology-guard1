@@ -1,21 +1,30 @@
 -- load-order: после toxic_air
--- KX-1: Toxic Air tanks on exo that is registered as filter-mode gear.
--- Filters work via settings_gear (hud_kx1, filter). Tanks need mode=="tank"
--- in get_active_tank_gear (local) Ч wrap it through tank_in_belt upvalue.
--- Verified: toxic_air.tank_in_belt -> get_active_tank_entry -> get_active_tank_gear;
--- hud_sci tank list already loaded by scientific outfits.
+-- KX-1 Toxic Air dual capability:
+-- LTX keeps mode=filter (hud_kx1) so filters work.
+-- Tanks need mode=tank in get_active_tank_gear / get_active_tank_entry.
+-- Primary: mutate airgear_items[KX1] to tank+hud_sci around tank_in_belt,
+-- keep tank mode while a tank stays on belt, restore filter on tank_out.
+-- Bonus: wrap get_active_tank_gear if upvalue is reachable.
 
 local LOG_TAG = "[kristiano_kx1_toxic_air]"
-local VERSION = "1.0.0"
+local VERSION = "1.1.0"
 local KX1 = "kristiano_kx1_exo_outfit"
 local TANK_HUD = "hud_sci"
+local FILTER_HUD = "hud_kx1"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
-local patched = false
+local items_tbl = nil
+local orig_tank_in_belt = nil
+local orig_tank_out_belt = nil
+local wrapped_tank_in_belt = nil
+local wrapped_tank_out_belt = nil
+local mode_flip_ok = false
+
+local gate_patched = false
 local orig_get_active_tank_gear = nil
-local owner_fn = nil
-local owner_idx = nil
+local gate_owner = nil
+local gate_idx = nil
 
 local function find_upvalue(fn, name)
 	if type(fn) ~= "function" or not (debug and type(debug.getupvalue) == "function") then
@@ -37,7 +46,7 @@ end
 local function find_upvalue_deep(fn, name, depth, seen)
 	depth = depth or 0
 	seen = seen or {}
-	if type(fn) ~= "function" or depth > 6 or seen[fn] then
+	if type(fn) ~= "function" or depth > 8 or seen[fn] then
 		return nil, nil, nil
 	end
 	seen[fn] = true
@@ -47,12 +56,12 @@ local function find_upvalue_deep(fn, name, depth, seen)
 		if not n then
 			break
 		end
-		if n == name and type(v) == "function" then
+		if n == name then
 			return v, i, fn
 		end
 		if type(v) == "function" then
 			local vv, ii, owner = find_upvalue_deep(v, name, depth + 1, seen)
-			if type(vv) == "function" then
+			if ii and owner then
 				return vv, ii, owner
 			end
 		end
@@ -61,68 +70,239 @@ local function find_upvalue_deep(fn, name, depth, seen)
 	return nil, nil, nil
 end
 
+local function wearing_kx1()
+	if not (db and db.actor) then
+		return false
+	end
+	local outfit = db.actor:item_in_slot(7)
+	return outfit and outfit:section() == KX1
+end
+
+local function tank_on_belt(tank)
+	if not (tank and db and db.actor) then
+		return false
+	end
+	local id = tank:id()
+	local found = false
+	db.actor:iterate_belt(function(owner, item)
+		if (not found) and item and item:id() == id then
+			found = true
+		end
+	end)
+	return found
+end
+
+local function resolve_airgear_items()
+	if type(items_tbl) == "table" then
+		return items_tbl
+	end
+	if not (toxic_air and type(toxic_air.available_equipment) == "function") then
+		return nil
+	end
+	local isa = select(1, find_upvalue(toxic_air.available_equipment, "is_supported_airgear"))
+	if type(isa) ~= "function" then
+		isa = select(1, find_upvalue_deep(toxic_air.available_equipment, "is_supported_airgear"))
+	end
+	if type(isa) == "function" then
+		local tbl = select(1, find_upvalue(isa, "airgear_items"))
+		if type(tbl) == "table" then
+			items_tbl = tbl
+			return items_tbl
+		end
+	end
+	local tbl2 = select(1, find_upvalue_deep(toxic_air.available_equipment, "airgear_items"))
+	if type(tbl2) == "table" then
+		items_tbl = tbl2
+	end
+	return items_tbl
+end
+
+local function ensure_kx1_def(items)
+	if type(items) ~= "table" then
+		return nil
+	end
+	if type(items[KX1]) ~= "table" then
+		items[KX1] = { hud = FILTER_HUD, mode = "filter", respi = true }
+	end
+	return items[KX1]
+end
+
+local function set_kx1_tank_mode()
+	local def = ensure_kx1_def(resolve_airgear_items())
+	if not def then
+		return nil
+	end
+	def.mode = "tank"
+	def.hud = TANK_HUD
+	return def
+end
+
+local function set_kx1_filter_mode()
+	local def = ensure_kx1_def(resolve_airgear_items())
+	if not def then
+		return nil
+	end
+	def.mode = "filter"
+	def.hud = FILTER_HUD
+	return def
+end
+
 local function wrapped_get_active_tank_gear()
 	local gear, def = orig_get_active_tank_gear()
 	if gear then
 		return gear, def
 	end
-	if not (db and db.actor) then
+	if not wearing_kx1() then
 		return nil, nil
 	end
-	local outfit = db.actor:item_in_slot(7)
-	if outfit and outfit:section() == KX1 then
-		-- Same shape as toxic_air airgear_items entries; hud_sci lists all tanks.
-		return outfit, { hud = TANK_HUD, mode = "tank", respi = true }
-	end
-	return nil, nil
+	return db.actor:item_in_slot(7), { hud = TANK_HUD, mode = "tank", respi = true }
 end
 
-local function install_tank_gate()
-	if patched then
+local function install_get_active_tank_gear_gate()
+	if gate_patched then
+		return true
+	end
+	if not (toxic_air and debug and type(debug.setupvalue) == "function") then
+		return false
+	end
+	local roots = {
+		toxic_air.tank_in_belt,
+		toxic_air.tank_out_belt,
+		toxic_air.available_equipment,
+	}
+	for i = 1, #roots do
+		local fn, idx, owner = find_upvalue_deep(roots[i], "get_active_tank_gear")
+		if type(fn) == "function" and idx and type(owner) == "function" then
+			orig_get_active_tank_gear = fn
+			gate_owner = owner
+			gate_idx = idx
+			debug.setupvalue(owner, idx, wrapped_get_active_tank_gear)
+			gate_patched = true
+			printf("%s tank gate OK (get_active_tank_gear)", LOG_TAG)
+			return true
+		end
+	end
+	return false
+end
+
+local function install_mode_flip()
+	if mode_flip_ok then
 		return true
 	end
 	if not (toxic_air and type(toxic_air.tank_in_belt) == "function") then
-		printf("%s WARN: toxic_air.tank_in_belt missing - tank gate skipped", LOG_TAG)
+		printf("%s WARN: toxic_air.tank_in_belt missing", LOG_TAG)
 		return false
 	end
-	if not (debug and type(debug.setupvalue) == "function") then
-		printf("%s WARN: debug.setupvalue missing - tank gate skipped", LOG_TAG)
+	if not resolve_airgear_items() then
+		printf("%s WARN: airgear_items not found", LOG_TAG)
 		return false
+	end
+	ensure_kx1_def(items_tbl)
+
+	orig_tank_in_belt = toxic_air.tank_in_belt
+	orig_tank_out_belt = toxic_air.tank_out_belt
+
+	wrapped_tank_in_belt = function(tank)
+		local flipped = false
+		if wearing_kx1() then
+			set_kx1_tank_mode()
+			flipped = true
+		end
+		orig_tank_in_belt(tank)
+		if flipped then
+			if tank and tank_on_belt(tank) then
+				set_kx1_tank_mode()
+			else
+				set_kx1_filter_mode()
+			end
+		end
 	end
 
-	local fn, idx, owner = find_upvalue_deep(toxic_air.tank_in_belt, "get_active_tank_gear")
-	if type(fn) ~= "function" or not idx or type(owner) ~= "function" then
-		printf("%s WARN: get_active_tank_gear upvalue not found - tank gate skipped", LOG_TAG)
-		return false
+	wrapped_tank_out_belt = function(tank)
+		if type(orig_tank_out_belt) == "function" then
+			orig_tank_out_belt(tank)
+		end
+		if wearing_kx1() then
+			set_kx1_filter_mode()
+		end
 	end
 
-	orig_get_active_tank_gear = fn
-	owner_fn = owner
-	owner_idx = idx
-	debug.setupvalue(owner, idx, wrapped_get_active_tank_gear)
-	patched = true
-	printf("%s tank gate installed (KX-1 uses %s tanks)", LOG_TAG, TANK_HUD)
+	UnregisterScriptCallback("actor_item_to_belt", orig_tank_in_belt)
+	toxic_air.tank_in_belt = wrapped_tank_in_belt
+	RegisterScriptCallback("actor_item_to_belt", wrapped_tank_in_belt)
+
+	if type(orig_tank_out_belt) == "function" then
+		UnregisterScriptCallback("actor_item_to_ruck", orig_tank_out_belt)
+		UnregisterScriptCallback("actor_on_item_drop", orig_tank_out_belt)
+		toxic_air.tank_out_belt = wrapped_tank_out_belt
+		RegisterScriptCallback("actor_item_to_ruck", wrapped_tank_out_belt)
+		RegisterScriptCallback("actor_on_item_drop", wrapped_tank_out_belt)
+	end
+
+	mode_flip_ok = true
+	printf("%s tank mode-flip OK (filter default, tank while belt)", LOG_TAG)
 	return true
 end
 
-local function uninstall_tank_gate()
-	if patched and owner_fn and owner_idx and orig_get_active_tank_gear and debug and type(debug.setupvalue) == "function" then
-		debug.setupvalue(owner_fn, owner_idx, orig_get_active_tank_gear)
+local function sync_mode_from_belt()
+	if not (mode_flip_ok and wearing_kx1() and db and db.actor) then
+		return
 	end
-	patched = false
-	orig_get_active_tank_gear = nil
-	owner_fn = nil
-	owner_idx = nil
+	local has_tank = false
+	db.actor:iterate_belt(function(owner, item)
+		if has_tank or not item then
+			return
+		end
+		local sec = item:section()
+		if sec and string.find(sec, "oxygen_tank", 1, true) then
+			has_tank = true
+		end
+	end)
+	if has_tank then
+		set_kx1_tank_mode()
+	else
+		set_kx1_filter_mode()
+	end
+end
+
+local function install()
+	local gate = install_get_active_tank_gear_gate()
+	local flip = install_mode_flip()
+	if flip then
+		sync_mode_from_belt()
+	end
+	return gate or flip
 end
 
 function on_game_start()
-	-- toxic_air registers callbacks in its on_game_start; we load after it.
-	if not install_tank_gate() then
-		RegisterScriptCallback("actor_on_first_update", install_tank_gate)
+	if not install() then
+		RegisterScriptCallback("actor_on_first_update", install)
+	else
+		RegisterScriptCallback("actor_on_first_update", sync_mode_from_belt)
 	end
 end
 
 function on_game_end()
-	UnregisterScriptCallback("actor_on_first_update", install_tank_gate)
-	uninstall_tank_gate()
+	UnregisterScriptCallback("actor_on_first_update", install)
+	UnregisterScriptCallback("actor_on_first_update", sync_mode_from_belt)
+
+	if gate_patched and gate_owner and gate_idx and orig_get_active_tank_gear and debug and type(debug.setupvalue) == "function" then
+		debug.setupvalue(gate_owner, gate_idx, orig_get_active_tank_gear)
+	end
+	gate_patched = false
+
+	if mode_flip_ok and orig_tank_in_belt then
+		UnregisterScriptCallback("actor_item_to_belt", wrapped_tank_in_belt)
+		toxic_air.tank_in_belt = orig_tank_in_belt
+		RegisterScriptCallback("actor_item_to_belt", orig_tank_in_belt)
+		if orig_tank_out_belt and wrapped_tank_out_belt then
+			UnregisterScriptCallback("actor_item_to_ruck", wrapped_tank_out_belt)
+			UnregisterScriptCallback("actor_on_item_drop", wrapped_tank_out_belt)
+			toxic_air.tank_out_belt = orig_tank_out_belt
+			RegisterScriptCallback("actor_item_to_ruck", orig_tank_out_belt)
+			RegisterScriptCallback("actor_on_item_drop", orig_tank_out_belt)
+		end
+		set_kx1_filter_mode()
+	end
+	mode_flip_ok = false
 end
