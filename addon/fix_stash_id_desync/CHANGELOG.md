@@ -1,5 +1,29 @@
 # Stash ID Desync Fix
 
+## [1.0.3] — 2026-09-17
+
+**Изменено**
+
+- `fix_stash_id_desync.script` — `install()` больше не выходит рано по `orig_release`; на `actor_on_first_update` переустанавливает wrap, если `release_stash_by_id` уже не наша обёртка (MT reload).
+
+**Причина**
+
+1.0.2 при уже записанном `orig_release` не сверял указатель. После замены таблицы `treasure_manager` гард `caches[id]==false` снова отваливался. Тот же паттерн, что у `fix_quest_stash` 1.0.5.
+
+**Не затронуто**
+
+- `session_live`, typ-first `se_invbox`, отложенный repair, список SPOTS
+
+**Совместимость**
+
+- Как 1.0.2
+- Сейвы: без изменений
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_stash_id_desync`
+- в игре: не прогонялось
+
 ## [1.0.2] — 2026-08-30
 
 **Изменено**

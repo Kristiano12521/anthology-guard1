@@ -25,7 +25,7 @@
 **Проверено**
 
 - lint: `python tools/lint_addon.py fix_kupol_wrong_bone` — LUA-008 нет
-- VERIFY-001: в игре не прогонялось. `verified_*` не ставились.
+- В игре: 2026-08-31, Anthology 2.1 / Modded Exes MT 10063 — `loaded v1.0.2 target=cit_physic_object_0014 level=az_radar` (см. `verified_*` в `meta.ini`).
 
 ## [1.0.1] — 2026-08-30
 

@@ -19,7 +19,7 @@
 -- One delayed repair: drop desynced cache ids, then scan leftover spots.
 
 local LOG_TAG = "[fix_stash_id_desync]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 local EVENT_ID = "fix_stash_id_desync"
 local REPAIR_ACTION = "repair"
 local REPAIR_DELAY = 1.0
@@ -239,9 +239,7 @@ local function install()
 	if treasure_manager.release_stash_by_id == patched_release_stash_by_id then
 		return true
 	end
-	if orig_release then
-		return true
-	end
+	-- MT reload may replace treasure_manager after our first wrap; always re-capture.
 	orig_release = treasure_manager.release_stash_by_id
 	treasure_manager.release_stash_by_id = patched_release_stash_by_id
 	log("v%s release_stash_by_id wrapped", VERSION)
@@ -348,7 +346,13 @@ end
 
 function actor_on_first_update()
 	mark_session_live()
-	install()
+	-- MT reload can replace treasure_manager after on_game_start.
+	local ok = treasure_manager
+		and treasure_manager.release_stash_by_id == patched_release_stash_by_id
+	if not ok then
+		orig_release = nil
+		install()
+	end
 	schedule_repair()
 end
 
