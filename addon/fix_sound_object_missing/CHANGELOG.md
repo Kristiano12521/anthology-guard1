@@ -1,5 +1,35 @@
 # Sound Object Missing Guard
 
+## [1.0.1] - 2026-09-16
+
+**Изменено**
+
+- `gamedata/scripts/fix_sound_object_missing.script` - при отсутствии `.ogg` proxy `sound_object(path)` возвращает no-op stub (`play` / `play_at_pos` / `stop` / `playing` / `volume`), а не `nil`. `xr_sound.get_safe_sound_object` по-прежнему возвращает `nil`. Счётчики в логе через `%s` (printf сборки не подставлял `%d`).
+
+**Причина**
+
+v1.0.0 возвращал `nil` из конструктора. Ванильный `sound_ambient.script:146` делает `ch.snd:play_at_pos` без проверки ? CTD (`attempt to index field 'snd'`). В логе перед падением: `skip missing sound path=` (пустой слот в канале).
+
+**Как исправлено**
+
+Конструктор снова всегда даёт объект; тихий stub вместо C++ `super` на битый путь. Safe-API без изменений.
+
+**Не затронуто**
+
+- `aaa_sound_object_patch.script`, кэш `soundCache`
+- сами `.ogg` / sound-моды
+- `get_safe_sound_object` (nil при отсутствии файла)
+
+**Совместимость**
+
+- Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
+- Сейвы: совместим, состояние не пишется
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_sound_object_missing`
+- в игре: не подтверждено. Ожидание: нет CTD в `sound_ambient` на missing/empty path; в логе разовые `skip missing sound path=...` с числами unique/total.
+
 ## [1.0.0] - 2026-09-15
 
 **Изменено**

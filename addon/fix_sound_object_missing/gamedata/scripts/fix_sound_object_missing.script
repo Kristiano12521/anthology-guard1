@@ -7,11 +7,14 @@
 --   File not found ...
 --   aaa_sound_object_patch.script(18) : super
 -- (amb_main via xr_sound.get_safe_sound_object, tb_angry_chimera_growls, etc.).
--- Spam stub only: skip constructor when the file is absent; return nil.
+--
+-- sound_object(path): skip C++ ctor when file absent; return a no-op stub
+-- (vanilla callers like sound_ambient assume the ctor always returns an object).
+-- xr_sound.get_safe_sound_object: still returns nil when absent.
 -- Does not restore missing assets.
 
 local LOG_TAG = "[fix_sound_object_missing]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -23,6 +26,27 @@ local callbacks_registered = false
 local missing_logged = {}
 local skip_count = 0
 local unique_missing = 0
+
+local function noop()
+end
+
+local function make_stub(path)
+	local stub = {
+		my_sound_object_path = path,
+		volume = 0,
+	}
+	stub.play = noop
+	stub.play_at_pos = noop
+	stub.stop = noop
+	stub.set_position = noop
+	stub.playing = function()
+		return false
+	end
+	stub.length = function()
+		return 0
+	end
+	return stub
+end
 
 local function sound_file_exists(path)
 	if type(path) ~= "string" or path == "" then
@@ -43,18 +67,18 @@ local function log_missing(path)
 	missing_logged[path] = true
 	unique_missing = unique_missing + 1
 	printf(
-		"%s skip missing sound path=%s (unique=%d total_skips=%d)",
+		"%s skip missing sound path=%s (unique=%s total_skips=%s)",
 		LOG_TAG,
 		tostring(path),
-		unique_missing,
-		skip_count
+		tostring(unique_missing),
+		tostring(skip_count)
 	)
 end
 
 local function make_sound(path)
 	if not sound_file_exists(path) then
 		log_missing(path)
-		return nil
+		return make_stub(path)
 	end
 	return RealSound(path)
 end
