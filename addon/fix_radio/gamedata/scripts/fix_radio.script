@@ -17,7 +17,7 @@
 --    No on_use. This gates play_sound, accepts any hit, toggles on use.
 
 local LOG_TAG = "[fix_radio]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 local TIP_ID = "st_fix_radio_use"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -367,6 +367,17 @@ function patched_idle_update(self, delta)
 	end
 end
 
+-- ph_sound only fetches a track when st.sound_set is true. After we stop
+-- played_sound (use off / zone off), sound_set stays false and update never
+-- re-arms. Arm again whenever the radio becomes allowed to play.
+local function arm_ph_sound(self)
+	if not self.st then
+		return
+	end
+	self.st.sound_set = true
+	self.st.pause_time = 0
+end
+
 function patched_snd_hit(self, obj, amount, local_direction, who, bone_index)
 	if is_device_radio(self.object) then
 		if self.played_sound then
@@ -389,9 +400,13 @@ function patched_snd_use(self, obj, actor)
 		return
 	end
 	self.destructed = not self.destructed
-	if self.destructed and self.played_sound then
-		self.played_sound:stop()
-		self.played_sound = nil
+	if self.destructed then
+		if self.played_sound then
+			self.played_sound:stop()
+			self.played_sound = nil
+		end
+	else
+		arm_ph_sound(self)
 	end
 end
 
@@ -404,7 +419,22 @@ function patched_snd_update(self, delta)
 			self.played_sound:stop()
 			self.played_sound = nil
 		end
+		self._fix_radio_zone_blocked = true
 		return
+	end
+	if self._fix_radio_zone_blocked then
+		self._fix_radio_zone_blocked = false
+		if not self.destructed then
+			arm_ph_sound(self)
+		end
+	elseif is_device_radio(self.object)
+		and not self.destructed
+		and self.played_sound == nil
+		and self.st
+		and self.st.sound_set == false
+	then
+		-- Already stuck (old save / prior use) before this fix.
+		arm_ph_sound(self)
 	end
 	if orig.snd_update then
 		return orig.snd_update(self, delta)
