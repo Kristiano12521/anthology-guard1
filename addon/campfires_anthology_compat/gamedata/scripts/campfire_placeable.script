@@ -1,6 +1,9 @@
 local LOG_TAG = "[campfires_anthology_compat]"
-local VERSION = "1.1.0"
+local VERSION = "1.1.1"
 printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local orig_trader_update = nil
+local wraps_ok, install_trader_wrap, uninstall_trader_wrap
 
 local ray_pos = {}
 --local se_campfires = {}
@@ -35,8 +38,14 @@ function load_state(m_data)
 end
 
 function actor_on_first_update()
+	-- MT reload can replace trader_autoinject after on_game_start.
+	if not wraps_ok() then
+		orig_trader_update = nil
+		install_trader_wrap()
+	end
+
 	if campfire_placeable_mcm.get_config("delete_items") then
-		-- alife-scan: çàïàñíîé ïóòü, MCM delete_items
+		-- alife-scan: ˜˜˜˜˜˜˜˜ ˜˜˜˜, MCM delete_items
 		for i = 1, 65534 do
 			local se_obj = alife_object(i)
 			if se_obj and (se_obj:section_name() == "itm_campfire" or se_obj:section_name() == "ph_campfiremod" or se_anoms[se_obj.id]) then
@@ -57,7 +66,7 @@ function actor_on_first_update()
 		if (prev_level.level_name ~= curr_level) and (campfire_placeable_mcm.get_config("transition_delete_items")) then
 			printf(".level_name is not equal curr_level")
 			-- del
-			-- alife-scan: çàïàñíîé ïóòü, level change cleanup
+			-- alife-scan: ˜˜˜˜˜˜˜˜ ˜˜˜˜, level change cleanup
 			for i = 1, 65534 do
 				local se_obj = alife_object(i)
 				if se_obj and (se_obj:section_name() == "ph_campfiremod" or se_anoms[se_obj.id]) then
@@ -416,11 +425,38 @@ function campfires_stock(npc)
 
 end
 
-TraderAuto = trader_autoinject.update
+local function patched_trader_update(npc)
+	if orig_trader_update then
+		orig_trader_update(npc)
+	end
+	campfires_stock(npc)
+end
 
-function trader_autoinject.update(npc)
-    TraderAuto(npc)
-    campfires_stock(npc)
+wraps_ok = function()
+	return type(trader_autoinject) == "table"
+		and trader_autoinject.update == patched_trader_update
+end
+
+install_trader_wrap = function()
+	if not (type(trader_autoinject) == "table" and type(trader_autoinject.update) == "function") then
+		printf("%s trader_autoinject.update not found - stock wrap NOT installed", LOG_TAG)
+		return false
+	end
+	if wraps_ok() then
+		return true
+	end
+	-- MT reload may replace trader_autoinject after our first wrap; always re-capture.
+	orig_trader_update = trader_autoinject.update
+	trader_autoinject.update = patched_trader_update
+	printf("%s trader_autoinject.update wrapped v%s", LOG_TAG, VERSION)
+	return true
+end
+
+uninstall_trader_wrap = function()
+	if orig_trader_update and wraps_ok() then
+		trader_autoinject.update = orig_trader_update
+	end
+	orig_trader_update = nil
 end
 
 ------------------------------------------------------------
@@ -430,9 +466,11 @@ function on_game_end()
 	UnregisterScriptCallback("load_state", load_state)
 	UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	UnregisterScriptCallback("actor_on_item_use", actor_on_item_use)
+	uninstall_trader_wrap()
 end
 
 function on_game_start()
+	install_trader_wrap()
 	RegisterScriptCallback("save_state", save_state)
 	RegisterScriptCallback("load_state", load_state)
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)

@@ -1,5 +1,24 @@
 # Campfires Anthology Compat
 
+## [1.1.1] — 2026-09-17
+
+**Изменено**
+
+- `campfire_placeable.script` — `wraps_ok` для `trader_autoinject.update`; на `actor_on_first_update` переустанавливает wrap, если модуль уже не наш; always re-capture; uninstall только если указатель ещё наш.
+
+**Причина**
+
+1.1.0 ставил wrap при загрузке скрипта через глобальный `TraderAuto`. После MT reload сток дров у торговцев мог пропасть.
+
+**Не затронуто**
+
+- DLTX `ph_campfiremod`, механика костров, сейвы
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py campfires_anthology_compat`
+- в игре: не прогонялось
+
 ## [1.1.0] — 2026-09-03
 
 **Изменено**
