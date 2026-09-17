@@ -1,5 +1,24 @@
 # Tosox vanish-fail на общем DRX stash-слоте
 
+## [1.3.1] — 2026-09-17
+
+**Изменено**
+
+- `fix_quest_item_shared_fail.script` — убран early-return по `orig_status`; `wraps_ok` / always re-capture; на `actor_on_first_update` переустанавливает wrap, если functor уже не наш.
+
+**Причина**
+
+1.3.0 при записанном `orig_status` не сверял указатель. После MT reload Tosox vanish-fail соседа снова проходил без rearm.
+
+**Не затронуто**
+
+- Rearm через `get_random_stash`, late install 0.5s
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_quest_item_shared_fail`
+- в игре: не прогонялось
+
 ## [1.3.0] — 2026-09-14
 
 **Изменено**

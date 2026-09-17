@@ -1,4 +1,4 @@
--- load-order: после dynamic_npc_armor_visuals.script
+-- load-order: after dynamic_npc_armor_visuals.script
 -- Dynamic Armor Visuals Nil Guard
 -- Anomaly 1.5.3 / Anthology 2.1
 --
@@ -8,9 +8,11 @@
 -- without a nil check -> LUA error at line 166.
 -- Unlike fix_minigun_dead_parent, this is plain nil indexing, not engine member
 -- access on destroyed userdata: item == nil before calling original is enough.
+--
+-- v1.0.3: re-wrap on actor_on_first_update if MT reload replaced the module.
 
 local LOG_TAG = "[fix_dynamic_armor_visuals_nil]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 local CALLBACK = "ActorMenu_on_item_after_move"
 local LOG_INTERVAL_MS = 1000
 
@@ -18,6 +20,7 @@ printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local orig_fn = nil
 local installed = false
+local callbacks_registered = false
 local skip_count = 0
 local last_log_tg = 0
 
@@ -44,6 +47,11 @@ function guarded_actor_on_item_take_from_box(npc_id, item, ...)
 	return orig_fn(npc_id, item, ...)
 end
 
+local function wraps_ok()
+	local mod = rawget(_G, "dynamic_npc_armor_visuals")
+	return mod and mod.actor_on_item_take_from_box == guarded_actor_on_item_take_from_box
+end
+
 local function steal_callback(name, old_fn, new_fn)
 	if type(UnregisterScriptCallback) == "function" and type(old_fn) == "function" and old_fn ~= new_fn then
 		UnregisterScriptCallback(name, old_fn)
@@ -56,7 +64,7 @@ local function steal_callback(name, old_fn, new_fn)
 end
 
 local function install()
-	if installed then
+	if installed and wraps_ok() then
 		return true
 	end
 
@@ -91,18 +99,20 @@ end
 
 local function uninstall()
 	local mod = rawget(_G, "dynamic_npc_armor_visuals")
-	if not installed or not orig_fn then
+	if not installed then
 		return
 	end
 
 	if type(UnregisterScriptCallback) == "function" then
 		UnregisterScriptCallback(CALLBACK, guarded_actor_on_item_take_from_box)
 	end
-	if type(RegisterScriptCallback) == "function" then
-		RegisterScriptCallback(CALLBACK, orig_fn)
-	end
-	if mod then
-		mod.actor_on_item_take_from_box = orig_fn
+	if orig_fn and wraps_ok() then
+		if type(RegisterScriptCallback) == "function" then
+			RegisterScriptCallback(CALLBACK, orig_fn)
+		end
+		if mod then
+			mod.actor_on_item_take_from_box = orig_fn
+		end
 	end
 
 	installed = false
@@ -110,18 +120,26 @@ local function uninstall()
 end
 
 function actor_on_first_update()
-	if not installed then
+	-- MT reload can replace dynamic_npc_armor_visuals after on_game_start.
+	if not installed or not wraps_ok() then
+		installed = false
+		orig_fn = nil
 		install()
 	end
 end
 
 function on_game_start()
-	-- Top-level install if dynamic_npc_armor_visuals already ran; retry on first update if not.
 	install()
-	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
 end
 
 function on_game_end()
-	UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
 	uninstall()
 end

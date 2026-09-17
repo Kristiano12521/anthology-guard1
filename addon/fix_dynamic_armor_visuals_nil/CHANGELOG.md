@@ -1,5 +1,24 @@
 # Dynamic Armor Visuals Nil Guard
 
+## [1.0.3] — 2026-09-17
+
+**Изменено**
+
+- `fix_dynamic_armor_visuals_nil.script` — `wraps_ok`; на `actor_on_first_update` переустанавливает wrap после MT reload; safe uninstall; `callbacks_registered`.
+
+**Причина**
+
+1.0.2 при `installed=true` не сверял указатели. После замены модуля снова `item:id()` на :166.
+
+**Не затронуто**
+
+- Отсев `item == nil`, steal callback
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_dynamic_armor_visuals_nil`
+- в игре: не прогонялось
+
 ## [1.0.2] — 2026-09-16
 
 **Изменено**

@@ -1,5 +1,24 @@
 # Smart Terrain STATE_Write Nil Guard
 
+## [1.0.2] — 2026-09-17
+
+**Изменено**
+
+- `fix_smart_terrain_state_write.script` — `wraps_ok` до early-return; на `actor_on_first_update` переустанавливает wrap STATE_Write/Read после MT reload; `callbacks_registered`.
+
+**Причина**
+
+1.0.1 делал `if installed then return` до сверки указателей. После reload класса снова `table.size(nil)` на :971.
+
+**Не затронуто**
+
+- Heal `npc_info` / `arriving_npc` / `already_spawned`
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_smart_terrain_state_write`
+- в игре: не прогонялось
+
 ## [1.0.1] — 2026-09-16
 
 **Изменено**

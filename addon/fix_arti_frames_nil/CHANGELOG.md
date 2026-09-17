@@ -1,5 +1,24 @@
 # Arti Frames Nil Guard
 
+## [1.0.2] — 2026-09-17
+
+**Изменено**
+
+- `fix_arti_frames_nil.script` — `wraps_ok` (current==guarded); на `actor_on_first_update` переустанавливает wrap, если модуль уже не наш; uninstall только если указатель ещё наш; `callbacks_registered`.
+
+**Причина**
+
+1.0.1 при `installed=true` не сверял указатели. После MT reload снова возможен FATAL `obj:id()` на Move_All.
+
+**Не затронуто**
+
+- Отсев `obj == nil`, steal callback
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_arti_frames_nil`
+- в игре: не прогонялось
+
 ## [1.0.1] — 2026-09-16
 
 **Изменено**

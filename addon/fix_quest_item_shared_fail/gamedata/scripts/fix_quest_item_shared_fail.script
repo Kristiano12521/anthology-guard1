@@ -5,9 +5,11 @@
 -- turn-in (shared drx_sl_quest_item_N). Instead of fail, rearm with a new
 -- stash (get_random_stash) and leave stage=0. Dual turn-in markers with one
 -- PDA are acceptable - turn in one, second quest gets a fresh stash.
+--
+-- v1.3.1: re-wrap status functor if MT reload replaced task_status_functor.
 
 local LOG_TAG = "[fix_quest_item_shared_fail]"
-local VERSION = "1.3.0"
+local VERSION = "1.3.1"
 local EVENT_ID = "fix_quest_item_shared_fail"
 local INSTALL_ACTION = "install_late"
 local INSTALL_DELAY = 0.5
@@ -151,17 +153,20 @@ function patched_status(tsk, task_id)
 	return result
 end
 
+local function wraps_ok()
+	return task_status_functor
+		and task_status_functor.drx_sl_quest_item_task_status == patched_status
+end
+
 local function install()
 	if not task_status_functor or type(task_status_functor.drx_sl_quest_item_task_status) ~= "function" then
 		printf("%s task_status_functor.drx_sl_quest_item_task_status not found - guard NOT installed", LOG_TAG)
 		return false
 	end
-	if orig_status then
+	if wraps_ok() then
 		return true
 	end
-	if task_status_functor.drx_sl_quest_item_task_status == patched_status then
-		return true
-	end
+	-- MT reload may replace the functor after our first wrap; always re-capture.
 	orig_status = task_status_functor.drx_sl_quest_item_task_status
 	task_status_functor.drx_sl_quest_item_task_status = patched_status
 	log("v%s status wrapped", VERSION)
@@ -169,7 +174,7 @@ local function install()
 end
 
 local function uninstall()
-	if orig_status and task_status_functor and task_status_functor.drx_sl_quest_item_task_status == patched_status then
+	if orig_status and wraps_ok() then
 		task_status_functor.drx_sl_quest_item_task_status = orig_status
 	end
 	orig_status = nil
@@ -190,7 +195,11 @@ local function schedule_late_install()
 end
 
 function actor_on_first_update()
-	install()
+	-- MT reload can replace task_status_functor after on_game_start.
+	if not wraps_ok() then
+		orig_status = nil
+		install()
+	end
 end
 
 function on_game_start()

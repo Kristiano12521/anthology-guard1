@@ -1,5 +1,24 @@
 # QAW Ammo Active Item Nil Guard
 
+## [1.0.2] — 2026-09-17
+
+**Изменено**
+
+- `zzz_fix_qaw_ammo_nil.script` — `wraps_ok` по `QAmmoWheelOption.LoadInActiveWeapon`; retry на `actor_on_first_update` после MT reload; `callbacks_registered`.
+
+**Причина**
+
+1.0.1 при `installed=true` не сверял классы. После reload QAW снова FATAL :1426.
+
+**Не затронуто**
+
+- Отсев `active_item() == nil`; `CanLoadInActiveWeapon`
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_qaw_ammo_nil`
+- в игре: не прогонялось
+
 ## [1.0.1] — 2026-09-16
 
 **Изменено**
