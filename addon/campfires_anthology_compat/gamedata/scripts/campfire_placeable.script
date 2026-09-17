@@ -1,9 +1,10 @@
 local LOG_TAG = "[campfires_anthology_compat]"
-local VERSION = "1.1.1"
+local VERSION = "1.1.2"
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local orig_trader_update = nil
 local wraps_ok, install_trader_wrap, uninstall_trader_wrap
+local MAX_ALIFE_ID = 65534
 
 local ray_pos = {}
 --local se_campfires = {}
@@ -37,6 +38,74 @@ function load_state(m_data)
 	prev_level = m_data.prev_level or {}
 end
 
+local function campfire_section_name(se_obj)
+	if not se_obj then
+		return nil
+	end
+	local ok, name = pcall(function()
+		return se_obj:section_name()
+	end)
+	if ok then
+		return name
+	end
+	return nil
+end
+
+-- Collect then release: do not alife_release inside sim:iterate_objects.
+local function release_tracked_campfires(mode)
+	local want_items = mode == "all"
+	local to_release = {}
+	local queued = {}
+
+	local function queue(se_obj)
+		if not se_obj or queued[se_obj.id] then
+			return
+		end
+		queued[se_obj.id] = true
+		to_release[#to_release + 1] = se_obj
+	end
+
+	for id, _ in pairs(se_anoms) do
+		queue(alife_object(id))
+	end
+
+	local function visit(se_obj)
+		if not se_obj or queued[se_obj.id] then
+			return
+		end
+		local sec = campfire_section_name(se_obj)
+		if sec == "ph_campfiremod" or (want_items and sec == "itm_campfire") then
+			queue(se_obj)
+		end
+	end
+
+	local sim = alife()
+	local scanned = false
+	if sim and type(sim.iterate_objects) == "function" then
+		local ok = pcall(function()
+			sim:iterate_objects(function(se_obj)
+				visit(se_obj)
+			end)
+		end)
+		scanned = ok and true or false
+	end
+
+	if not scanned then
+		-- alife-scan: запасной путь, основной sim:iterate_objects, если метода нет или pcall упал; docs/pitfalls.md §16
+		for id = 1, MAX_ALIFE_ID do
+			visit(alife_object(id))
+		end
+	end
+
+	for i = 1, #to_release do
+		local se_obj = to_release[i]
+		if mode == "transition" then
+			printf("- Object deleted (id): %s", tostring(se_obj.id))
+		end
+		alife_release(se_obj)
+	end
+end
+
 function actor_on_first_update()
 	-- MT reload can replace trader_autoinject after on_game_start.
 	if not wraps_ok() then
@@ -45,13 +114,7 @@ function actor_on_first_update()
 	end
 
 	if campfire_placeable_mcm.get_config("delete_items") then
-		-- alife-scan:  , MCM delete_items
-		for i = 1, 65534 do
-			local se_obj = alife_object(i)
-			if se_obj and (se_obj:section_name() == "itm_campfire" or se_obj:section_name() == "ph_campfiremod" or se_anoms[se_obj.id]) then
-				alife_release(se_obj)
-			end
-		end
+		release_tracked_campfires("all")
 --		se_campfires = {}
 		se_anoms = {}
 	end
@@ -65,15 +128,7 @@ function actor_on_first_update()
 		printf("tbl is not empty")
 		if (prev_level.level_name ~= curr_level) and (campfire_placeable_mcm.get_config("transition_delete_items")) then
 			printf(".level_name is not equal curr_level")
-			-- del
-			-- alife-scan:  , level change cleanup
-			for i = 1, 65534 do
-				local se_obj = alife_object(i)
-				if se_obj and (se_obj:section_name() == "ph_campfiremod" or se_anoms[se_obj.id]) then
-					alife_release(se_obj)
-					printf("- Object deleted (id): %s", se_obj.id)
-				end
-			end
+			release_tracked_campfires("transition")
 			se_anoms = {}
 			prev_level.level_name = curr_level
 		end

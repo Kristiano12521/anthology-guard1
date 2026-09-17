@@ -1,5 +1,24 @@
 # Campfires Anthology Compat
 
+## [1.1.2] — 2026-09-17
+
+**Изменено**
+
+- `campfire_placeable.script` — удаление костров на load / смене уровня через `alife():iterate_objects`; полный `1..65534` только как fallback с `-- alife-scan`; collect-then-release (не `alife_release` внутри iterate).
+
+**Причина**
+
+1.1.1 гонял два полных id-скана через `alife_object` — хитч (LUA-008).
+
+**Не затронуто**
+
+- MT re-wrap `trader_autoinject.update`, DLTX, ray place
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py campfires_anthology_compat` — LUA-008 снят
+- в игре: не прогонялось
+
 ## [1.1.1] — 2026-09-17
 
 **Изменено**
