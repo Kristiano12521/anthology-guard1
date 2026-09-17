@@ -1,5 +1,24 @@
 # Valley of Whispers Ambush & Ilya Stash Fix
 
+## [1.0.2] — 2026-09-17
+
+**Изменено**
+
+- `fix_vows_ambush_stash.script` — `install()` больше не выходит рано по `orig_activate_by_section`; на `actor_on_first_update` переустанавливает wrap, если `activate_by_section` уже не наша (MT reload).
+
+**Причина**
+
+1.0.1 при уже записанном orig не сверял указатель. После замены `xr_logic` ремонт active_section Ильи снова отваливался.
+
+**Не затронуто**
+
+- DLTX iliya/ambush, online repair логика
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_vows_ambush_stash`
+- в игре: не прогонялось
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**

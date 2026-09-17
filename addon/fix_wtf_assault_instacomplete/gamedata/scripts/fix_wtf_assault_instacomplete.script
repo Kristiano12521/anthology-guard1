@@ -17,7 +17,7 @@
 -- and retry that collect in status() only while the snapshot is still empty.
 
 local LOG_TAG = "[fix_wtf_assault_instacomplete]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -149,8 +149,15 @@ local function patched_status(entity)
 	return orig.status(entity)
 end
 
+local function wraps_ok()
+	local Assault = assault_table()
+	return Assault
+		and Assault.on_init == patched_on_init
+		and Assault.status == patched_status
+end
+
 local function install()
-	if installed then
+	if installed and wraps_ok() then
 		return true
 	end
 
@@ -160,10 +167,14 @@ local function install()
 		return false
 	end
 
-	orig.on_init = Assault.on_init
-	orig.status = Assault.status
-	Assault.on_init = patched_on_init
-	Assault.status = patched_status
+	if Assault.on_init ~= patched_on_init then
+		orig.on_init = Assault.on_init
+		Assault.on_init = patched_on_init
+	end
+	if Assault.status ~= patched_status then
+		orig.status = Assault.status
+		Assault.status = patched_status
+	end
 	installed = true
 	log("loaded v%s", VERSION)
 	return true
@@ -172,10 +183,10 @@ end
 local function uninstall()
 	local Assault = assault_table()
 	if Assault then
-		if orig.on_init then
+		if orig.on_init and Assault.on_init == patched_on_init then
 			Assault.on_init = orig.on_init
 		end
-		if orig.status then
+		if orig.status and Assault.status == patched_status then
 			Assault.status = orig.status
 		end
 	end
@@ -189,7 +200,10 @@ function on_game_load()
 end
 
 function actor_on_first_update()
-	if not installed then
+	-- MT reload can replace igi_target_assault after on_game_start.
+	if not installed or not wraps_ok() then
+		installed = false
+		orig = {}
 		install()
 	end
 end

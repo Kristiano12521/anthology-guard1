@@ -1,5 +1,24 @@
 # WTF Assault instacomplete
 
+## [1.0.2] — 2026-09-17
+
+**Изменено**
+
+- `fix_wtf_assault_instacomplete.script` — на `actor_on_first_update` переустанавливает wrap Assault.on_init/status, если указатели уже не наши (MT reload).
+
+**Причина**
+
+1.0.1 при `installed=true` не сверял указатели. После замены таблицы WTF снова возможен COMPLETED на пустом снапшоте.
+
+**Не затронуто**
+
+- Фильтры enemy/legit и merge только на пустом снапшоте
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_wtf_assault_instacomplete`
+- в игре: не прогонялось
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**

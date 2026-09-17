@@ -7,7 +7,7 @@
 -- Does not wrap spawn of the ambush dummy (see DLTX on cs_actor).
 
 local LOG_TAG = "[fix_vows_ambush_stash]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 local STASH_NAME = "sad_b1_iliya_treasure"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -79,9 +79,7 @@ local function install()
 	if xr_logic.activate_by_section == patched_activate_by_section then
 		return true
 	end
-	if orig_activate_by_section then
-		return true
-	end
+	-- MT reload may replace xr_logic after our first wrap; always re-capture.
 	orig_activate_by_section = xr_logic.activate_by_section
 	xr_logic.activate_by_section = patched_activate_by_section
 	log("v%s activate_by_section wrapped", VERSION)
@@ -131,6 +129,12 @@ function try_repair_online_stash()
 end
 
 function actor_on_first_update()
+	-- MT reload can replace xr_logic after on_game_start.
+	local ok = xr_logic and xr_logic.activate_by_section == patched_activate_by_section
+	if not ok then
+		orig_activate_by_section = nil
+		install()
+	end
 	try_repair_online_stash()
 end
 

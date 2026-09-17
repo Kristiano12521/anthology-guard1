@@ -1,5 +1,24 @@
 # DotMarks Dropped Weapon Marker Fix
 
+## [1.0.2] — 2026-09-17
+
+**Изменено**
+
+- `fix_dotmarks_dropped_weapon.script` — на `actor_on_first_update` переустанавливает wrap, если слоты DotMarks уже не наши; `callbacks_registered`; uninstall только если указатель ещё наш.
+
+**Причина**
+
+1.0.1 при `installed=true` не сверял указатели. После MT reload снова возможен prompt «ЗАБРАТЬ» на своём стволе.
+
+**Не затронуто**
+
+- Семантика unhide только для оружия
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_dotmarks_dropped_weapon`
+- в игре: не прогонялось
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**

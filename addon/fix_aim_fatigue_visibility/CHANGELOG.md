@@ -1,5 +1,24 @@
 # Aim Fatigue Visibility Fix
 
+## [1.0.2] — 2026-09-17
+
+**Изменено**
+
+- `fix_aim_fatigue_visibility.script` — на `actor_on_first_update` переустанавливает wrap, если `aim_stamina` уже не наши обёртки (MT reload).
+
+**Причина**
+
+1.0.1 при `installed=true` не сверял указатели. После замены модуля снова возможен as_bool false→true.
+
+**Не затронуто**
+
+- real_bool / steal callback / MCM флаги
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_aim_fatigue_visibility`
+- в игре: не прогонялось
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**

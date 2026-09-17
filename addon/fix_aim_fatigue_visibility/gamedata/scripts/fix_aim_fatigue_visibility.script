@@ -13,7 +13,7 @@
 -- the same callbacks and relied on filename order instead.
 
 local LOG_TAG = "[fix_aim_fatigue_visibility]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 local MODULE_NAME = "aim_stamina"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -88,8 +88,15 @@ local function steal_callback(name, orig_fn, patched_fn)
 	return false
 end
 
+local function wraps_ok()
+	local as = module_of(MODULE_NAME)
+	return as
+		and as.on_option_change == patched_on_option_change
+		and as.load_state == patched_load_state
+end
+
 local function install()
-	if installed then
+	if installed and wraps_ok() then
 		return true
 	end
 
@@ -104,19 +111,12 @@ local function install()
 		return false
 	end
 
-	orig_on_option_change = orig_on_option_change or as.on_option_change
-	orig_load_state = orig_load_state or as.load_state
-
 	if as.on_option_change ~= patched_on_option_change then
-		if as.on_option_change ~= orig_on_option_change then
-			orig_on_option_change = as.on_option_change
-		end
+		orig_on_option_change = as.on_option_change
 		as.on_option_change = patched_on_option_change
 	end
 	if as.load_state ~= patched_load_state then
-		if as.load_state ~= orig_load_state then
-			orig_load_state = as.load_state
-		end
+		orig_load_state = as.load_state
 		as.load_state = patched_load_state
 	end
 
@@ -131,10 +131,10 @@ end
 local function uninstall()
 	local as = module_of(MODULE_NAME)
 	if as then
-		if orig_on_option_change then
+		if orig_on_option_change and as.on_option_change == patched_on_option_change then
 			as.on_option_change = orig_on_option_change
 		end
-		if orig_load_state then
+		if orig_load_state and as.load_state == patched_load_state then
 			as.load_state = orig_load_state
 		end
 	end
@@ -158,7 +158,9 @@ local function uninstall()
 end
 
 function actor_on_first_update()
-	if not installed then
+	-- MT reload can replace aim_stamina after on_game_start.
+	if not installed or not wraps_ok() then
+		installed = false
 		install()
 	end
 	apply_visibility_flags()
