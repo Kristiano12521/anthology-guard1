@@ -1,5 +1,24 @@
 # Tosox vanish-fail на общем DRX stash-слоте
 
+## [1.3.2] — 2026-09-17
+
+**Изменено**
+
+- `fix_quest_item_shared_fail.script` — не перезахватывает `orig_status`, если обёртка уже ставилась (другой мод сверху); re-assert только при `current == orig`. Guard `status_busy` против рекурсии status-цепочки с `fix_quest_stash`.
+
+**Причина**
+
+1.3.1 always re-capture + `orig_status = nil` на `actor_on_first_update`/`late install` создавали цикл SF ↔ QS на общем `drx_sl_quest_item_task_status` → Lua stack overflow / CTD при load.
+
+**Не затронуто**
+
+- Логика rearm / vanish-fail
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_quest_item_shared_fail`
+- в игре: не прогонялось (ожидание: load без stack overflow)
+
 ## [1.3.1] — 2026-09-17
 
 **Изменено**

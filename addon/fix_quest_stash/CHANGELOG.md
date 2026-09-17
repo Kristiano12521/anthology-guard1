@@ -1,5 +1,24 @@
 # Фикс миграции типов квестовых тайников
 
+## [1.0.6] — 2026-09-17
+
+**Изменено**
+
+- `fix_quest_stash.script` — не перезахватывает `orig_status`, если обёртка уже ставилась (другой мод сверху); re-assert только при `current == orig`. Guard `status_busy` против рекурсии с `fix_quest_item_shared_fail`.
+
+**Причина**
+
+1.0.5 always re-capture + сброс `orig_status` на `actor_on_first_update` вместе с late-rewrap `fix_quest_item_shared_fail` давали цикл status-функторов → stack overflow при загрузке сейва.
+
+**Не затронуто**
+
+- Миграция `stash_type_legacy`, recover, DLTX
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_quest_stash`
+- в игре: не прогонялось
+
 ## [1.0.5] — 2026-09-17
 
 **Изменено**

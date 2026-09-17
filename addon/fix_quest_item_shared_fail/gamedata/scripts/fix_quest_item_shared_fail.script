@@ -6,10 +6,11 @@
 -- stash (get_random_stash) and leave stage=0. Dual turn-in markers with one
 -- PDA are acceptable - turn in one, second quest gets a fresh stash.
 --
--- v1.3.1: re-wrap status functor if MT reload replaced task_status_functor.
+-- v1.3.2: do not re-capture orig when another wrap is on top (cycle with
+-- fix_quest_stash). Re-assert only if current == orig. Re-entry guard.
 
 local LOG_TAG = "[fix_quest_item_shared_fail]"
-local VERSION = "1.3.1"
+local VERSION = "1.3.2"
 local EVENT_ID = "fix_quest_item_shared_fail"
 local INSTALL_ACTION = "install_late"
 local INSTALL_DELAY = 0.5
@@ -18,6 +19,7 @@ printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local orig_status = nil
 local callbacks_registered = false
+local status_busy = false
 
 local function log(fmt, ...)
 	printf(LOG_TAG .. " " .. fmt, ...)
@@ -129,28 +131,31 @@ local function is_vanish_fail(var)
 end
 
 function patched_status(tsk, task_id)
-	local result
-	if type(orig_status) == "function" then
-		result = orig_status(tsk, task_id)
-	end
-
-	if result ~= "fail" then
-		return result
-	end
-
-	if not db.actor then
-		return result
-	end
-
-	local var = load_task_var(task_id)
-	if not is_vanish_fail(var) then
-		return result
-	end
-
-	if rearm_stash(tsk, task_id, var) then
+	-- Break SF <-> fix_quest_stash cycles from competing re-captures.
+	if status_busy then
 		return nil
 	end
-	return result
+	status_busy = true
+
+	local ok, result = pcall(function()
+		local res
+		if type(orig_status) == "function" then
+			res = orig_status(tsk, task_id)
+		end
+		if res == "fail" and db.actor then
+			local var = load_task_var(task_id)
+			if is_vanish_fail(var) and rearm_stash(tsk, task_id, var) then
+				return nil
+			end
+		end
+		return res
+	end)
+
+	status_busy = false
+	if ok then
+		return result
+	end
+	return nil
 end
 
 local function wraps_ok()
@@ -166,10 +171,21 @@ local function install()
 	if wraps_ok() then
 		return true
 	end
-	-- MT reload may replace the functor after our first wrap; always re-capture.
-	orig_status = task_status_functor.drx_sl_quest_item_task_status
-	task_status_functor.drx_sl_quest_item_task_status = patched_status
-	log("v%s status wrapped", VERSION)
+	local current = task_status_functor.drx_sl_quest_item_task_status
+	if orig_status == nil then
+		-- First install: capture vanilla or whichever wrap is already on top.
+		orig_status = current
+		task_status_functor.drx_sl_quest_item_task_status = patched_status
+		log("v%s status wrapped", VERSION)
+		return true
+	end
+	-- Already installed. If another mod wrapped us, stay under them (do not
+	-- re-capture - that creates SF <-> QS cycles). Re-assert only when MT
+	-- restored the exact function we originally captured.
+	if current == orig_status then
+		task_status_functor.drx_sl_quest_item_task_status = patched_status
+		log("v%s status re-asserted", VERSION)
+	end
 	return true
 end
 
@@ -195,11 +211,9 @@ local function schedule_late_install()
 end
 
 function actor_on_first_update()
-	-- MT reload can replace task_status_functor after on_game_start.
-	if not wraps_ok() then
-		orig_status = nil
-		install()
-	end
+	-- Do not clear orig_status: clearing + re-capture while fix_quest_stash
+	-- (or another wrap) is on top creates an infinite status chain.
+	install()
 end
 
 function on_game_start()
