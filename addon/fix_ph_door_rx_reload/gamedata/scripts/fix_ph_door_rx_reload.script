@@ -20,7 +20,7 @@
 -- crash.
 
 local LOG_TAG = "[fix_ph_door_rx_reload]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 local SKIP_LOG_LIMIT = 8
@@ -130,13 +130,25 @@ local function wrap(slot, module, name, patched)
 	if module[name] == patched then
 		return true
 	end
-	orig[slot] = orig[slot] or module[name]
+	orig[slot] = module[name]
 	module[name] = patched
 	return true
 end
 
+local function door_wraps_ok()
+	local ph_door = module_of("ph_door")
+	return ph_door
+		and ph_door.try_to_open_door == patched_try_to_open_door
+		and ph_door.try_to_close_door == patched_try_to_close_door
+end
+
+local function rx_wrap_ok()
+	local rx_ai = module_of("rx_ai")
+	return rx_ai and rx_ai.enable_schemes == patched_enable_schemes
+end
+
 local function install_door()
-	if installed.door then
+	if installed.door and door_wraps_ok() then
 		return true
 	end
 
@@ -159,7 +171,7 @@ local function install_door()
 end
 
 local function install_rx()
-	if installed.rx then
+	if installed.rx and rx_wrap_ok() then
 		return true
 	end
 
@@ -188,10 +200,10 @@ end
 local function uninstall_door()
 	local ph_door = module_of("ph_door")
 	if ph_door then
-		if orig.open then
+		if orig.open and ph_door.try_to_open_door == patched_try_to_open_door then
 			ph_door.try_to_open_door = orig.open
 		end
-		if orig.close then
+		if orig.close and ph_door.try_to_close_door == patched_try_to_close_door then
 			ph_door.try_to_close_door = orig.close
 		end
 	end
@@ -202,7 +214,7 @@ end
 
 local function uninstall_rx()
 	local rx_ai = module_of("rx_ai")
-	if rx_ai and orig.enable then
+	if rx_ai and orig.enable and rx_ai.enable_schemes == patched_enable_schemes then
 		rx_ai.enable_schemes = orig.enable
 	end
 	orig.enable = nil
@@ -222,7 +234,17 @@ function game_object_on_net_destroy(obj)
 end
 
 function actor_on_first_update()
-	if not (installed.door and installed.rx) then
+	-- MT reload can replace ph_door / rx_ai after on_game_start.
+	if not door_wraps_ok() then
+		installed.door = false
+		orig.open = nil
+		orig.close = nil
+	end
+	if not rx_wrap_ok() then
+		installed.rx = false
+		orig.enable = nil
+	end
+	if not (installed.door and installed.rx and door_wraps_ok() and rx_wrap_ok()) then
 		install()
 	end
 end

@@ -1,5 +1,29 @@
 # PH Door Stale Registry and RX Offline Planner Guard
 
+## [1.0.2] — 2026-09-17
+
+**Изменено**
+
+- `fix_ph_door_rx_reload.script` — `install_door` / `install_rx` сверяют указатели с нашими обёртками; на `actor_on_first_update` переустанавливают wrap после MT reload; uninstall возвращает orig только если слот ещё наш.
+
+**Причина**
+
+1.0.1 при `installed.door/rx=true` не сверял указатели. После замены таблиц `ph_door` / `rx_ai` снова возможны FATAL на мёртвой двери и offline planner. Тот же паттерн, что у `fix_rx_bandage_dead` 1.0.2.
+
+**Не затронуто**
+
+- prune `db.level_doors`, `game_object_on_net_destroy`, семантика RX enable_schemes
+
+**Совместимость**
+
+- Как 1.0.1
+- Сейвы: без изменений
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_ph_door_rx_reload`
+- в игре: не прогонялось
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**

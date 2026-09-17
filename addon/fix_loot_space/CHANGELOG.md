@@ -1,5 +1,29 @@
 # Loot Space Take-All Fix
 
+## [1.0.2] — 2026-09-17
+
+**Изменено**
+
+- `fix_loot_space.script` — `wrap_method` сверяет `cls[method]==wrapper` вместо early-return по `orig[slot]`; на `actor_on_first_update` переустанавливает wrap после MT reload; uninstall возвращает orig только если слот ещё наш.
+
+**Причина**
+
+1.0.1 при уже записанном `orig[slot]` не сверял указатель. После замены UI-классов пробел снова не делал TakeAll. Тот же паттерн, что у соседних MT-фиксов.
+
+**Не затронуто**
+
+- Семантика SPACE→RETURN / SPACE→LMode_TakeAll, non-loot modes
+
+**Совместимость**
+
+- Как 1.0.1
+- Сейвы: без изменений
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_loot_space`
+- в игре: не прогонялось
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**
