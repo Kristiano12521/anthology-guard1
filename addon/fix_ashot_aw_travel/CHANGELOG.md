@@ -1,5 +1,24 @@
 # Ashot Army Warehouses Travel Fix
 
+## [1.0.2] — 2026-09-17
+
+**Изменено**
+
+- `fix_ashot_aw_travel.script` — `wraps_ok`; на `actor_on_first_update` переустанавливает wrap, если `get_named_location` уже не наша; always re-capture; uninstall только если указатель ещё наш.
+
+**Причина**
+
+1.0.1 ставил wrap только в `on_game_start` и держал `orig_get` через `or`. После MT reload снова возможен телепорт в X-18.
+
+**Не затронуто**
+
+- Remap на `mil_smart_terrain_7_7`, проверка `l07_military`
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_ashot_aw_travel`
+- в игре: не прогонялось
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**
