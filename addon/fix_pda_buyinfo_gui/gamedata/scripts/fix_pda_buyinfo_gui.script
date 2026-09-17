@@ -13,7 +13,7 @@
 -- the live window for the original call, then restores the field.
 
 local LOG_TAG = "[fix_pda_buyinfo_gui]"
-local VERSION = "1.1.1"
+local VERSION = "1.1.2"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -139,13 +139,42 @@ local function wrap(slot, owner, name, patched)
 	if owner[name] == patched then
 		return true
 	end
-	orig[slot] = orig[slot] or owner[name]
+	-- MT reload may replace the module after our first wrap; always re-capture.
+	orig[slot] = owner[name]
 	owner[name] = patched
 	return true
 end
 
+local function wraps_ok()
+	local any = false
+	if type(pda_inter_x_buyinfo) == "table" and type(pda_inter_x_buyinfo.add_sender) == "function" then
+		any = true
+		if pda_inter_x_buyinfo.add_sender ~= patched_add_sender then
+			return false
+		end
+	end
+	if type(pda_inter_x_trade) == "table" and type(pda_inter_x_trade.add_trader) == "function" then
+		any = true
+		if pda_inter_x_trade.add_trader ~= patched_add_trader then
+			return false
+		end
+	end
+	if type(pda_inter_x_banter) == "table" then
+		for i = 1, #BANTER_FNS do
+			local name = BANTER_FNS[i]
+			if type(pda_inter_x_banter[name]) == "function" then
+				any = true
+				if pda_inter_x_banter[name] ~= banter_patched[name] then
+					return false
+				end
+			end
+		end
+	end
+	return any
+end
+
 local function install()
-	if installed then
+	if installed and wraps_ok() then
 		return true
 	end
 
@@ -193,16 +222,18 @@ local function install()
 end
 
 local function uninstall()
-	if type(pda_inter_x_buyinfo) == "table" and orig.add_sender then
+	if type(pda_inter_x_buyinfo) == "table" and orig.add_sender
+		and pda_inter_x_buyinfo.add_sender == patched_add_sender then
 		pda_inter_x_buyinfo.add_sender = orig.add_sender
 	end
-	if type(pda_inter_x_trade) == "table" and orig.add_trader then
+	if type(pda_inter_x_trade) == "table" and orig.add_trader
+		and pda_inter_x_trade.add_trader == patched_add_trader then
 		pda_inter_x_trade.add_trader = orig.add_trader
 	end
 	if type(pda_inter_x_banter) == "table" then
 		for i = 1, #BANTER_FNS do
 			local name = BANTER_FNS[i]
-			if orig[name] then
+			if orig[name] and pda_inter_x_banter[name] == banter_patched[name] then
 				pda_inter_x_banter[name] = orig[name]
 			end
 		end
@@ -217,7 +248,10 @@ function on_game_load()
 end
 
 function actor_on_first_update()
-	if not installed then
+	-- MT reload can replace Interactive PDA modules after on_game_start.
+	if not installed or not wraps_ok() then
+		installed = false
+		orig = {}
 		install()
 	end
 end

@@ -1,5 +1,24 @@
 # PDA Buy Info GUI Fix
 
+## [1.1.2] — 2026-09-17
+
+**Изменено**
+
+- `fix_pda_buyinfo_gui.script` — `wraps_ok` по слотам buyinfo/trade/banter; на `actor_on_first_update` переустанавливает wrap после MT reload; uninstall только если указатель ещё наш; always re-capture orig.
+
+**Причина**
+
+1.1.1 при `installed=true` не сверял указатели. После MT reload снова FATAL `GUI` на trade/banter.
+
+**Не затронуто**
+
+- with_live_gui / CTE unpack / noop
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_pda_buyinfo_gui`
+- в игре: не прогонялось
+
 ## [1.1.1] — 2026-09-13
 
 **Изменено**

@@ -1,5 +1,24 @@
 # Arena Loadout Fix
 
+## [1.1.1] — 2026-09-17
+
+**Изменено**
+
+- `fix_arena_loadout.script` — на `actor_on_first_update` переустанавливает wrap `bar_arena_teleport`, если указатель уже не наш; uninstall только если слот ещё наш; `callbacks_registered`.
+
+**Причина**
+
+1.1.0 ставил wrap только в `on_game_start`. После MT reload xr_effects снова без recover/mags/exo.
+
+**Не затронуто**
+
+- FIGHT_LOADOUTS, pcall recover, mag/exo post-delay
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_arena_loadout`
+- в игре: не прогонялось
+
 ## [1.1.0] — 2026-09-12
 
 **Изменено**

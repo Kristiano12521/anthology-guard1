@@ -12,7 +12,7 @@
 -- -> FATAL attempt to index local 'se'. Guard with pcall + safe recover spawn.
 
 local LOG_TAG = "[fix_arena_loadout]"
-local VERSION = "1.1.0"
+local VERSION = "1.1.1"
 local APPLY_DELAY = 0.35
 local SPARE_MAGS = 2
 local PSU_SECTION = "exo_power_supply"
@@ -44,6 +44,7 @@ local FIGHT_LOADOUTS = {
 local orig_teleport = nil
 local pending_exo_id = nil
 local pending_psu_id = nil
+local callbacks_registered = false
 
 local function log(fmt, ...)
 	printf(LOG_TAG .. " " .. fmt, ...)
@@ -393,14 +394,19 @@ function patched_bar_arena_teleport(actor, npc)
 	delay_call("apply", APPLY_DELAY, apply_arena_loadout)
 end
 
+local function wraps_ok()
+	return xr_effects and xr_effects.bar_arena_teleport == patched_bar_arena_teleport
+end
+
 local function install()
 	if not (xr_effects and type(xr_effects.bar_arena_teleport) == "function") then
 		log("xr_effects.bar_arena_teleport not found - guard NOT installed")
 		return false
 	end
-	if xr_effects.bar_arena_teleport == patched_bar_arena_teleport then
+	if wraps_ok() then
 		return true
 	end
+	-- MT reload may replace xr_effects after our first wrap; always re-capture.
 	orig_teleport = xr_effects.bar_arena_teleport
 	xr_effects.bar_arena_teleport = patched_bar_arena_teleport
 	log("bar_arena_teleport wrapped")
@@ -408,7 +414,7 @@ local function install()
 end
 
 local function uninstall()
-	if orig_teleport and type(xr_effects) == "table" then
+	if orig_teleport and wraps_ok() then
 		xr_effects.bar_arena_teleport = orig_teleport
 	end
 	orig_teleport = nil
@@ -416,10 +422,26 @@ local function uninstall()
 	pending_psu_id = nil
 end
 
+function actor_on_first_update()
+	-- MT reload can replace xr_effects after on_game_start.
+	if not wraps_ok() then
+		orig_teleport = nil
+		install()
+	end
+end
+
 function on_game_start()
 	install()
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
 end
 
 function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
 	uninstall()
 end
