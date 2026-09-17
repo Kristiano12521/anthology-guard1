@@ -9,7 +9,7 @@
 -- при inv_box=true Ч поэтому оборачиваем get_random_stash и чиним сейвы.
 
 local LOG_TAG = "[fix_locked_stash_boxes]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local EVENT_ID = "fix_locked_stash_boxes"
 local REPAIR_ACTION = "repair"
 local REPAIR_DELAY = 1.0
@@ -22,7 +22,9 @@ local LOCKED_NAMES = {
 	esc_kkp_sidr_habar = true,
 	esc_inv_out_quest_fee = true,
 	esc_inventory_box_base_bandits = true,
+	esc_inventory_box_quest = true,
 	esc_inventory_box_quest_fee = true,
+	caz_aeroplan_narkota_box = true,
 	okr_s1_inventory_box = true,
 	okr_av_1_inv_box = true,
 	okr_av_2_inv_box = true,

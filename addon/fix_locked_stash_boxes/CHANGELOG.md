@@ -1,34 +1,56 @@
-# Р¤РёРєСЃ Р·Р°РєСЂС‹С‚С‹С… СЏС‰РёРєРѕРІ РїРѕРґ Р·РµР»С‘РЅС‹Рµ С‚Р°Р№РЅРёРєРё
+# Фикс закрытых ящиков под зелёные тайники
 
-## [1.0.0] вЂ” 2026-09-14
+## [1.0.1] — 2026-09-17
 
-**РР·РјРµРЅРµРЅРѕ**
+**Изменено**
 
-- `gamedata/configs/items/settings/mod_treasure_manager_fix_locked_stash_boxes.ltx` вЂ” DLTX `![blacklist_stashes_names]`: СЃСЋР¶РµС‚РЅС‹Рµ/Р·Р°РєСЂС‹С‚С‹Рµ СЏС‰РёРєРё.
-- `gamedata/configs/items/settings/mod_grok_treasure_manager_fix_locked_stash_boxes.ltx` вЂ” С‚Рѕ Р¶Рµ РґР»СЏ Grok's Stash Overhaul (`grok_treasure_manager.ltx`).
-- `gamedata/scripts/fix_locked_stash_boxes.script` вЂ” РѕР±С‘СЂС‚РєР° `treasure_manager.get_random_stash` (РѕСЂРёРіРёРЅР°Р» РїСЂРѕРІРµСЂСЏРµС‚ blacklist С‚РѕР»СЊРєРѕ РїСЂРё `inv_box=true`); repair СЃРµР№РІР°: pending-Р»СѓС‚ РїРµСЂРµРЅРѕСЃРёС‚СЃСЏ РЅР° СЃРІРѕР±РѕРґРЅС‹Р№ СЏС‰РёРє, РїСѓСЃС‚С‹Рµ СЃР»РѕС‚С‹ Рё РјРµС‚РєРё СЃРЅРёРјР°СЋС‚СЃСЏ.
+- В blacklist добавлены `esc_inventory_box_quest` и `caz_aeroplan_narkota_box` (скрипт + оба DLTX).
+- `meta.ini` -> 1.0.1.
 
-**РЎРїРёСЃРѕРє РёРјС‘РЅ (se_obj:name)**
+**Причина**
+
+На Кордоне `simulation_task_44` («Было ваше — стало наше») через `get_random_stash(..., inv_box=true)` садился на `esc_inventory_box_quest`: сундук открывается, путь режет запертая дверь. Имени не было в списке (класс «открытый ящик за дверью», без `nonscript_usable=false`). `caz_aeroplan_narkota_box` — скриптово закрытый ящик, пропущенный в 1.0.0.
+
+**Не затронуто**
+
+- Логика дверей/ключей, `all.spawn`, остальные имена blacklist
+- Пул свободных ящиков для белых/зелёных/красных меток и заданий
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_locked_stash_boxes` — 0 ошибок
+- `--cross`: CROSS-001 с `fix_quest_stash` на `[blacklist_stashes_names]` (как раньше; порядок в MO2)
+- в игре: не прогонялось. Ожидаемый лог при проблемном сейве: `relocated pending name=esc_inventory_box_quest ...` или `removed from pool name=esc_inventory_box_quest ...`
+
+## [1.0.0] — 2026-09-14
+
+**Изменено**
+
+- `gamedata/configs/items/settings/mod_treasure_manager_fix_locked_stash_boxes.ltx` — DLTX `![blacklist_stashes_names]`: сюжетные/закрытые ящики.
+- `gamedata/configs/items/settings/mod_grok_treasure_manager_fix_locked_stash_boxes.ltx` — то же для Grok's Stash Overhaul (`grok_treasure_manager.ltx`).
+- `gamedata/scripts/fix_locked_stash_boxes.script` — обёртка `treasure_manager.get_random_stash` (оригинал проверяет blacklist только при `inv_box=true`); repair сейва: pending-лут переносится на свободный ящик, пустые слоты и метки снимаются.
+
+**Список имён (se_obj:name)**
 
 `esc_kkp_sidr_habar`, `esc_inv_out_quest_fee`, `esc_inventory_box_base_bandits`, `esc_inventory_box_quest_fee`, `okr_s1_inventory_box`, `okr_av_1..5_inv_box`, `kn_b1_av_1_inv_box`, `scf_av_1_inv_box`, `scf_d3_box_code`, `scf_v1_shakal_box`, `sad_b1_iliya_treasure`, `sad_b2_maxim_treasure`, `sad_ran_cowboy_treasure`, `inv_box_strelok_mlr`, `mon_blue_box_mlr`, `zat_b12_conteiner`, `topi_i1_killer_code_tainik`, `cit_a2_secret_box`, `az_box_pidor_case_merger`, `caz_bb_heli_container_pilots`, `okr_texnar_util_box`, `sad_b2_util_box`, `jup_b202_snag_treasure`, `jup_b202_actor_treasure`.
 
-**РџСЂРёС‡РёРЅР°**
+**Причина**
 
-Р—РµР»С‘РЅС‹Р№ С‚Р°Р№РЅРёРє (`treasure` spot) СЃРµР» РЅР° Р·Р°РєСЂС‹С‚С‹Р№ СЃСЋР¶РµС‚РЅС‹Р№ СЏС‰РёРє РЎРёРґРѕСЂР° РЅР° СЃРµРІРµСЂРЅРѕРј РљРџРџ (`esc_kkp_sidr_habar`, В«РџСѓС‚СЊ РІРѕ РјРіР»РµВ»). РўРѕС‚ Р¶Рµ РєР»Р°СЃСЃ: СЏС‰РёРєРё СЃ `nonscript_usable=false` РґРѕ РєР»СЋС‡Р°/РєРѕРґР°/РёРЅС„РѕРїРѕСЂС†РёРё РЅРµ Р±С‹Р»Рё РІ `[blacklist_stashes_names]`.
+Зелёный тайник (`treasure` spot) сел на закрытый сюжетный ящик Сидора на северном КПП (`esc_kkp_sidr_habar`, «Путь во мгле»). Тот же класс: ящики с `nonscript_usable=false` до ключа/кода/инфопорции не были в `[blacklist_stashes_names]`.
 
-**РќРµ Р·Р°С‚СЂРѕРЅСѓС‚Рѕ**
+**Не затронуто**
 
-- РЎСЋР¶РµС‚РЅС‹Рµ Р·Р°РјРєРё, РєР»СЋС‡Рё, Р»РѕРіРёРєР° СЏС‰РёРєРѕРІ, `all.spawn`
-- `fix_quest_stash` / `val_q7_n`, СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёРµ Р·Р°РїРёСЃРё blacklist
-- Р’С‹РґР°С‡Р° С…Р°Р±Р°СЂР° РЎРёРґРѕСЂСѓ / Spectrum
+- Сюжетные замки, ключи, логика ящиков, `all.spawn`
+- `fix_quest_stash` / `val_q7_n`, уже существующие записи blacklist
+- Выдача хабара Сидору / Spectrum
 
-**РЎРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ**
+**Совместимость**
 
 - Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
-- РЎРµР№РІС‹: repair РїСЂРё `actor_on_first_update`; РЅРѕРІР°СЏ РёРіСЂР° РЅРµ РЅСѓР¶РЅР°
-- Р’ MO2 РЅРёР¶Рµ СЃР±РѕСЂРєРё Рё Grok's Stash Overhaul (РµСЃР»Рё СЃС‚РѕРёС‚)
+- Сейвы: repair при `actor_on_first_update`; новая игра не нужна
+- В MO2 ниже сборки и Grok's Stash Overhaul (если стоит)
 
-**РџСЂРѕРІРµСЂРµРЅРѕ**
+**Проверено**
 
-- lint: РѕР¶РёРґР°РµС‚СЃСЏ `python tools/lint_addon.py fix_locked_stash_boxes`
-- Р’ РёРіСЂРµ: РЅРµ РїСЂРѕРіРѕРЅСЏР»РѕСЃСЊ. РћР¶РёРґР°РµРјС‹Р№ Р»РѕРі: `get_random_stash wrapped`, РїСЂРё РїСЂРѕР±Р»РµРјРЅРѕРј СЃРµР№РІРµ `relocated pending name=esc_kkp_sidr_habar ...`
+- lint: ожидается `python tools/lint_addon.py fix_locked_stash_boxes`
+- В игре: не прогонялось. Ожидаемый лог: `get_random_stash wrapped`, при проблемном сейве `relocated pending name=esc_kkp_sidr_habar ...`
