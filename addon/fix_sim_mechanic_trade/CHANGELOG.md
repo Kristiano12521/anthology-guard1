@@ -1,5 +1,24 @@
 # Sim Mechanic Trade Fix
 
+## [1.0.2] — 2026-09-17
+
+**Изменено**
+
+- `fix_sim_mechanic_trade.script` — `wraps_ok` по trade_init/update/reset_show_spot; на `actor_on_first_update` переустанавливает wraps после MT reload; always re-capture; safe uninstall.
+
+**Причина**
+
+1.0.1 ставил wraps только в `on_game_start` и держал orig через `or`. После MT reload сим-техник снова с пустым стоком.
+
+**Не затронуто**
+
+- Подмена generic → mechanic cfg, force restock, spot
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_sim_mechanic_trade`
+- в игре: не прогонялось
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**

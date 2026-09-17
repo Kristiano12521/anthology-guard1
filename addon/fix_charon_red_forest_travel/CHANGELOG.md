@@ -1,5 +1,24 @@
 # Charon Red Forest Travel Fix
 
+## [1.0.2] — 2026-09-17
+
+**Изменено**
+
+- `fix_charon_red_forest_travel.script` — `wraps_ok`; на `actor_on_first_update` переустанавливает wrap `change_lvl` после MT reload; always re-capture; uninstall только если указатель ещё наш.
+
+**Причина**
+
+1.0.1 ставил wrap только в `on_game_start` и держал `orig` через `or`. После MT reload снова nil se_obj у Харона.
+
+**Не затронуто**
+
+- Alias MISSING_SMART → TARGET_SMART на время вызова
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_charon_red_forest_travel`
+- в игре: не прогонялось
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**

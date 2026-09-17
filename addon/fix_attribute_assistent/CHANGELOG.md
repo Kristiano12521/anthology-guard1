@@ -1,5 +1,24 @@
 # Attribute Assistant Crash and Hostility Fix
 
+## [1.0.2] — 2026-09-17
+
+**Изменено**
+
+- `fix_attribute_assistent.script` — `wraps_ok`; на `actor_on_first_update` переустанавливает ASCII/CP1251 слоты SMS после MT reload; `callbacks_registered`.
+
+**Причина**
+
+1.0.1 сверял указатели в `install()`, но после MT никто не вызывал `install` снова. Снова возможен FATAL nil functor на таймере.
+
+**Не затронуто**
+
+- DLTX hostility / timer ASCII name
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_attribute_assistent`
+- в игре: не прогонялось
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**

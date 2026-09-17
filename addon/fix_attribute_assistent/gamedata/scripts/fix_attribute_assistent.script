@@ -12,7 +12,7 @@
 -- fields that were dead or too narrow.
 
 local LOG_TAG = "[fix_attribute_assistent]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -23,6 +23,7 @@ local KEY_CP1251 = "mod_sms_error_task_" .. string.char(0xE0)
 local orig_ascii = nil
 local orig_cp1251 = nil
 local installed = false
+local callbacks_registered = false
 
 local function log(fmt, ...)
 	printf(LOG_TAG .. " " .. fmt, ...)
@@ -40,12 +41,24 @@ local function send_error_sms(actor, npc)
 	end
 end
 
+local function wraps_ok()
+	return type(xr_effects) == "table"
+		and xr_effects.mod_sms_error_task == send_error_sms
+		and xr_effects[KEY_CP1251] == send_error_sms
+end
+
 local function install()
 	if type(xr_effects) ~= "table" then
 		printf("%s xr_effects not found - guard NOT installed", LOG_TAG)
 		return false
 	end
 
+	if wraps_ok() then
+		installed = true
+		return true
+	end
+
+	-- MT reload may replace xr_effects after our first wrap; always re-capture.
 	if xr_effects.mod_sms_error_task ~= send_error_sms then
 		orig_ascii = xr_effects.mod_sms_error_task
 		xr_effects.mod_sms_error_task = send_error_sms
@@ -76,16 +89,34 @@ local function uninstall()
 end
 
 -- xr_effects is loaded before user scripts. Install now so a condlist
--- cannot race on_game_start. on_game_start repeats if a later script
--- cleared the slot.
+-- cannot race on_game_start. on_game_start / first_update repeat if MT
+-- reload cleared the slot.
 install()
+
+function actor_on_first_update()
+	-- MT reload can replace xr_effects after on_game_start.
+	if not wraps_ok() then
+		orig_ascii = nil
+		orig_cp1251 = nil
+		installed = false
+		install()
+	end
+end
 
 function on_game_start()
 	if install() then
 		log("loaded v%s", VERSION)
 	end
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
 end
 
 function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
 	uninstall()
 end
