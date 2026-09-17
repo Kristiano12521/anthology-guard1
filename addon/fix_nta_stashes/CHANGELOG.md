@@ -1,5 +1,24 @@
 # NTA Stashes Anthology Guard
 
+## [1.0.1] — 2026-09-17
+
+**Изменено**
+
+- `fix_nta_stashes.script` — `wraps_ok`; always re-capture; на `actor_on_first_update` и `on_game_load` переустанавливает wrap, если `populate` уже не наша; uninstall только если указатель ещё наш.
+
+**Причина**
+
+1.0.0 держал `orig_populate` через `or` и не переустанавливал mid-session после MT reload. Снова возможен `table index is nil`.
+
+**Не затронуто**
+
+- Логика skip по level_name, treasure_manager
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_nta_stashes`
+- в игре: не прогонялось
+
 ## [1.0.0] — 2026-08-29
 
 **Изменено**

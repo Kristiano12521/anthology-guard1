@@ -1,5 +1,24 @@
 # Crowkiller Hello Dialog Fix
 
+## [1.0.1] — 2026-09-17
+
+**Изменено**
+
+- `fix_crowkiller_hello.script` — `wraps_ok`; always re-capture; на `actor_on_first_update` переустанавливает wrap, если `crowkiller_is_valiable` уже не наша; uninstall только если указатель ещё наш; VERSION в логе.
+
+**Причина**
+
+1.0.0 ставил wrap только в `on_game_start` и держал `orig` через `or`. После MT reload снова возможен SayPhrase FATAL.
+
+**Не затронуто**
+
+- Fallback `gar_bandit_crowkiller`, XML диалогов
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_crowkiller_hello`
+- в игре: не прогонялось
+
 ## [1.0.0] — 2026-08-28
 
 **Изменено**

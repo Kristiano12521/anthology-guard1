@@ -1,5 +1,24 @@
 # Milspec and Exo Craft Fix
 
+## [1.0.3] — 2026-09-17
+
+**Изменено**
+
+- `fix_milspec_exo_craft.script` — `wraps_ok`; на `actor_on_first_update` переустанавливает wrap, если `LoadRecipesLTX` уже не наша; always re-capture; uninstall только если указатель ещё наш.
+
+**Причина**
+
+1.0.2 при `installed=true` не сверял указатели. После MT reload снова возможна пустая вкладка Exo.
+
+**Не затронуто**
+
+- Состав рецептов, DLTX `mod_craft_device_*`
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_milspec_exo_craft`
+- в игре: не прогонялось
+
 ## [1.0.2] — 2026-08-30
 
 **Изменено**

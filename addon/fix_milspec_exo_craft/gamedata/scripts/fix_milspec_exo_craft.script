@@ -4,13 +4,16 @@
 -- tables; this wrap injects after that, same as the old archive script.
 
 local LOG_TAG = "[fix_milspec_exo_craft]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local DEVICE_TAB_TITLE = "st_ui_craft_device"
 local EXO_TAB_TITLE = "st_exo_system_craftingtitle"
 
 local orig_load = nil
 local installed = false
+local callbacks_registered = false
 
 local function log(fmt, ...)
 	printf(LOG_TAG .. " " .. fmt, ...)
@@ -197,9 +200,14 @@ local function wrapped_LoadRecipesLTX(...)
 	return result
 end
 
+local function wraps_ok()
+	local csi = aa_load_recipes_Banjaji_CSI
+	return type(csi) == "table" and csi.LoadRecipesLTX == wrapped_LoadRecipesLTX
+end
+
 local function uninstall()
 	local csi = aa_load_recipes_Banjaji_CSI
-	if installed and csi and orig_load and csi.LoadRecipesLTX == wrapped_LoadRecipesLTX then
+	if orig_load and wraps_ok() then
 		csi.LoadRecipesLTX = orig_load
 	end
 	orig_load = nil
@@ -207,18 +215,20 @@ local function uninstall()
 end
 
 local function install()
-	if installed then
-		return
-	end
 	if not aa_load_recipes_Banjaji_CSI then
 		log("ABORT: aa_load_recipes_Banjaji_CSI not found")
-		return
+		return false
 	end
 	if type(aa_load_recipes_Banjaji_CSI.LoadRecipesLTX) ~= "function" then
 		log("ABORT: LoadRecipesLTX not found")
-		return
+		return false
+	end
+	if wraps_ok() then
+		installed = true
+		return true
 	end
 
+	-- MT reload may replace CSI after our first wrap; always re-capture.
 	orig_load = aa_load_recipes_Banjaji_CSI.LoadRecipesLTX
 	aa_load_recipes_Banjaji_CSI.LoadRecipesLTX = wrapped_LoadRecipesLTX
 	installed = true
@@ -227,12 +237,30 @@ local function install()
 	if aa_load_recipes_Banjaji_CSI.all_recipes and aa_load_recipes_Banjaji_CSI.all_recipe_tabs then
 		inject_recipes()
 	end
+	return true
+end
+
+function actor_on_first_update()
+	-- MT reload can replace aa_load_recipes_Banjaji_CSI after on_game_start.
+	if not wraps_ok() then
+		orig_load = nil
+		installed = false
+		install()
+	end
 end
 
 function on_game_start()
 	install()
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
 end
 
 function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
 	uninstall()
 end

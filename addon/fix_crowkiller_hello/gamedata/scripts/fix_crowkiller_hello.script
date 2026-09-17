@@ -11,9 +11,13 @@
 -- start at the Garbage depot hits that window.
 
 local LOG_TAG = "[fix_crowkiller_hello]"
+local VERSION = "1.0.1"
 local FALLBACK_NAME = "gar_bandit_crowkiller"
 
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
 local orig_is_valiable = nil
+local callbacks_registered = false
 
 local function manager()
 	if type(minigames_manager) ~= "table" or type(minigames_manager.get_minigames_manager) ~= "function" then
@@ -120,30 +124,53 @@ local function patched_is_valiable(...)
 	return true
 end
 
+local function wraps_ok()
+	return type(minigame_dialogs) == "table"
+		and minigame_dialogs.crowkiller_is_valiable == patched_is_valiable
+end
+
 local function install()
 	if type(minigame_dialogs) ~= "table" or type(minigame_dialogs.crowkiller_is_valiable) ~= "function" then
 		printf(LOG_TAG .. " minigame_dialogs.crowkiller_is_valiable not found - guard NOT installed")
 		return false
 	end
-	if minigame_dialogs.crowkiller_is_valiable == patched_is_valiable then
+	if wraps_ok() then
 		return true
 	end
-	orig_is_valiable = orig_is_valiable or minigame_dialogs.crowkiller_is_valiable
+	-- MT reload may replace minigame_dialogs after our first wrap; always re-capture.
+	orig_is_valiable = minigame_dialogs.crowkiller_is_valiable
 	minigame_dialogs.crowkiller_is_valiable = patched_is_valiable
-	printf(LOG_TAG .. " crowkiller_is_valiable wrapped")
+	printf(LOG_TAG .. " crowkiller_is_valiable wrapped v%s", VERSION)
 	return true
 end
 
 local function uninstall()
-	if orig_is_valiable and type(minigame_dialogs) == "table" then
+	if orig_is_valiable and wraps_ok() then
 		minigame_dialogs.crowkiller_is_valiable = orig_is_valiable
+	end
+	orig_is_valiable = nil
+end
+
+function actor_on_first_update()
+	-- MT reload can replace minigame_dialogs after on_game_start.
+	if not wraps_ok() then
+		orig_is_valiable = nil
+		install()
 	end
 end
 
 function on_game_start()
 	install()
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
 end
 
 function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
 	uninstall()
 end

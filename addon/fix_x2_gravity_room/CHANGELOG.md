@@ -1,5 +1,24 @@
 # Lab X-2 Gravity Room Crash Fix
 
+## [1.0.2] — 2026-09-17
+
+**Изменено**
+
+- `fix_x2_gravity_room.script` — `wraps_ok`; на `actor_on_first_update` переустанавливает `bas_no_gravity_anomaly`, если `xr_effects` уже не наш; uninstall снимает functor только если указатель ещё наш.
+
+**Причина**
+
+1.0.1 ставил functor только в `on_game_start`. После MT reload снова возможен CTD на отсутствующем `bas_no_gravity_anomaly`.
+
+**Не затронуто**
+
+- Импульс 6 с, DLTX `[duality_circle]` / `bas_space_restrictor_0016`
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_x2_gravity_room`
+- в игре: не прогонялось
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**

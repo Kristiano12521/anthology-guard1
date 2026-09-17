@@ -19,7 +19,9 @@
 -- treasure_manager.caches and the alife objects are not modified.
 
 local LOG_TAG = "[fix_nta_stashes]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local orig_populate = nil
 local callbacks_registered = false
@@ -121,16 +123,22 @@ function patched_populate()
 	end
 end
 
+local function wraps_ok()
+	local mod = nta()
+	return type(mod) == "table" and mod.populate_stashes_by_levels_table == patched_populate
+end
+
 local function install()
 	local mod = nta()
 	if type(mod) ~= "table" or type(mod.populate_stashes_by_levels_table) ~= "function" then
 		log("z_nta_stashes_utils.populate_stashes_by_levels_table not found - guard NOT installed")
 		return false
 	end
-	if mod.populate_stashes_by_levels_table == patched_populate then
+	if wraps_ok() then
 		return true
 	end
-	orig_populate = orig_populate or mod.populate_stashes_by_levels_table
+	-- MT reload may replace z_nta_stashes_utils after our first wrap; always re-capture.
+	orig_populate = mod.populate_stashes_by_levels_table
 	mod.populate_stashes_by_levels_table = patched_populate
 	log("v%s populate wrapped", VERSION)
 	return true
@@ -138,7 +146,7 @@ end
 
 local function uninstall()
 	local mod = nta()
-	if orig_populate and type(mod) == "table" and mod.populate_stashes_by_levels_table == patched_populate then
+	if orig_populate and wraps_ok() then
 		mod.populate_stashes_by_levels_table = orig_populate
 	end
 	orig_populate = nil
@@ -146,7 +154,18 @@ end
 
 function on_game_load()
 	reset_warned()
-	install()
+	if not wraps_ok() then
+		orig_populate = nil
+		install()
+	end
+end
+
+function actor_on_first_update()
+	-- MT reload can replace z_nta_stashes_utils after on_game_start.
+	if not wraps_ok() then
+		orig_populate = nil
+		install()
+	end
 end
 
 function on_game_start()
@@ -155,13 +174,15 @@ function on_game_start()
 		return
 	end
 	RegisterScriptCallback("on_game_load", on_game_load)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	callbacks_registered = true
-	log("loaded v%s", VERSION)
+	log("callbacks registered v%s", VERSION)
 end
 
 function on_game_end()
 	if callbacks_registered then
 		UnregisterScriptCallback("on_game_load", on_game_load)
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
 		callbacks_registered = false
 	end
 	uninstall()

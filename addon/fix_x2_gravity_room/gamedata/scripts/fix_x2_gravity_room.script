@@ -13,7 +13,7 @@
 -- xr_effects.effect_swiming_true/false.
 
 local LOG_TAG = "[fix_x2_gravity_room]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 local EVENT_ID = "fix_x2_gravity_room"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -100,6 +100,30 @@ local function apply_no_gravity_anomaly(actor, npc, p)
 	schedule_restore()
 end
 
+local function wraps_ok()
+	return type(xr_effects) == "table"
+		and xr_effects.bas_no_gravity_anomaly == apply_no_gravity_anomaly
+end
+
+local function install()
+	if not (type(xr_effects) == "table") then
+		printf("%s xr_effects not found - guard NOT installed", LOG_TAG)
+		return false
+	end
+	if wraps_ok() then
+		return true
+	end
+	xr_effects.bas_no_gravity_anomaly = apply_no_gravity_anomaly
+	log("bas_no_gravity_anomaly bound v%s", VERSION)
+	return true
+end
+
+local function uninstall()
+	if wraps_ok() then
+		xr_effects.bas_no_gravity_anomaly = nil
+	end
+end
+
 function on_before_level_changing()
 	if saved_gravity ~= nil then
 		restore_gravity()
@@ -111,18 +135,21 @@ function on_game_load()
 	RemoveTimeEvent(EVENT_ID, RESTORE_ACTION)
 end
 
-function on_game_start()
-	if type(xr_effects) == "table" then
-		xr_effects.bas_no_gravity_anomaly = apply_no_gravity_anomaly
-	else
-		printf("%s xr_effects not found - guard NOT installed", LOG_TAG)
+function actor_on_first_update()
+	-- MT reload can replace xr_effects after on_game_start.
+	if not wraps_ok() then
+		install()
 	end
+end
 
+function on_game_start()
+	install()
 	if callbacks_registered then
 		return
 	end
 	RegisterScriptCallback("on_game_load", on_game_load)
 	RegisterScriptCallback("on_before_level_changing", on_before_level_changing)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	callbacks_registered = true
 	log("loaded v%s", VERSION)
 end
@@ -134,6 +161,8 @@ function on_game_end()
 	if callbacks_registered then
 		UnregisterScriptCallback("on_game_load", on_game_load)
 		UnregisterScriptCallback("on_before_level_changing", on_before_level_changing)
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
 		callbacks_registered = false
 	end
+	uninstall()
 end

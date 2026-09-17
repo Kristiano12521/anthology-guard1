@@ -13,9 +13,11 @@
 -- TalentsMenu methods for the PDA tab only.
 
 local LOG_TAG = "[fix_talents_pda_respec]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local FITTED_FLAG = "_fix_talents_pda_respec_fitted"
 local MARGIN = 4
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local orig = {}
 local installed = false
@@ -186,7 +188,8 @@ local function wrap(slot, owner, name, patched)
 		return true
 	end
 
-	orig[slot] = orig[slot] or current
+	-- MT reload may replace TalentsMenu after our first wrap; always re-capture.
+	orig[slot] = current
 
 	local ok_set = pcall(function()
 		owner[name] = patched
@@ -203,14 +206,26 @@ local function restore(slot, owner, name)
 		return
 	end
 	pcall(function()
-		if owner[name] then
-			owner[name] = orig[slot]
-		end
+		owner[name] = orig[slot]
 	end)
 end
 
+local function wraps_ok()
+	local gui = module_of()
+	local cls = gui and gui.TalentsMenu
+	if cls == nil then
+		return false
+	end
+	return cls.BuildTalentsMenu == patched_BuildTalentsMenu
+		and cls.OnClickRespec == patched_OnClickRespec
+		and cls.OnClickRespecNo == patched_OnClickRespecNo
+		and cls.OnClickRespecYes == patched_OnClickRespecYes
+		and cls.UpdateTalentsMenu == patched_UpdateTalentsMenu
+		and cls.Update == patched_Update
+end
+
 local function install()
-	if installed then
+	if installed and wraps_ok() then
 		return true
 	end
 
@@ -224,6 +239,12 @@ local function install()
 	if cls == nil then
 		log("talents_gui.TalentsMenu not found")
 		return false
+	end
+
+	-- Stale orig after MT reload would point at a dead module copy.
+	if installed and not wraps_ok() then
+		orig = {}
+		installed = false
 	end
 
 	local wrapped = 0
@@ -261,7 +282,7 @@ end
 local function uninstall()
 	local gui = module_of()
 	local cls = gui and gui.TalentsMenu
-	if cls ~= nil then
+	if cls ~= nil and wraps_ok() then
 		restore("BuildTalentsMenu", cls, "BuildTalentsMenu")
 		restore("RefreshForOpen", cls, "RefreshForOpen")
 		restore("OnClickRespec", cls, "OnClickRespec")
@@ -275,7 +296,10 @@ local function uninstall()
 end
 
 function actor_on_first_update()
-	if not installed then
+	-- MT reload can replace talents_gui after on_game_start.
+	if not wraps_ok() then
+		orig = {}
+		installed = false
 		install()
 	end
 end

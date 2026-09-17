@@ -1,5 +1,24 @@
 # Talents PDA Respec Fix
 
+## [1.0.1] — 2026-09-17
+
+**Изменено**
+
+- `fix_talents_pda_respec.script` — `wraps_ok` по ключевым методам `TalentsMenu`; на `actor_on_first_update` переустанавливает wrap, если модуль уже не наш; always re-capture; uninstall только если указатели ещё наши.
+
+**Причина**
+
+1.0.0 при `installed=true` не сверял указатели и держал `orig` через `or`. После MT reload снова возможен обрезанный respec в PDA.
+
+**Не затронуто**
+
+- PDA-only поведение, standalone окно
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_talents_pda_respec`
+- в игре: не прогонялось
+
 ## [1.0.0] — 2026-08-29
 
 **Изменено**
