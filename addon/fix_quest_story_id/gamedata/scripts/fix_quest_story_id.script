@@ -10,7 +10,7 @@
 -- quests actually look up. Does not rewind NPC XR logic.
 
 local LOG_TAG = "[fix_quest_story_id]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 local TASK_ID_LEVSHA = "yan_quest_levsha"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -162,11 +162,7 @@ local function install()
 	if story_objects.register == patched_register then
 		return true
 	end
-	-- Already wrapped once. A later mod may have wrapped us; calling
-	-- register() again here would recurse (their wrap -> ours -> theirs).
-	if orig_register then
-		return true
-	end
+	-- MT reload may replace story_objects after our first wrap; always re-capture.
 	orig_register = story_objects.register
 	story_objects.register = patched_register
 	log("v%s register() wrapped", VERSION)
@@ -308,7 +304,12 @@ local function schedule_levsha_repair()
 end
 
 function actor_on_first_update()
-	install()
+	-- MT reload can replace story_objects after on_game_start.
+	local ok = story_objects and story_objects.register == patched_register
+	if not ok then
+		orig_register = nil
+		install()
+	end
 	schedule_levsha_repair()
 end
 

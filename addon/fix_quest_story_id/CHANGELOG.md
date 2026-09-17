@@ -1,5 +1,29 @@
 # Quest Story ID Collision Fix
 
+## [1.0.3] — 2026-09-17
+
+**Изменено**
+
+- `fix_quest_story_id.script` — `install()` больше не выходит рано по `orig_register`; на `actor_on_first_update` переустанавливает wrap, если `story_objects.register` уже не наша обёртка (MT reload).
+
+**Причина**
+
+1.0.2 при уже записанном `orig_register` не сверял указатель. После замены таблицы `story_objects` first-wins гард снова отваливался. Тот же паттерн, что у `fix_stash_id_desync` 1.0.3.
+
+**Не затронуто**
+
+- DLTX `!story_id`, preference, `ResetTimeEvent` для Левши
+
+**Совместимость**
+
+- Как 1.0.2
+- Сейвы: без изменений
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_quest_story_id`
+- в игре: не прогонялось
+
 ## [1.0.2] — 2026-08-31
 
 **Изменено**
