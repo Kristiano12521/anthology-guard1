@@ -14,10 +14,12 @@
 -- 2) World radios / notebooks: option sound/radio/zone only gated ph_sound
 --    (Zone FM). Most base devices use ph_idle + play_sound and ignore it.
 --    ph_sound defaults no_hit=true. ph_idle hit_on_bone requires exact bone 2.
---    No on_use. This gates play_sound, accepts any hit, toggles on use.
+--    No on_use in LTX for many devices. Toggle via physic_object_on_use_callback.
+--    ph_idle: mute with stop_sounds (do not switch to @broken — kills scheme).
+--    ph_sound: mute with volume 0 on Zone FM *_out.
 
 local LOG_TAG = "[fix_radio]"
-local VERSION = "1.0.5"
+local VERSION = "1.0.7"
 local TIP_ID = "st_fix_radio_use"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -25,6 +27,8 @@ printf("%s loaded v%s", LOG_TAG, VERSION)
 local orig = {}
 local installed = false
 local callbacks_registered = false
+local last_ph_sound_toggle = 0
+local last_ph_idle_toggle = 0
 
 local function log(fmt, ...)
 	printf(LOG_TAG .. " " .. fmt, ...)
@@ -300,30 +304,139 @@ local function ini_has_section(ini, section)
 	return ok and has
 end
 
-local function toggle_ph_idle_radio(self)
-	local obj = self.object
-	if not obj then
-		return
+local function notify_toggle(muted)
+	local msg
+	if muted then
+		msg = "Radio: OFF"
+	else
+		msg = "Radio: ON"
 	end
-	local bag = db and db.storage and db.storage[obj:id()]
-	local ini = (bag and bag.ini) or (self.st and self.st.ini)
-	local active = (bag and bag.active_section) or ""
-	if not ini then
-		return
+	if actor_menu and actor_menu.set_msg then
+		pcall(function()
+			actor_menu.set_msg(1, msg, 2)
+		end)
+	end
+end
+
+local function theme_from_idle_ini(ini, section)
+	if not (ini and section) then
+		return nil
+	end
+	local keys = { "on_info", "on_info2", "on_info3", "on_info4", "on_info5" }
+	local ki, key
+	for ki = 1, #keys do
+		key = keys[ki]
+		local ok_has, has = pcall(function()
+			return ini:line_exist(section, key)
+		end)
+		if ok_has and has then
+			local ok_val, val = pcall(function()
+				return ini:r_string_ex(section, key)
+			end)
+			if ok_val and type(val) == "string" then
+				local theme = string.match(val, "play_sound%s*%(%s*([%w_]+)")
+				if theme then
+					return theme
+				end
+			end
+		end
+	end
+	return nil
+end
+
+local function recover_radio_logic(obj)
+	if not (obj and db and db.storage and xr_logic and xr_logic.activate_by_section) then
+		return false
+	end
+	local bag = db.storage[obj:id()]
+	if not bag or not bag.ini then
+		return false
+	end
+	if bag.active_scheme then
+		return true
 	end
 	local target
-	if string.find(string.lower(tostring(active)), "broken", 1, true) then
-		if ini_has_section(ini, "ph_idle@music") then
-			target = "ph_idle@music"
+	if ini_has_section(bag.ini, "ph_idle@music") then
+		target = "ph_idle@music"
+	elseif ini_has_section(bag.ini, "ph_sound") then
+		target = "ph_sound"
+	end
+	if not target then
+		return false
+	end
+	xr_logic.activate_by_section(obj, bag.ini, target, bag.gulag_name, false)
+	log("recover: %s -> %s", obj_name_lower(obj), target)
+	return db.storage[obj:id()].active_scheme ~= nil
+end
+
+-- ph_idle radios: do NOT switch music<->broken on use. Switching to @broken
+-- can leave active_scheme=nil (tip gone, further use ignored by binder).
+-- Mute = stop_sounds + bag flag; unmute = play_sound(theme) from on_info.
+local function toggle_ph_idle_radio(obj)
+	local tg = time_global and time_global() or 0
+	if tg > 0 and tg < last_ph_idle_toggle + 300 then
+		return
+	end
+	last_ph_idle_toggle = tg
+
+	if not (obj and db and db.storage) then
+		return
+	end
+	local bag = db.storage[obj:id()]
+	if not bag then
+		log("idle use: no storage for %s", obj_name_lower(obj))
+		return
+	end
+
+	local was_dead = bag.active_scheme == nil
+	recover_radio_logic(obj)
+	bag = db.storage[obj:id()]
+	if not bag then
+		return
+	end
+
+	-- After old broken-toggle left scheme nil: restore music once, don't mute.
+	if was_dead then
+		bag._fix_radio_muted = false
+		local theme = theme_from_idle_ini(bag.ini, "ph_idle@music")
+		if theme and xr_effects and xr_effects.play_sound then
+			xr_effects.play_sound(db.actor, obj, { theme })
+		end
+		set_use_tip(obj)
+		notify_toggle(false)
+		log("idle use: recovered dead %s", obj_name_lower(obj))
+		return
+	end
+
+	bag._fix_radio_muted = not bag._fix_radio_muted
+	local id = obj:id()
+	if bag._fix_radio_muted then
+		if xr_sound and xr_sound.stop_sounds_by_id then
+			xr_sound.stop_sounds_by_id(id)
 		end
 	else
-		if ini_has_section(ini, "ph_idle@broken") then
-			target = "ph_idle@broken"
+		local ini = bag.ini
+		local section = bag.active_section or "ph_idle@music"
+		local theme = theme_from_idle_ini(ini, section)
+		if not theme then
+			theme = theme_from_idle_ini(ini, "ph_idle@music")
+		end
+		if theme and xr_effects and xr_effects.play_sound then
+			xr_effects.play_sound(db.actor, obj, { theme })
+		elseif ini and ini_has_section(ini, "ph_idle@music") and xr_logic and xr_logic.activate_by_section then
+			bag.active_section = nil
+			bag.active_scheme = nil
+			xr_logic.activate_by_section(obj, ini, "ph_idle@music", bag.gulag_name, false)
 		end
 	end
-	if target and xr_logic and xr_logic.switch_to_section then
-		xr_logic.switch_to_section(obj, ini, target)
-	end
+	set_use_tip(obj)
+	notify_toggle(bag._fix_radio_muted)
+	log(
+		"idle use: %s muted=%s scheme=%s",
+		obj_name_lower(obj),
+		tostring(bag._fix_radio_muted),
+		tostring(bag.active_scheme)
+	)
 end
 
 function patched_idle_hit(self, obj, amount, local_direction, who, bone_index)
@@ -354,8 +467,9 @@ function patched_idle_use(self, obj, actor)
 			return handled
 		end
 	end
+	-- Radio toggle is in physic_object_on_use_callback (also runs when
+	-- active_section is nil). Consume use here to avoid double-handling.
 	if is_device_radio(self.object) then
-		toggle_ph_idle_radio(self)
 		return true
 	end
 end
@@ -363,7 +477,9 @@ end
 function patched_idle_update(self, delta)
 	if is_device_radio(self.object) then
 		set_use_tip(self.object)
-		if not zone_enabled() and xr_sound and xr_sound.stop_sounds_by_id then
+		local bag = db and db.storage and db.storage[self.object:id()]
+		local muted = bag and bag._fix_radio_muted
+		if (muted or not zone_enabled()) and xr_sound and xr_sound.stop_sounds_by_id then
 			xr_sound.stop_sounds_by_id(self.object:id())
 		end
 	end
@@ -395,6 +511,85 @@ local function apply_use_mute_volume(self)
 	end
 end
 
+local function find_ph_sound_action(obj)
+	if not (obj and db and db.storage) then
+		return nil
+	end
+	local bag = db.storage[obj:id()]
+	if not bag or bag.active_scheme ~= "ph_sound" then
+		return nil
+	end
+	local st = bag.ph_sound or bag[bag.active_scheme]
+	if not (st and st.actions) then
+		return nil
+	end
+	local action, active
+	for action, active in pairs(st.actions) do
+		if active then
+			return action
+		end
+	end
+	return nil
+end
+
+local function toggle_ph_sound_radio(obj)
+	local tg = time_global and time_global() or 0
+	if tg > 0 and tg < last_ph_sound_toggle + 300 then
+		return
+	end
+	last_ph_sound_toggle = tg
+
+	local action = find_ph_sound_action(obj)
+	if not action then
+		log("use: no ph_sound action for %s", obj_name_lower(obj))
+		return
+	end
+
+	-- Old 1.0.x stored mute as destr — clear so the radio can play again.
+	if action.destructed then
+		action.destructed = false
+		action._fix_radio_muted = false
+		arm_ph_sound(action)
+		set_use_tip(obj)
+		notify_toggle(false)
+		log("use: cleared destr on %s", obj_name_lower(obj))
+		return
+	end
+
+	action._fix_radio_muted = not action._fix_radio_muted
+	if action._fix_radio_muted then
+		apply_use_mute_volume(action)
+	elseif not action.played_sound then
+		arm_ph_sound(action)
+	end
+	set_use_tip(obj)
+	notify_toggle(action._fix_radio_muted)
+	log(
+		"use: %s muted=%s snd=%s",
+		obj_name_lower(obj),
+		tostring(action._fix_radio_muted),
+		tostring(action.played_sound ~= nil)
+	)
+end
+
+function physic_object_on_use_callback(obj, who)
+	if not is_device_radio(obj) then
+		return
+	end
+	local bag = db and db.storage and db.storage[obj:id()]
+	if not bag then
+		return
+	end
+	if bag.active_scheme == "ph_sound" then
+		toggle_ph_sound_radio(obj)
+		return
+	end
+	-- ph_idle, or dead logic (scheme nil after old music<->broken toggle)
+	if bag.active_scheme == "ph_idle" or bag.active_scheme == nil then
+		toggle_ph_idle_radio(obj)
+	end
+end
+
 function patched_snd_hit(self, obj, amount, local_direction, who, bone_index)
 	if is_device_radio(self.object) then
 		if self.played_sound then
@@ -408,32 +603,6 @@ function patched_snd_hit(self, obj, amount, local_direction, who, bone_index)
 	if orig.snd_hit then
 		return orig.snd_hit(self, obj, amount, local_direction, who, bone_index)
 	end
-end
-
-function patched_snd_use(self, obj, actor)
-	-- Vanilla ph_sound has no use_callback; guard against self-call if install ran twice.
-	if orig.snd_use and orig.snd_use ~= patched_snd_use then
-		orig.snd_use(self, obj, actor)
-	end
-	if not is_device_radio(self.object) then
-		return
-	end
-	-- Old 1.0.x toggled destructed on use (saved as destr). Clear so the radio
-	-- can play again; further mutes use volume only.
-	if self.destructed then
-		self.destructed = false
-		self._fix_radio_muted = false
-		arm_ph_sound(self)
-		set_use_tip(self.object)
-		return
-	end
-	self._fix_radio_muted = not self._fix_radio_muted
-	if self._fix_radio_muted then
-		apply_use_mute_volume(self)
-	elseif not self.played_sound then
-		arm_ph_sound(self)
-	end
-	set_use_tip(self.object)
 end
 
 function patched_snd_update(self, delta)
@@ -466,7 +635,6 @@ function patched_snd_update(self, delta)
 	if orig.snd_update then
 		result = orig.snd_update(self, delta)
 	end
-	-- Orig sets volume from LTX condlist after play — re-apply mute on top.
 	if is_device_radio(self.object) then
 		apply_use_mute_volume(self)
 	end
@@ -519,18 +687,15 @@ local function install_world()
 	ok = patch_method("ph_sound", "snd_source", "hit_callback", patched_snd_hit, "snd_hit") and ok
 	ok = patch_method("ph_sound", "snd_source", "update", patched_snd_update, "snd_update") and ok
 
+	-- Clear leftover use_callback from fix_radio 1.0.3–1.0.5 if still hanging on class.
 	local snd_cls = class_of("ph_sound", "snd_source")
-	if snd_cls then
-		-- Original use_callback is nil; cannot use "orig == nil" as capture guard
-		-- (on_game_start + actor_on_first_update would store patched as orig).
-		if not orig.snd_use_captured then
-			orig.snd_use = snd_cls.use_callback
-			orig.snd_use_added = snd_cls.use_callback == nil
-				or snd_cls.use_callback == patched_snd_use
-			orig.snd_use_captured = true
-		end
-		snd_cls.use_callback = patched_snd_use
+	if snd_cls and snd_cls.use_callback ~= nil then
+		snd_cls.use_callback = nil
 	end
+
+	-- Do not add snd_source.use_callback: vanilla has none, and class lookup for a
+	-- newly added method is unreliable. Binder always SendScriptCallbacks
+	-- physic_object_on_use_callback — that is the toggle path for Zone FM.
 
 	local fx = module_of("xr_effects")
 	if fx and type(fx.play_sound) == "function" and fx.play_sound ~= patched_play_sound then
@@ -572,16 +737,6 @@ function uninstall()
 	restore_method("ph_idle", "action_idle", "update", "idle_update")
 	restore_method("ph_sound", "snd_source", "hit_callback", "snd_hit")
 	restore_method("ph_sound", "snd_source", "update", "snd_update")
-	local snd_cls = class_of("ph_sound", "snd_source")
-	if snd_cls then
-		if orig.snd_use_added then
-			snd_cls.use_callback = nil
-		elseif orig.snd_use and orig.snd_use ~= patched_snd_use then
-			snd_cls.use_callback = orig.snd_use
-		else
-			snd_cls.use_callback = nil
-		end
-	end
 	local fx = module_of("xr_effects")
 	if fx and orig.play_sound then
 		fx.play_sound = orig.play_sound
@@ -589,9 +744,6 @@ function uninstall()
 	if ui_options and orig.ui_get then
 		ui_options.get = orig.ui_get
 	end
-	orig.snd_use = nil
-	orig.snd_use_added = nil
-	orig.snd_use_captured = nil
 	installed = false
 end
 
@@ -603,6 +755,7 @@ function on_game_start()
 	install()
 	if not callbacks_registered then
 		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		RegisterScriptCallback("physic_object_on_use_callback", physic_object_on_use_callback)
 		callbacks_registered = true
 	end
 end
@@ -610,6 +763,7 @@ end
 function on_game_end()
 	if callbacks_registered then
 		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		UnregisterScriptCallback("physic_object_on_use_callback", physic_object_on_use_callback)
 		callbacks_registered = false
 	end
 	uninstall()

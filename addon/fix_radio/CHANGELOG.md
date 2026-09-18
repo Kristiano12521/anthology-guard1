@@ -1,5 +1,45 @@
 # Radio Fix
 
+## [1.0.7] — 2026-09-18
+
+**Изменено**
+
+- `gamedata/scripts/fix_radio.script` — для `ph_idle` use больше не переключает `music`↔`broken` (после `@broken` у Сидоровича `scheme` становился `nil`, tip пропадал). Мьют: `stop_sounds_by_id` + `bag._fix_radio_muted`; вкл: `xr_effects.play_sound` по теме из `on_info`. Recovery через `activate_by_section` если scheme nil. Toggle в `physic_object_on_use_callback` (и для nil scheme).
+
+**Причина**
+
+Diag: `esc_sidorovich_radio` в игре на `ph_idle@music`, не `ph_sound`. Первый use → `@broken` → через секунду `scheme=nil` → tip/use по схеме мертвы.
+
+**Не затронуто**
+
+- Hit → `@broken` по `hit_on_bone`
+- Zone FM (`ph_sound`) volume-mute
+- HF placeable
+
+**Проверено**
+
+- lint / деплой
+- в игре: ждать `[fix_radio] idle use: esc_sidorovich_radio muted=... scheme=ph_idle`
+
+## [1.0.6] — 2026-09-18
+
+**Изменено**
+
+- `gamedata/scripts/fix_radio.script` — toggle Zone FM (`ph_sound`) через `physic_object_on_use_callback`, а не через добавление `snd_source.use_callback` (у ванили метода нет, lookup ненадёжен). Мьют по-прежнему `volume = 0`. В лог пишется `use: ... muted=...`. На экране краткое `Radio: ON/OFF`.
+
+**Причина**
+
+1.0.5 грузился без Lua-ошибок, но use не давал стабильного эффекта: патч несуществующего `use_callback` на классе мог не вызываться. Binder всегда шлёт `physic_object_on_use_callback`.
+
+**Не затронуто**
+
+- `ph_idle` use (секции music/broken), hit, зона, HF
+
+**Проверено**
+
+- lint / деплой в MO2 pack
+- в игре: ждать `[fix_radio] use: esc_sidorovich_radio muted=...` при каждом use
+
 ## [1.0.5] — 2026-09-18
 
 **Изменено**
