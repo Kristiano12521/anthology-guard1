@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import REPO_ROOT  # noqa: E402
 
 BUILD = REPO_ROOT / "build"
-BUNDLE_NAME = "Kristiano_Fixes_Bundle_2026-09-02.zip"
+BUNDLE_NAME = "Kristiano_Fixes_Bundle_2026-09-18.zip"
 VANILLA_BUNDLE_NAME = "Kristiano_Vanilla_Anomaly_Fixes_2026-09-02.zip"
 
 ZIP_VER = re.compile(r"^(.+)-(\d+(?:\.\d+)+)\.zip$")
@@ -67,6 +67,7 @@ TOP_PREFIXES = (
     "[HUD] Context",
     "[GFX] QuickQK",
     "[SND] Anthology ST2",
+    "[FIX] Campfires",
 )
 
 
@@ -129,17 +130,20 @@ def write_index(individual: list[Path]) -> str:
 
 def write_changelog(count: int) -> str:
     return (
-        "# Kristiano Fixes Bundle — 2026-09-02 (v2)\n\n"
+        "# Kristiano Fixes Bundle - 2026-09-18\n\n"
         "## Что нового\n\n"
-        "### fix_fdda_mcm_paths v1.0.0 (подтверждён 02.09.2026)\n\n"
-        "DotMarks: mcm_paths перенаправлен с EA_settings/* на fddar/* (FDDA Redone).\n"
-        "Убирает !MCM given bad path от DotMarks; pickup-анимации согласованы с MCM FDDA.\n"
-        "Нужны DotMarks + FDDA Redone. Уже внутри AIO.\n\n"
+        "### 2026-09-18\n\n"
+        "- fix_radio 1.0.5: mute через volume (не stop/destructed); tip через "
+        "translate_string; защита от двойного wrap use-callback.\n"
+        "- fix_milspec_exo_craft 1.0.4 + kristiano_kx1_exo 1.5.5-b: убран цикл "
+        "LoadRecipesLTX (CTD на ТБ/гайдах); схрон с флешкой KX-1 — 1%.\n\n"
+        "### 2026-09-17 (вечер)\n\n"
+        "- fix_radio 1.0.3: arm sound_set после use / опции Радио Зоны.\n"
+        "- MT re-wrap по crash-guard партиям; campfires trader wrap.\n\n"
         "### Структура bundle\n\n"
-        "- Корень: AIO + 3 отдельных MO2-мода (CMO, QuickQK, ST2)\n"
-        f"- individual/: {count} отдельных zip — каждый со своим CHANGELOG.md\n"
-        "- README_RU.txt, CHANGELOG.txt, individual/INDEX.txt\n\n"
-        "AIO: 54 аддона, 161 файл gamedata, BHS v0.6.10 внутри.\n"
+        "- Корень: AIO + CMO + QuickQK + ST2 + Campfires\n"
+        f"- individual/: {count} отдельных zip\n"
+        "- README_RU.txt, CHANGELOG.txt, individual/INDEX.txt\n"
     )
 
 
@@ -159,6 +163,7 @@ def write_readme() -> str:
             "  [HUD] Context Menu_Overhaul_Anthology.zip",
             "  [GFX] QuickQK Task Status Tool Anthology.zip",
             "  [SND] Anthology ST2 Mutant Footstep Sound.zip",
+            "  [FIX] Campfires Anthology Compat.zip",
             "",
             "Для чистой Anomaly без Anthology:",
             "  — не ставить AIO;",

@@ -17,7 +17,7 @@
 --    No on_use. This gates play_sound, accepts any hit, toggles on use.
 
 local LOG_TAG = "[fix_radio]"
-local VERSION = "1.0.4"
+local VERSION = "1.0.5"
 local TIP_ID = "st_fix_radio_use"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -96,9 +96,17 @@ local function set_use_tip(obj)
 	if not (obj and obj.set_tip_text) then
 		return
 	end
-	-- Pass string-table id (same as ph_door / ph_code), not a pre-translated string.
+	-- Translated text (vasgen_fairy_radio pattern): id-only tip can show blank
+	-- if the string table is late/missing for a frame.
+	local text = TIP_ID
+	if game and game.translate_string then
+		local t = game.translate_string(TIP_ID)
+		if t and t ~= "" then
+			text = t
+		end
+	end
 	pcall(function()
-		obj:set_tip_text(TIP_ID)
+		obj:set_tip_text(text)
 	end)
 	if obj.set_nonscript_usable then
 		pcall(function()
@@ -364,15 +372,27 @@ function patched_idle_update(self, delta)
 	end
 end
 
--- ph_sound only fetches a track when st.sound_set is true. After we stop
--- played_sound (use off / zone off), sound_set stays false and update never
--- re-arms. Arm again whenever the radio becomes allowed to play.
+-- ph_sound fetches a track only when st.sound_set is true. Zone-off used to
+-- stop the out-sound and leave sound_set false — re-arm when allowed again.
 local function arm_ph_sound(self)
 	if not self.st then
 		return
 	end
 	self.st.sound_set = true
 	self.st.pause_time = 0
+end
+
+-- Use-mute must NOT stop Zone FM *_out or flip destructed (vasgen_fairy_radio:
+-- volume 0/1, track keeps running). destructed is only for hit / saved break.
+local function apply_use_mute_volume(self)
+	if not (self and self.played_sound) then
+		return
+	end
+	if self._fix_radio_muted then
+		pcall(function()
+			self.played_sound.volume = 0
+		end)
+	end
 end
 
 function patched_snd_hit(self, obj, amount, local_direction, who, bone_index)
@@ -382,6 +402,7 @@ function patched_snd_hit(self, obj, amount, local_direction, who, bone_index)
 			self.played_sound = nil
 		end
 		self.destructed = true
+		self._fix_radio_muted = false
 		return
 	end
 	if orig.snd_hit then
@@ -397,13 +418,19 @@ function patched_snd_use(self, obj, actor)
 	if not is_device_radio(self.object) then
 		return
 	end
-	self.destructed = not self.destructed
+	-- Old 1.0.x toggled destructed on use (saved as destr). Clear so the radio
+	-- can play again; further mutes use volume only.
 	if self.destructed then
-		if self.played_sound then
-			self.played_sound:stop()
-			self.played_sound = nil
-		end
-	else
+		self.destructed = false
+		self._fix_radio_muted = false
+		arm_ph_sound(self)
+		set_use_tip(self.object)
+		return
+	end
+	self._fix_radio_muted = not self._fix_radio_muted
+	if self._fix_radio_muted then
+		apply_use_mute_volume(self)
+	elseif not self.played_sound then
 		arm_ph_sound(self)
 	end
 	set_use_tip(self.object)
@@ -423,21 +450,27 @@ function patched_snd_update(self, delta)
 	end
 	if self._fix_radio_zone_blocked then
 		self._fix_radio_zone_blocked = false
-		if not self.destructed then
+		if not self.destructed and not self._fix_radio_muted then
 			arm_ph_sound(self)
 		end
 	elseif is_device_radio(self.object)
 		and not self.destructed
+		and not self._fix_radio_muted
 		and self.played_sound == nil
 		and self.st
 		and self.st.sound_set == false
 	then
-		-- Already stuck (old save / prior use) before this fix.
 		arm_ph_sound(self)
 	end
+	local result
 	if orig.snd_update then
-		return orig.snd_update(self, delta)
+		result = orig.snd_update(self, delta)
 	end
+	-- Orig sets volume from LTX condlist after play — re-apply mute on top.
+	if is_device_radio(self.object) then
+		apply_use_mute_volume(self)
+	end
+	return result
 end
 
 function patched_play_sound(actor, obj, p)
