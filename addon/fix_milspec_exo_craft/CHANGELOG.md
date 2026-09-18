@@ -1,5 +1,24 @@
 # Milspec and Exo Craft Fix
 
+## [1.0.4] — 2026-09-18
+
+**Изменено**
+
+- `fix_milspec_exo_craft.script` — на `actor_on_first_update` не переустанавливает wrap, если таблица CSI та же и мы уже в цепочке (поверх нас outer-мод вроде `kristiano_kx1`). Re-wrap только при замене самой таблицы CSI (MT reload).
+
+**Причина**
+
+1.0.3 при «указатель не наш» захватывал outer wrap как `orig_load` → цикл `milspec ↔ kristiano` → stack overflow при любом `LoadRecipesLTX` (ТБ/патроны, гайды). В FATAL ошибочно светилось `DebuggerMode` / `w_s32`.
+
+**Не затронуто**
+
+- Состав рецептов, DLTX `mod_craft_device_*`
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_milspec_exo_craft`
+- в игре: не прогонялось
+
 ## [1.0.3] — 2026-09-17
 
 **Изменено**
