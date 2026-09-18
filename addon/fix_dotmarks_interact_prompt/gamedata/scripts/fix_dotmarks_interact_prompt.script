@@ -1,0 +1,220 @@
+-- load-order: after ui_hud_dotmarks / utils_catspaw_common
+-- DotMarks InteractPrompt InitStatic guard
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- xray_mg9000: tutorial_campfire_extinguish -> setup_tutorial_prompt ->
+-- InteractPrompt:BuildUI -> InitStatic("alt_interact") -> Lua Runtime Error ->
+-- tempsave -> native crash in ScreenResolutionChanged.
+--
+-- Stock ui_dotmarks.xml has alt_interact; failure is runtime (stale/bad
+-- CScriptXmlInit cache or unreadable doc). Soft-fail: pcall construction /
+-- on_option_change, bust our xml cache, retry once; if still broken skip
+-- the prompt instead of CTD. Vanilla tutorial text path stays intact.
+
+local LOG_TAG = "[fix_dotmarks_interact_prompt]"
+local VERSION = "1.0.0"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local installed = false
+local callbacks_registered = false
+
+local orig_get_xml_cache = nil
+local orig_setup_pri = nil
+local orig_setup_sec = nil
+local orig_on_option_change = nil
+
+local xml_cache = {}
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function interact_filepath()
+	local cfg = ui_hud_dotmarks and ui_hud_dotmarks.cfg
+	return cfg and cfg.interact_uifile or "ui_dotmarks.xml"
+end
+
+local function bust_xml_cache(filepath)
+	if filepath then
+		xml_cache[filepath] = nil
+	else
+		xml_cache = {}
+	end
+end
+
+local function patched_get_xml_cache(filepath, uid)
+	if not filepath then
+		return nil
+	end
+	local cached = xml_cache[filepath]
+	if cached then
+		return cached
+	end
+	local xml = CScriptXmlInit()
+	xml:ParseFile(filepath)
+	xml_cache[filepath] = xml
+	return xml
+end
+
+local function pcall_retry(label, fn, ...)
+	local ok, a, b, c, d = pcall(fn, ...)
+	if ok then
+		return true, a, b, c, d
+	end
+	local err1 = a
+	log("%s failed (%s) - bust xml cache and retry", label, tostring(err1))
+	bust_xml_cache(interact_filepath())
+	ok, a, b, c, d = pcall(fn, ...)
+	if ok then
+		log("%s recovered after fresh ParseFile", label)
+		return true, a, b, c, d
+	end
+	log("%s retry failed (%s) - skipped", label, tostring(a))
+	return false, nil
+end
+
+local function patched_setup_pri(mark, args)
+	local ok, result = pcall_retry("setup_pri_interact_prompt", orig_setup_pri, mark, args)
+	if ok then
+		return result
+	end
+	return nil
+end
+
+local function patched_setup_sec(mark)
+	local ok, result = pcall_retry("setup_sec_interact_prompt", orig_setup_sec, mark)
+	if ok then
+		return result
+	end
+	return nil
+end
+
+local function patched_on_option_change(self, ...)
+	local ok = pcall_retry("InteractPrompt:on_option_change", orig_on_option_change, self, ...)
+	if ok then
+		return
+	end
+	-- Leave object inert so later ShowPrompt/BusyState do not CTD on nil widgets.
+	self.destroyed = true
+end
+
+local function wraps_ok()
+	if type(ui_hud_dotmarks) ~= "table" then
+		return false
+	end
+	if ui_hud_dotmarks.setup_pri_interact_prompt ~= patched_setup_pri then
+		return false
+	end
+	if ui_hud_dotmarks.setup_sec_interact_prompt ~= patched_setup_sec then
+		return false
+	end
+	local cls = ui_hud_dotmarks.InteractPrompt
+	if type(cls) ~= "table" or cls.on_option_change ~= patched_on_option_change then
+		return false
+	end
+	if type(utils_catspaw_common) ~= "table"
+		or utils_catspaw_common.get_xml_cache ~= patched_get_xml_cache then
+		return false
+	end
+	return true
+end
+
+local function uninstall()
+	if type(utils_catspaw_common) == "table"
+		and orig_get_xml_cache
+		and utils_catspaw_common.get_xml_cache == patched_get_xml_cache then
+		utils_catspaw_common.get_xml_cache = orig_get_xml_cache
+	end
+	if type(ui_hud_dotmarks) == "table" then
+		if orig_setup_pri and ui_hud_dotmarks.setup_pri_interact_prompt == patched_setup_pri then
+			ui_hud_dotmarks.setup_pri_interact_prompt = orig_setup_pri
+		end
+		if orig_setup_sec and ui_hud_dotmarks.setup_sec_interact_prompt == patched_setup_sec then
+			ui_hud_dotmarks.setup_sec_interact_prompt = orig_setup_sec
+		end
+		local cls = ui_hud_dotmarks.InteractPrompt
+		if type(cls) == "table"
+			and orig_on_option_change
+			and cls.on_option_change == patched_on_option_change then
+			cls.on_option_change = orig_on_option_change
+		end
+	end
+	orig_get_xml_cache = nil
+	orig_setup_pri = nil
+	orig_setup_sec = nil
+	orig_on_option_change = nil
+	xml_cache = {}
+	installed = false
+end
+
+local function install()
+	if installed and wraps_ok() then
+		return true
+	end
+
+	if type(utils_catspaw_common) ~= "table"
+		or type(utils_catspaw_common.get_xml_cache) ~= "function" then
+		log("utils_catspaw_common.get_xml_cache not found - guard NOT installed")
+		return false
+	end
+	if type(ui_hud_dotmarks) ~= "table" then
+		log("ui_hud_dotmarks not found - guard NOT installed")
+		return false
+	end
+	if type(ui_hud_dotmarks.setup_pri_interact_prompt) ~= "function"
+		or type(ui_hud_dotmarks.setup_sec_interact_prompt) ~= "function" then
+		log("setup_pri/sec_interact_prompt not found - guard NOT installed")
+		return false
+	end
+	local cls = ui_hud_dotmarks.InteractPrompt
+	if type(cls) ~= "table" or type(cls.on_option_change) ~= "function" then
+		log("InteractPrompt.on_option_change not found - guard NOT installed")
+		return false
+	end
+
+	if utils_catspaw_common.get_xml_cache ~= patched_get_xml_cache then
+		orig_get_xml_cache = utils_catspaw_common.get_xml_cache
+		utils_catspaw_common.get_xml_cache = patched_get_xml_cache
+		xml_cache = {}
+	end
+	if ui_hud_dotmarks.setup_pri_interact_prompt ~= patched_setup_pri then
+		orig_setup_pri = ui_hud_dotmarks.setup_pri_interact_prompt
+		ui_hud_dotmarks.setup_pri_interact_prompt = patched_setup_pri
+	end
+	if ui_hud_dotmarks.setup_sec_interact_prompt ~= patched_setup_sec then
+		orig_setup_sec = ui_hud_dotmarks.setup_sec_interact_prompt
+		ui_hud_dotmarks.setup_sec_interact_prompt = patched_setup_sec
+	end
+	if cls.on_option_change ~= patched_on_option_change then
+		orig_on_option_change = cls.on_option_change
+		cls.on_option_change = patched_on_option_change
+	end
+
+	installed = true
+	log("guards installed v%s", VERSION)
+	return true
+end
+
+function actor_on_first_update()
+	if not installed or not wraps_ok() then
+		installed = false
+		install()
+	end
+end
+
+function on_game_start()
+	install()
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
+	uninstall()
+end
