@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import REPO_ROOT  # noqa: E402
 
 BUILD = REPO_ROOT / "build"
-BUNDLE_NAME = "Kristiano_Fixes_Bundle_2026-09-18.zip"
+BUNDLE_NAME = "Kristiano_Fixes_Bundle_2026-09-19.zip"
 VANILLA_BUNDLE_NAME = "Kristiano_Vanilla_Anomaly_Fixes_2026-09-02.zip"
 
 ZIP_VER = re.compile(r"^(.+)-(\d+(?:\.\d+)+)\.zip$")
@@ -130,8 +130,12 @@ def write_index(individual: list[Path]) -> str:
 
 def write_changelog(count: int) -> str:
     return (
-        "# Kristiano Fixes Bundle - 2026-09-18\n\n"
+        "# Kristiano Fixes Bundle - 2026-09-19\n\n"
         "## Что нового\n\n"
+        "### 2026-09-19\n\n"
+        "- fix_matches_campfire_softlock 1.0.0: FDDA анимация спичек у костра — "
+        "watchdog 8 с снимает disable_input, если cam-callback не сработал "
+        "(soft-lock «ничего не могу делать»).\n\n"
         "### 2026-09-18\n\n"
         "- fix_radio 1.0.5: mute через volume (не stop/destructed); tip через "
         "translate_string; защита от двойного wrap use-callback.\n"

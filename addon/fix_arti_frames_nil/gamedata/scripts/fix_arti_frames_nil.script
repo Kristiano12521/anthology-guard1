@@ -12,7 +12,7 @@
 -- v1.0.2: re-wrap on actor_on_first_update if MT reload replaced the module.
 
 local LOG_TAG = "[fix_arti_frames_nil]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 local MODULE_NAME = "arti_frames_control"
 local CALLBACK = "ActorMenu_on_item_after_move"
 local LOG_INTERVAL_MS = 1000
@@ -41,6 +41,9 @@ local function log_skip(npc_id)
 end
 
 function guarded_on_move(npc_id, obj, ...)
+	if not orig_fn then
+		return
+	end
 	if obj == nil then
 		log_skip(npc_id)
 		return
@@ -50,7 +53,7 @@ end
 
 local function wraps_ok()
 	local mod = rawget(_G, MODULE_NAME)
-	return mod and mod.on_move == guarded_on_move
+	return mod and mod.on_move == guarded_on_move and orig_fn
 end
 
 local function steal_callback(name, old_fn, new_fn)
@@ -80,8 +83,8 @@ local function install()
 	end
 
 	if mod.on_move == guarded_on_move then
-		installed = true
-		return true
+		installed = type(orig_fn) == "function"
+		return installed
 	end
 
 	orig_fn = mod.on_move
@@ -123,9 +126,9 @@ end
 
 function actor_on_first_update()
 	-- MT reload can replace arti_frames_control after on_game_start.
+	-- Do not wipe orig_fn: install() re-captures only when the slot is no longer ours.
 	if not installed or not wraps_ok() then
 		installed = false
-		orig_fn = nil
 		install()
 	end
 end

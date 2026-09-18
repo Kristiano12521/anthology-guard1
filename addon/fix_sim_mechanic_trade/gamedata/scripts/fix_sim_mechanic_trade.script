@@ -12,7 +12,7 @@
 -- not by a save-specific object id.
 
 local LOG_TAG = "[fix_sim_mechanic_trade]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -59,6 +59,9 @@ local function needs_mechanic_restock(npc)
 end
 
 local function patched_trade_init(npc, cfg)
+	if not orig_trade_init then
+		return
+	end
 	if is_sim_mechanic(npc) and is_default_generic(cfg) then
 		cfg = MECHANIC_CFG
 	end
@@ -70,6 +73,9 @@ local function patched_trade_init(npc, cfg)
 end
 
 local function patched_update(npc, force_refresh)
+	if not orig_update then
+		return
+	end
 	if not force_refresh and needs_mechanic_restock(npc) then
 		force_refresh = true
 	end
@@ -77,6 +83,9 @@ local function patched_update(npc, force_refresh)
 end
 
 local function patched_reset_show_spot(npc, scheme, st, section)
+	if not orig_reset_show_spot then
+		return
+	end
 	orig_reset_show_spot(npc, scheme, st, section)
 	if not is_sim_mechanic(npc) then
 		return
@@ -97,15 +106,18 @@ local function wraps_ok()
 	if not (type(trade_manager) == "table" and type(trade_manager.trade_init) == "function") then
 		return false
 	end
-	if trade_manager.trade_init ~= patched_trade_init then
+	if trade_manager.trade_init ~= patched_trade_init or not orig_trade_init then
 		return false
 	end
-	if type(trade_manager.update) == "function" and trade_manager.update ~= patched_update then
-		return false
+	if type(trade_manager.update) == "function" then
+		if trade_manager.update ~= patched_update or not orig_update then
+			return false
+		end
 	end
-	if type(stalker_generic) == "table" and type(stalker_generic.reset_show_spot) == "function"
-		and stalker_generic.reset_show_spot ~= patched_reset_show_spot then
-		return false
+	if type(stalker_generic) == "table" and type(stalker_generic.reset_show_spot) == "function" then
+		if stalker_generic.reset_show_spot ~= patched_reset_show_spot or not orig_reset_show_spot then
+			return false
+		end
 	end
 	return true
 end
@@ -166,10 +178,9 @@ end
 
 function actor_on_first_update()
 	-- MT reload can replace trade_manager / stalker_generic after on_game_start.
+	-- Do not wipe orig_* first: install() re-captures only slots that are no
+	-- longer ours. Wiping broke still-wrapped slots (orig nil → CTD).
 	if not wraps_ok() then
-		orig_trade_init = nil
-		orig_update = nil
-		orig_reset_show_spot = nil
 		install()
 	end
 end

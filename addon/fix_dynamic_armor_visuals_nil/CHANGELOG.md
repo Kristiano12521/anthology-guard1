@@ -1,5 +1,25 @@
 # Dynamic Armor Visuals Nil Guard
 
+## [1.0.4] — 2026-09-19
+
+**Изменено**
+
+- Monkey-patch re-wrap: больше не обнуляет `orig_*` перед `install()` на `actor_on_first_update`.
+- `wraps_ok` требует живой `orig`; вызовы оригинала под nil-guard.
+
+**Причина**
+
+Обнуление всех `orig` при частичном сбое wrap оставляло уже наш патч с `orig == nil` → CTD (как `fix_sim_mechanic_trade` / xray_korisnik).
+
+**Не затронуто**
+
+- Игровая логика патча, сейвы, DLTX
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_dynamic_armor_visuals_nil`
+- в игре: не прогонялось
+
 ## [1.0.3] — 2026-09-17
 
 **Изменено**

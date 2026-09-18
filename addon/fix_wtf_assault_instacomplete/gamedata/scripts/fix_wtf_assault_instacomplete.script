@@ -17,7 +17,7 @@
 -- and retry that collect in status() only while the snapshot is still empty.
 
 local LOG_TAG = "[fix_wtf_assault_instacomplete]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -132,6 +132,9 @@ local function log_recover(entity, added, reason)
 end
 
 local function patched_on_init(entity)
+	if not orig.on_init then
+		return
+	end
 	orig.on_init(entity)
 	local added = merge_squads(entity, collect_assigned_enemies(entity))
 	if added > 0 then
@@ -140,6 +143,9 @@ local function patched_on_init(entity)
 end
 
 local function patched_status(entity)
+	if not orig.status then
+		return
+	end
 	if snapshot_len(entity) == 0 then
 		local added = merge_squads(entity, collect_assigned_enemies(entity))
 		if added > 0 then
@@ -154,6 +160,8 @@ local function wraps_ok()
 	return Assault
 		and Assault.on_init == patched_on_init
 		and Assault.status == patched_status
+		and orig.on_init
+		and orig.status
 end
 
 local function install()
@@ -201,9 +209,9 @@ end
 
 function actor_on_first_update()
 	-- MT reload can replace igi_target_assault after on_game_start.
+	-- Do not wipe orig: install() re-captures only slots that are no longer ours.
 	if not installed or not wraps_ok() then
 		installed = false
-		orig = {}
 		install()
 	end
 end

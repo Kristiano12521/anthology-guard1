@@ -13,7 +13,7 @@
 -- TalentsMenu methods for the PDA tab only.
 
 local LOG_TAG = "[fix_talents_pda_respec]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 local FITTED_FLAG = "_fix_talents_pda_respec_fitted"
 local MARGIN = 4
 
@@ -126,11 +126,17 @@ local function fit_respec_btn(self)
 end
 
 local function patched_BuildTalentsMenu(self, xml)
+	if not orig.BuildTalentsMenu then
+		return
+	end
 	orig.BuildTalentsMenu(self, xml)
 	fit_respec_btn(self)
 end
 
 local function patched_RefreshForOpen(self)
+	if not orig.RefreshForOpen then
+		return
+	end
 	orig.RefreshForOpen(self)
 	if self.is_pda_tab then
 		fit_respec_btn(self)
@@ -139,6 +145,9 @@ local function patched_RefreshForOpen(self)
 end
 
 local function patched_OnClickRespec(self)
+	if not orig.OnClickRespec then
+		return
+	end
 	orig.OnClickRespec(self)
 	if self.is_pda_tab then
 		set_overlay(self, true)
@@ -146,6 +155,9 @@ local function patched_OnClickRespec(self)
 end
 
 local function patched_OnClickRespecNo(self)
+	if not orig.OnClickRespecNo then
+		return
+	end
 	orig.OnClickRespecNo(self)
 	if self.is_pda_tab then
 		set_overlay(self, false)
@@ -153,6 +165,9 @@ local function patched_OnClickRespecNo(self)
 end
 
 local function patched_OnClickRespecYes(self)
+	if not orig.OnClickRespecYes then
+		return
+	end
 	orig.OnClickRespecYes(self)
 	if self.is_pda_tab then
 		set_overlay(self, false)
@@ -160,6 +175,9 @@ local function patched_OnClickRespecYes(self)
 end
 
 local function patched_UpdateTalentsMenu(self)
+	if not orig.UpdateTalentsMenu then
+		return
+	end
 	orig.UpdateTalentsMenu(self)
 	if overlay_active(self) then
 		set_overlay(self, true)
@@ -167,6 +185,9 @@ local function patched_UpdateTalentsMenu(self)
 end
 
 local function patched_Update(self)
+	if not orig.Update then
+		return
+	end
 	orig.Update(self)
 	if overlay_active(self) then
 		set_shown(self.talents_tooltip_cont, false)
@@ -185,10 +206,12 @@ local function wrap(slot, owner, name, patched)
 		return false
 	end
 	if current == patched then
-		return true
+		-- Already ours: keep existing orig. Missing orig is a broken state;
+		-- do not pretend wrap succeeded without a callable original.
+		return type(orig[slot]) == "function"
 	end
 
-	-- MT reload may replace TalentsMenu after our first wrap; always re-capture.
+	-- MT reload may replace TalentsMenu after our first wrap; re-capture this slot only.
 	orig[slot] = current
 
 	local ok_set = pcall(function()
@@ -222,6 +245,12 @@ local function wraps_ok()
 		and cls.OnClickRespecYes == patched_OnClickRespecYes
 		and cls.UpdateTalentsMenu == patched_UpdateTalentsMenu
 		and cls.Update == patched_Update
+		and type(orig.BuildTalentsMenu) == "function"
+		and type(orig.OnClickRespec) == "function"
+		and type(orig.OnClickRespecNo) == "function"
+		and type(orig.OnClickRespecYes) == "function"
+		and type(orig.UpdateTalentsMenu) == "function"
+		and type(orig.Update) == "function"
 end
 
 local function install()
@@ -241,11 +270,7 @@ local function install()
 		return false
 	end
 
-	-- Stale orig after MT reload would point at a dead module copy.
-	if installed and not wraps_ok() then
-		orig = {}
-		installed = false
-	end
+	-- Do not wipe orig here: re-capture per slot only when that slot is no longer ours.
 
 	local wrapped = 0
 	local missing = 0
@@ -297,8 +322,8 @@ end
 
 function actor_on_first_update()
 	-- MT reload can replace talents_gui after on_game_start.
+	-- Do not wipe orig: install() re-captures only slots that are no longer ours.
 	if not wraps_ok() then
-		orig = {}
 		installed = false
 		install()
 	end

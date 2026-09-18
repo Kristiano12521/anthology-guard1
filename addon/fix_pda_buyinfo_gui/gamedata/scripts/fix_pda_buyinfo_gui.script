@@ -13,7 +13,7 @@
 -- the live window for the original call, then restores the field.
 
 local LOG_TAG = "[fix_pda_buyinfo_gui]"
-local VERSION = "1.1.2"
+local VERSION = "1.1.3"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -108,15 +108,24 @@ local function with_cte_gui_guard(slot, fn)
 end
 
 local function patched_add_sender()
+	if type(orig.add_sender) ~= "function" then
+		return
+	end
 	return with_live_gui("add_sender", orig.add_sender)
 end
 
 local function patched_add_trader()
+	if type(orig.add_trader) ~= "function" then
+		return
+	end
 	return with_live_gui("add_trader", orig.add_trader)
 end
 
 local function make_banter_patch(slot)
 	return function(...)
+		if type(orig[slot]) ~= "function" then
+			return
+		end
 		local args = { ... }
 		return with_cte_gui_guard(slot, function()
 			return with_live_gui(slot, function()
@@ -137,9 +146,9 @@ local function wrap(slot, owner, name, patched)
 		return false
 	end
 	if owner[name] == patched then
-		return true
+		return type(orig[slot]) == "function"
 	end
-	-- MT reload may replace the module after our first wrap; always re-capture.
+	-- MT reload may replace the module after our first wrap; re-capture this slot only.
 	orig[slot] = owner[name]
 	owner[name] = patched
 	return true
@@ -149,13 +158,15 @@ local function wraps_ok()
 	local any = false
 	if type(pda_inter_x_buyinfo) == "table" and type(pda_inter_x_buyinfo.add_sender) == "function" then
 		any = true
-		if pda_inter_x_buyinfo.add_sender ~= patched_add_sender then
+		if pda_inter_x_buyinfo.add_sender ~= patched_add_sender
+			or type(orig.add_sender) ~= "function" then
 			return false
 		end
 	end
 	if type(pda_inter_x_trade) == "table" and type(pda_inter_x_trade.add_trader) == "function" then
 		any = true
-		if pda_inter_x_trade.add_trader ~= patched_add_trader then
+		if pda_inter_x_trade.add_trader ~= patched_add_trader
+			or type(orig.add_trader) ~= "function" then
 			return false
 		end
 	end
@@ -164,7 +175,8 @@ local function wraps_ok()
 			local name = BANTER_FNS[i]
 			if type(pda_inter_x_banter[name]) == "function" then
 				any = true
-				if pda_inter_x_banter[name] ~= banter_patched[name] then
+				if pda_inter_x_banter[name] ~= banter_patched[name]
+					or type(orig[name]) ~= "function" then
 					return false
 				end
 			end
@@ -249,9 +261,9 @@ end
 
 function actor_on_first_update()
 	-- MT reload can replace Interactive PDA modules after on_game_start.
+	-- Do not wipe orig: install() re-captures only slots that are no longer ours.
 	if not installed or not wraps_ok() then
 		installed = false
-		orig = {}
 		install()
 	end
 end

@@ -1,0 +1,266 @@
+-- load-order: after zzz_matches_anim.script
+-- FDDA Matches Campfire Softlock Guard
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- zzz_matches_anim.ignit() calls level.disable_input() and starts
+-- tutorial_campfire_none; unlock is only via cam-effector callback
+-- actor_on_hud_animation_end. If level.add_call never sees slot 0 /
+-- detector off, or the callback errors / never fires, input stays off
+-- (soft-lock). Seen in xray_nikit.log: tutorial-xml then Esc to menu.
+--
+-- Guard: nil-check campfire before ignit; watchdog timeout force-unlock;
+-- wrap end-callback with pcall + ensure enable_input.
+
+local LOG_TAG = "[fix_matches_campfire_softlock]"
+local VERSION = "1.0.1"
+local MODULE_NAME = "zzz_matches_anim"
+local CAM_EFFECTOR_ID = 9665
+local WATCHDOG_SEC = 8
+local EVENT_ID = "fix_matches_campfire_softlock"
+local ACTION_WATCHDOG = "watchdog"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local orig_ignit = nil
+local orig_end = nil
+local installed = false
+local callbacks_registered = false
+local armed = false
+local unlock_count = 0
+
+local function get_mod()
+	return rawget(_G, MODULE_NAME)
+end
+
+local function cancel_watchdog()
+	if type(RemoveTimeEvent) == "function" then
+		pcall(RemoveTimeEvent, EVENT_ID, ACTION_WATCHDOG)
+	end
+end
+
+local function safe_stop_hud_motion()
+	if not (game and game.stop_hud_motion) then
+		return
+	end
+	if game.hud_motion_allowed and game.hud_motion_allowed() then
+		return
+	end
+	pcall(game.stop_hud_motion)
+end
+
+local function clear_match_light_events()
+	if type(RemoveTimeEvent) ~= "function" then
+		return
+	end
+	pcall(RemoveTimeEvent, "AnimatedMatches", "match_light")
+	pcall(RemoveTimeEvent, "ea_s_l1", "ea_s_l1")
+	pcall(RemoveTimeEvent, "ea_s_l_2move", "ea_l_2move")
+end
+
+-- Force-unlock without lighting the campfire / discharging matches.
+function force_unlock(reason)
+	local was_armed = armed
+	local mod = get_mod()
+	local had_anim = mod and mod.anim_item ~= nil
+	if not was_armed and not had_anim then
+		return false
+	end
+
+	armed = false
+	cancel_watchdog()
+	clear_match_light_events()
+
+	if level and level.remove_cam_effector then
+		pcall(level.remove_cam_effector, CAM_EFFECTOR_ID)
+	end
+
+	if game and game.stop_tutorial then
+		pcall(game.stop_tutorial)
+	end
+
+	safe_stop_hud_motion()
+
+	if mod then
+		local fov = mod.cur_fov
+		if fov ~= nil and get_console then
+			pcall(function()
+				get_console():execute("hud_fov " .. tostring(fov))
+			end)
+		end
+
+		if db and db.actor then
+			local slot = mod.active_slot or 0
+			pcall(function()
+				db.actor:activate_slot(slot)
+			end)
+			local det = mod.det_active
+			if det then
+				pcall(function()
+					det:switch_state(1)
+				end)
+			end
+		end
+
+		mod.anim_item = nil
+		mod.active_slot = nil
+		mod.camp_obj = nil
+		mod.cur_fov = nil
+		mod.det_active = nil
+	end
+
+	if level and level.enable_input then
+		pcall(level.enable_input)
+	end
+
+	unlock_count = unlock_count + 1
+	printf(
+		"%s force_unlock reason=%s total=%s",
+		LOG_TAG,
+		tostring(reason),
+		tostring(unlock_count)
+	)
+	return true
+end
+
+function watchdog_tick()
+	force_unlock("timeout")
+	return true
+end
+
+local function arm_watchdog()
+	armed = true
+	cancel_watchdog()
+	CreateTimeEvent(EVENT_ID, ACTION_WATCHDOG, WATCHDOG_SEC, watchdog_tick)
+end
+
+local function disarm_watchdog()
+	armed = false
+	cancel_watchdog()
+end
+
+function guarded_ignit()
+	local mod = get_mod()
+	if not (mod and orig_ignit) then
+		return
+	end
+
+	local binder = nil
+	if type(mod.get_campfire_binder) == "function" then
+		local ok, res = pcall(mod.get_campfire_binder, 2)
+		if ok then
+			binder = res
+		end
+	end
+	if not (binder and binder.object) then
+		printf("%s ignit aborted: no nearby campfire binder", LOG_TAG)
+		return
+	end
+
+	arm_watchdog()
+	local ok, err = pcall(orig_ignit)
+	if not ok then
+		printf("%s ignit error: %s", LOG_TAG, tostring(err))
+		force_unlock("ignit_error")
+	end
+end
+
+function guarded_animation_end()
+	disarm_watchdog()
+	if not orig_end then
+		force_unlock("end_no_orig")
+		return
+	end
+	local ok, err = pcall(orig_end)
+	if not ok then
+		printf("%s animation_end error: %s", LOG_TAG, tostring(err))
+		force_unlock("end_error")
+		return
+	end
+
+	-- Orig cleared anim_item; ensure input is back even if a later step failed.
+	local mod = get_mod()
+	if mod and mod.anim_item ~= nil then
+		force_unlock("end_incomplete")
+		return
+	end
+	if level and level.enable_input then
+		pcall(level.enable_input)
+	end
+end
+
+local function wraps_ok()
+	local mod = get_mod()
+	return mod
+		and mod.ignit == guarded_ignit
+		and mod.actor_on_hud_animation_end == guarded_animation_end
+		and orig_ignit
+		and orig_end
+end
+
+local function install()
+	if installed and wraps_ok() then
+		return true
+	end
+
+	local mod = get_mod()
+	if not (mod and type(mod.ignit) == "function" and type(mod.actor_on_hud_animation_end) == "function") then
+		printf("%s %s.ignit/end not found - guard NOT installed", LOG_TAG, MODULE_NAME)
+		return false
+	end
+
+	-- Re-wrap after MT reload replaced the module table.
+	-- Do not early-return when already ours without orig — that was a CTD path.
+	if mod.ignit ~= guarded_ignit then
+		orig_ignit = mod.ignit
+		mod.ignit = guarded_ignit
+	end
+	if mod.actor_on_hud_animation_end ~= guarded_animation_end then
+		orig_end = mod.actor_on_hud_animation_end
+		mod.actor_on_hud_animation_end = guarded_animation_end
+	end
+
+	installed = wraps_ok()
+	if installed then
+		printf("%s guard installed v%s timeout=%ss", LOG_TAG, VERSION, tostring(WATCHDOG_SEC))
+	end
+	return installed
+end
+
+local function uninstall()
+	local mod = get_mod()
+	if installed and mod then
+		if orig_ignit and mod.ignit == guarded_ignit then
+			mod.ignit = orig_ignit
+		end
+		if orig_end and mod.actor_on_hud_animation_end == guarded_animation_end then
+			mod.actor_on_hud_animation_end = orig_end
+		end
+	end
+	disarm_watchdog()
+	orig_ignit = nil
+	orig_end = nil
+	installed = false
+end
+
+function actor_on_first_update()
+	if not installed or not wraps_ok() then
+		install()
+	end
+end
+
+function on_game_start()
+	install()
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
+	uninstall()
+	unlock_count = 0
+end
