@@ -83,7 +83,7 @@ python3 tools/build_addon.py my_fix_weapon_jam --zip
 | `tools/check_changelog_tools.py` | падает, если в диффе `CHANGELOG.md` есть путь `tools/` без пометки `(tools-ref)` в конце строки, а файлы в `tools/` не менялись; `(tools-ref)` — ссылка на инструмент, не правка (как `-- load-order:` для ORDER-002) |
 | `tools/modcheck.py lookup\|scan\|list` | сверка текста с правилами Discord: пункты из `community/discord-rules.json`; `scan` — кандидаты по ключевым словам, не приговор |
 | `tools/pack_bhs.py` | собирает zip Anthology Busy Hands Stability Fix из `reference/` + оверлеи `addon/anthology_busyhands_stability_fix` |
-| `tools/_pack_kristiano_aio.py` | одноразовый пакер: zip `[DBG] Kristiano Fixes ALL IN ONE` из всех модов в `addon/` с `gamedata/` (кроме трёх отдельных и снятого `fix_bhs_fdda_loot`) плюс три отдельных архива — Context Menu Overhaul, QuickQK Task Complete, ST2 Footstep — в `build/` |
+| `tools/_pack_kristiano_aio.py` | пакер: zip `[DBG] Kristiano Fixes ALL IN ONE` (`AIO_VERSION` → `meta.ini` / `BUILD_INFO.txt`) из `addon/` с `gamedata/` (кроме SEPARATE/SKIP) + отдельные архивы Context Menu, QuickQK, ST2 Footstep, Campfires Compat |
 
 Python-инструменты — 3.9+, без зависимостей. Кодировка и DDS — PowerShell (`*.ps1`). На Windows — `py -3` вместо `python3`.
 

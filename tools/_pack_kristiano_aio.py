@@ -43,6 +43,9 @@ SKIP = {
 BHS_MOD_ID = "anthology_busyhands_stability_fix"
 
 AIO_NAME = "[DBG] Kristiano Fixes ALL IN ONE"
+# Package semver (not per-addon). Bump when the AIO zip contents change for testers.
+# Dates stay in BUILD_INFO `built:`; do not use date-as-version (rebuild ≠ new release).
+AIO_VERSION = "1.0.0"
 
 
 def copy_gamedata(source: Path, destination: Path) -> int:
@@ -205,6 +208,7 @@ def pack_aio(
         "\n".join(
             [
                 AIO_NAME,
+                f"version: {AIO_VERSION}",
                 "Rewritten DLTX / callback pack for Anomaly 1.5.3 / Anthology 2.1",
                 f"Built: {datetime.now().isoformat(timespec='seconds')}",
                 f"Addons: {len(addons) + 1}",
@@ -217,6 +221,7 @@ def pack_aio(
                 "  context_menu_overhaul_anthology",
                 "  quickqk_task_complete",
                 "  fix_st2_footstep",
+                "  campfires_anthology_compat",
                 "",
                 "Not included (withdrawn, lives in BusyHands 0.6.4):",
                 "  fix_bhs_fdda_loot",
@@ -230,6 +235,7 @@ def pack_aio(
         "\n".join(
             [
                 AIO_NAME,
+                f"Версия пакета: {AIO_VERSION}",
                 "",
                 "Это переписанный пак старых Kristiano-фиксов: DLTX и callback'и,",
                 "без полной подмены чужих файлов и без правок all.spawn.",
@@ -245,7 +251,7 @@ def pack_aio(
                 "   Hideout Furniture, WTF / iTheon, Western Goods, SYS_Balance,",
                 "   Burn Shit, Sorting Plus, DotMarks, Tosox, Grok Stash, HoC Icons, FDDA.",
                 "   BusyHands внутри этого архива — отдельный zip BHS не нужен.",
-                "5. Context Menu, QuickQK и ST2 Footstep ставятся отдельными модами.",
+                "5. Context Menu, QuickQK, ST2 Footstep и Campfires Compat — отдельные моды.",
                 "",
             ]
         )
@@ -254,9 +260,9 @@ def pack_aio(
     )
     write_meta(
         staging / "meta.ini",
-        version=datetime.now().strftime("%Y.%m.%d"),
+        version=AIO_VERSION,
         comments=(
-            "Rewritten Kristiano Fixes ALL IN ONE: DLTX/callback pack "
+            f"Kristiano Fixes ALL IN ONE {AIO_VERSION}: DLTX/callback pack "
             "for Anomaly 1.5.3 / Anthology 2.1"
         ),
         install_name=AIO_NAME,
@@ -265,6 +271,7 @@ def pack_aio(
         "\n".join(
             [
                 f"mod_id: {AIO_NAME}",
+                f"version: {AIO_VERSION}",
                 f"built: {datetime.now().isoformat(timespec='seconds')}",
                 f"addons: {len(addons) + 1}",
                 f"gamedata_files: {total}",
@@ -276,7 +283,10 @@ def pack_aio(
     )
     archive = out_dir / f"{AIO_NAME}.zip"
     write_zip(staging, archive)
-    print(f"{AIO_NAME}: {total} files from {len(addons)} addons -> {archive.name}")
+    print(
+        f"{AIO_NAME}: v{AIO_VERSION}, {total} files from {len(addons)} addons "
+        f"-> {archive.name}"
+    )
     return archive
 
 

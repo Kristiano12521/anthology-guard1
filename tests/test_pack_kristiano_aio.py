@@ -180,6 +180,12 @@ class PackKristianoTests(unittest.TestCase):
         self.assertIn("anthology_busyhands_stability_fix", contents)
         self.assertIn("pack_bhs", contents)
         self.assertNotIn("Not included (separate archive, tools/pack_bhs.py)", contents)
+        with zipfile.ZipFile(aio) as zf:
+            build_info = zf.read("BUILD_INFO.txt").decode("utf-8")
+            meta = zf.read("meta.ini").decode("utf-8")
+        self.assertIn(f"version: {packer.AIO_VERSION}", build_info)
+        self.assertIn(f"version={packer.AIO_VERSION}", meta)
+        self.assertIn(f"version: {packer.AIO_VERSION}", contents)
 
     def test_separate_zips_layout_and_version(self):
         self.pack()
@@ -193,7 +199,9 @@ class PackKristianoTests(unittest.TestCase):
             self.assertIn("BUILD_INFO.txt", names)
             with zipfile.ZipFile(archive) as zf:
                 meta = zf.read("meta.ini").decode("utf-8")
+                build_info = zf.read("BUILD_INFO.txt").decode("utf-8")
             self.assertIn("version=3.2.1", meta)
+            self.assertIn("version: 3.2.1", build_info)
 
         addons = {p.name for p in packer.aio_addons(self.addon_root)}
         self.assertEqual(addons, {"also_keep", "fix_stale_fetch_marker", "keep_me"})

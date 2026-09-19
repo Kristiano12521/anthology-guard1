@@ -3,6 +3,10 @@
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 Записи старше месяца — в [`CHANGELOG-archive.md`](CHANGELOG-archive.md).
 
+## [0.1.70] — версия пакета AIO для бета-отчётов
+
+`tools/_pack_kristiano_aio.py`: константа `AIO_VERSION` (сейчас `1.0.0`, semver) пишется в `BUILD_INFO.txt` (`version:`), `meta.ini` (поле Version в MO2), `CONTENTS.txt` / `README_RU.txt`. Раньше в meta была дата дня сборки, в BUILD_INFO версии не было. Дата остаётся в `built:`. Separate (CMO / QuickQK / ST2 / Campfires) уже берут version из мода в meta и BUILD_INFO — без правок. `community/BUG_REPORT.md` — поле «версия пакета» и где взять. Тест на строки version в AIO zip.
+
 ## [0.1.69] — gigant: снятие сессионного карантина на on_game_end
 
 `fix_gigant_space_restriction` 1.1.2: перед `reset_state` на `on_game_end` сессионные reason в `quarantined` получают `set_switch_online(true)`; unsafe оставляем; одна строка лога `exit quarantine freed=…`. Персист `false` — побочный эффект сериализации API, не замысел. `community/UNINSTALL.md` обновлён (шаг load→меню и оставшаяся дыра без запуска).

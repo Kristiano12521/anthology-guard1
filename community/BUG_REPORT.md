@@ -13,11 +13,24 @@
 | Получилось | Что произошло вместо этого |
 | Сборка | Версия Anthology (например 2.1) |
 | Движок | Modded Exes / build из шапки `xray_*.log` (`'xrCore' build …`) |
+| Версия пакета | Версия `[DBG] Kristiano Fixes ALL IN ONE` (или отдельного zip) — см. ниже |
 | Порядок | Порядок загрузки модов в MO2 (сверху вниз или скрин списка слева) |
 | modlist.txt | Файл из профиля MO2: `profiles/<профиль>/modlist.txt` |
 | Лог | Полный `xray_<user>.log` сессии с проблемой (не фрагмент) |
 
 Скриншот ошибки или «вылета» **не заменяет** лог и modlist.
+
+## Где взять версию пакета
+
+Одно слово / номер, например `1.0.0` — не дата сборки.
+
+**AIO** `[DBG] Kristiano Fixes ALL IN ONE`:
+
+1. В MO2: выдели мод слева → в правой панели поле Version (`meta.ini`).
+2. Или открой `mods/[DBG] Kristiano Fixes ALL IN ONE/BUILD_INFO.txt` → строка `version: …`  
+   (`built:` — время сборки, в отчёт не нужно).
+
+**Отдельные zip** (Context Menu Overhaul, QuickQK, ST2 Footstep, Campfires Compat): то же — Version в MO2 или `version:` в их `BUILD_INFO.txt` (при упаковке копируется из `meta.ini` / CHANGELOG мода).
 
 ## Почему нужен полный лог, а не скриншот
 
