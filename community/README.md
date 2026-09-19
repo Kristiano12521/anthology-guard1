@@ -1,6 +1,7 @@
 # Community
 
 - [`BUG_REPORT.md`](BUG_REPORT.md) — шаблон отчёта о проблеме для бета-тестеров (шаги, сейв, версии, `modlist.txt`, полный `xray_*.log`).
+- [`UNINSTALL.md`](UNINSTALL.md) — снятие пакета `[DBG] Kristiano Fixes ALL IN ONE` (необратимое, три шага до выключения).
 - [`RULES.md`](RULES.md) — канон правил Discord Anomaly Anthology.
 - [`discord-rules.json`](discord-rules.json) — машиночитаемый индекс пунктов (id, наказание, сигналы).
 

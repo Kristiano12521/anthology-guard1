@@ -1,11 +1,37 @@
 # Gigant Space Restriction Crash Fix
 
-**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 ниже сборки и `id_cleaner` после игры с этим модом без крайней нужды.
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; в MO2 ниже сборки и `id_cleaner`.
 
 **Удаление**
 
-- Не снимайте после игры с этим модом без крайней нужды. Штатной безопасной процедуры перед отключением в коде нет.
-- Небезопасно: set_switch_online(false) уходит в пакет alife и без мода allow_online некому вызвать — гиганты могут навсегда остаться offline. alife_release небезопасных гигантов необратим (плюс против CTD / минус для мира). Карантин — состояние, которое мод держит, пока работает; после снятия оно в сейве остаётся.
+- Отключить слот в MO2 после выхода в меню с включённым модом (в логе `exit quarantine freed=…`); новая игра не нужна.
+- Сессионный карантин (`off_level` / `level_not_ready` / смена уровня) снимается на `on_game_end` — персист `set_switch_online(false)` был побочным эффектом сериализации, не замыслом. Небезопасные (invalid graph / dangling) флаг не трогаем. Сейв на диске с `false` и выключение AIO **без** запуска игры кодом не закрывается. `alife_release` по-прежнему необратим.
+
+## [1.1.2] — 2026-09-19
+
+**Изменено**
+
+- `on_game_end`: перед `reset_state` обход `quarantined` — сессионные причины (`off_level`, `level_not_ready`, `on_before_level_changing`, `on_level_changing`, `queued`) получают `set_switch_online(true)`; unsafe (`invalid_game_vertex`, `dangling_*`) оставляем. Одна строка лога: `exit quarantine freed=N kept=M freed_by=… kept_by=…`.
+- Версия → 1.1.2.
+
+**Причина**
+
+Карантин задуман как сессионный гейт до `actor_on_first_update` на уровне гиганта; таблица `quarantined` между загрузками пуста, карантин ставится снова на `server_entity_on_register`. `set_switch_online(false)` при этом сериализуется в пакет alife — побочный эффект API, не лечение STATE. На выгрузке флаг не снимался → после снятия AIO гиганты могли навсегда остаться offline.
+
+**Не затронуто**
+
+- Логика `process_one` / `alife_release` unsafe, wrap `can_switch_online`, callback'и входа на уровень
+- `uninstall_can_switch_online` — только восстановление указателя метода; CSE не трогает (проход только в `on_game_end`)
+- `verified_*`
+
+**Ограничение**
+
+Патч помогает, только если последняя сессия с включённым модом/пакетом дошла до выгрузки (`on_game_end`). Уже лежащий на диске сейв с `false` и выключение слота без запуска — по-прежнему дыра.
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_gigant_space_restriction`
+- В игре: не прогонялось агентом. Ожидание: зайти → уйти с уровня гигантов → меню → в логе `exit quarantine freed=…`
 
 ## [1.1.1] — 2026-08-31
 

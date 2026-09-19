@@ -18,7 +18,7 @@
 -- or a missing smart terrain: alife_release (squad-safe) while offline.
 
 local LOG_TAG = "[fix_gigant_space_restriction]"
-local VERSION = "1.1.1"
+local VERSION = "1.1.2"
 local EVENT_ID = "fix_gigant_space_restriction"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -613,6 +613,74 @@ local function uninstall_can_switch_online()
 	end
 end
 
+-- Session gates only. Unsafe reasons stay flagged for release/process.
+-- set_switch_online(false) serializes into the alife object; clearing it on
+-- exit fixes that leak. The Lua quarantined table is empty between loads.
+local function is_session_quarantine_reason(reason)
+	if type(reason) ~= "string" then
+		return false
+	end
+	return reason == "off_level"
+		or reason == "level_not_ready"
+		or reason == "on_before_level_changing"
+		or reason == "on_level_changing"
+		or reason == "queued"
+end
+
+local function format_reason_counts(counts)
+	local parts = {}
+	for reason, n in pairs(counts) do
+		parts[#parts + 1] = string.format("%s=%s", tostring(reason), tostring(n))
+	end
+	table.sort(parts)
+	if #parts == 0 then
+		return "-"
+	end
+	return table.concat(parts, ",")
+end
+
+-- Call from on_game_end only (before reset_state). uninstall_can_switch_online
+-- only restores the method pointer and must not touch CSE flags.
+local function release_session_quarantine_on_exit()
+	local sim = get_sim()
+	local to_free = {}
+	local freed_by = {}
+	local kept_by = {}
+	local freed = 0
+	local kept = 0
+
+	for id, reason in pairs(quarantined) do
+		if is_session_quarantine_reason(reason) then
+			to_free[#to_free + 1] = { id = id, reason = reason }
+		else
+			kept = kept + 1
+			kept_by[reason] = (kept_by[reason] or 0) + 1
+		end
+	end
+
+	for i = 1, #to_free do
+		local entry = to_free[i]
+		local id = entry.id
+		local reason = entry.reason
+		if sim then
+			set_can_switch_online(sim, id, true)
+		end
+		quarantined[id] = nil
+		freed = freed + 1
+		freed_by[reason] = (freed_by[reason] or 0) + 1
+	end
+
+	if freed > 0 or kept > 0 then
+		log(
+			"exit quarantine freed=%s kept=%s freed_by=%s kept_by=%s",
+			tostring(freed),
+			tostring(kept),
+			format_reason_counts(freed_by),
+			format_reason_counts(kept_by)
+		)
+	end
+end
+
 function server_entity_on_register(se_obj, type_name)
 	remember_name(se_obj)
 	if not is_gigant(se_obj) then
@@ -683,6 +751,8 @@ function on_game_end()
 	if type(RemoveTimeEvent) == "function" then
 		pcall(RemoveTimeEvent, EVENT_ID, PROCESS_ACTION)
 	end
+	-- Clear session-gate CSE flags while quarantined still holds reasons.
+	release_session_quarantine_on_exit()
 	uninstall_can_switch_online()
 	if not callbacks_registered then
 		reset_state()
