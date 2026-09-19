@@ -177,7 +177,37 @@ class EncodingTests(unittest.TestCase):
             line = "-- load-order: после other_mod\r\nfunction on_game_start() end\r\n"
             (scripts / "cp1251_mod.script").write_bytes(line.encode("cp1251"))
             findings = lint_addon.lint(addon, lint_addon.ReferenceView())
-            self.assertNotIn("ENC-004", {f.code for f in findings})
+            codes = {f.code for f in findings}
+            self.assertNotIn("ENC-004", codes)
+            self.assertNotIn("ENC-005", codes)
+
+    def test_load_order_question_marks_is_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = Path(tmp) / "qmark_mod"
+            scripts = addon / "gamedata" / "scripts"
+            scripts.mkdir(parents=True)
+            # Редактор без кириллицы: «после» → пять ASCII «?»
+            (scripts / "qmark_mod.script").write_bytes(
+                b"-- load-order: ????? other_mod\r\n"
+                b"function on_game_start() end\r\n"
+            )
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView())
+            enc = [f for f in findings if f.code == "ENC-005"]
+            self.assertEqual(len(enc), 1)
+            self.assertEqual(enc[0].severity, "error")
+
+    def test_load_order_single_question_mark_ok(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = Path(tmp) / "one_q_mod"
+            scripts = addon / "gamedata" / "scripts"
+            scripts.mkdir(parents=True)
+            # Одиночный «?» не порча (порог — два подряд)
+            (scripts / "one_q_mod.script").write_bytes(
+                b"-- load-order: after? other_mod\r\n"
+                b"function on_game_start() end\r\n"
+            )
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView())
+            self.assertNotIn("ENC-005", {f.code for f in findings})
 
 
 class EmptyReferenceTests(unittest.TestCase):

@@ -38,6 +38,8 @@ python3 tools/new_addon.py <mod_id> --title "Читаемое имя"
 
 Создаётся `addon/<mod_id>/` с `meta.ini`, `CHANGELOG.md`, скриптом логики, `<mod_id>_mcm.script` и примером DLTX-патча. Лишнее удаляем сразу.
 
+ТЗ, лор-черновики, заметки художнику — сразу в `docs/mods/<mod_id>/`, не в корень аддона (`STRUCT-004`/`STRUCT-005`). Правило: [`docs/mods/README.md`](../mods/README.md).
+
 ## Этап 4. Реализация
 
 ```

@@ -1,5 +1,11 @@
 # Kristiano KX-1 Exo Craft
 
+## [1.5.5-c] — 2026-09-19
+
+**Рабочие материалы вне addon/**
+
+- `ICON_TZ.txt` и `lore/` перенесены в `docs/mods/kristiano_kx1_exo/` (STRUCT-004/005: в пакет не попадали). Правило: `docs/mods/README.md`.
+
 ## [1.5.5-b] — 2026-09-18
 
 **Схрон с флешкой**

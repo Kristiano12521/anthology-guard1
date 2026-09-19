@@ -6,6 +6,7 @@
 
 - Monkey-patch re-wrap: больше не обнуляет `orig_*` перед `install()` на `actor_on_first_update`.
 - `wraps_ok` требует живой `orig`; вызовы оригинала под nil-guard.
+- Снова восстановлено `-- load-order: после …` в Windows-1251 (редактор без кириллицы; линтер ENC-005).
 
 **Причина**
 

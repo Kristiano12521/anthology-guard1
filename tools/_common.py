@@ -95,6 +95,19 @@ def has_utf8_replacement(data: bytes) -> bool:
     return b"\xef\xbf\xbd" in data
 
 
+# Кириллица «после» → «?????», если редактор без cp1251 сохранил файл как ASCII/Latin-1.
+_LOAD_ORDER_QUESTION_MARKS_RE = re.compile(rb"--\s*load-order:[^\n]*\?{2,}", re.I)
+
+
+def has_load_order_question_marks(data: bytes) -> bool:
+    """True, если в комментарии -- load-order: подряд идут '?' (≥2).
+
+    Типичная порча: редактор без кириллицы заменил «после» на «?????».
+    ENC-004 (EF BF BD) этот случай не ловит — там уже ASCII «?».
+    """
+    return _LOAD_ORDER_QUESTION_MARKS_RE.search(data) is not None
+
+
 def looks_like_utf8_cyrillic(data: bytes) -> bool:
     """True, если файл похож на UTF-8 с кириллицей (для игровых файлов это ошибка)."""
     if data.startswith(b"\xef\xbb\xbf"):

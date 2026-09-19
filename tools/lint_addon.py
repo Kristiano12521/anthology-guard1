@@ -35,6 +35,7 @@ from _common import (  # noqa: E402
     REPO_ROOT,
     decode_bytes,
     has_bad_line_endings,
+    has_load_order_question_marks,
     has_utf8_replacement,
     iter_files,
     looks_like_utf8_cyrillic,
@@ -786,6 +787,15 @@ class AddonLinter:
                 "error",
                 "UTF-8 replacement character (EF BF BD / U+FFFD) в игровом файле: "
                 "порча после перекодировки. Перепиши кириллицу в Windows-1251 "
+                "(tools/to_cp1251.ps1).",
+                path,
+            )
+        elif has_load_order_question_marks(data):
+            self.add(
+                "ENC-005",
+                "error",
+                "В комментарии -- load-order: подряд идут '?': кириллица «после» "
+                "испорчена редактором без cp1251. Восстанови слово в Windows-1251 "
                 "(tools/to_cp1251.ps1).",
                 path,
             )
