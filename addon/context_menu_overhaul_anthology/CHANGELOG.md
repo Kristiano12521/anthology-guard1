@@ -1,5 +1,7 @@
 CONTEXT MENU OVERHAUL 1.4.2 — ANTHOLOGY 2.1 ADAPTATION
 
+**Совместимость:** заменяет предыдущие версии этой адаптации CMO под Anthology; оригинал Context Menu Overhaul и старые ZIP адаптации выключить; в MO2 ниже CMO / QAW / Mags Redux / OPO / Exo / Toxic Air / Kristiano AIO.
+
 v1.2.4 — 06.09.2026
 ------------------------------------------------
 Дефолты MCM для комфорта ПКМ-меню:

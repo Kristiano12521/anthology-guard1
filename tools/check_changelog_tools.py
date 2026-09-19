@@ -5,9 +5,9 @@
     python tools/check_changelog_tools.py --base origin/main
 
 Смотрит добавленные строки диффа CHANGELOG.md (не весь файл: в истории
-tools/ упоминается часто). Строка с пометкой (tools-ref) в конце — ссылка
-на инструмент, не заявление о правке (как -- load-order: для ORDER-002).
-Нужен git.
+tools/ упоминается часто). CHANGELOG-archive.md в сверку не входит.
+Строка с пометкой (tools-ref) в конце — ссылка на инструмент, не заявление
+о правке (как -- load-order: для ORDER-002). Нужен git.
 """
 
 from __future__ import annotations

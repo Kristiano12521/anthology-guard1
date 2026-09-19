@@ -1,5 +1,7 @@
 # Anthology Busy Hands Stability Fix
 
+**Совместимость:** форк BusyHands Stability Fix; full-file поверх вендора — `mon_sleep`, `guaranteed_loot`, `aes_crow_spawner.ltx` и `sequential_load_magazine.script` (MAG Redux); старые BHS ZIP и дубли в профиле выключить; в MO2 ниже BusyHands / MAG Redux / DotMarks / SortingPlus / Outfit Parts.
+
 ## [0.6.14] — 2026-09-15
 
 **Изменено**

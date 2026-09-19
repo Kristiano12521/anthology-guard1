@@ -45,6 +45,30 @@ RegisterScriptCallback("actor_on_update", function() ... end)
 
 Скопировать `weapons.ltx` из сборки, поменять одну цифру и положить к себе — рабочий способ гарантированно конфликтовать со всеми модами, трогающими этот файл, и потерять правку при обновлении Anthology. Конфиги — DLTX, скрипты — monkey-patch.
 
+## 8a. FATAL `[DLTX] Duplicate section`
+
+Типовой вид в `xray_*.log` (вылет на старте / загрузке конфигов):
+
+```
+FATAL ERROR
+[error]Function      : CInifile::StashCurrentSection
+[error]Description   : fatal error
+[error]Arguments     : [DLTX] Duplicate section 'af_indeikam_breeding_1' wasn't marked as an override.
+Override section by prefixing it with '!' (![af_indeikam_breeding_1]) or give it a unique name.
+Check this file and its DLTX mods:
+file with duplicate "mod_system_anthology_indeikam_breeding_fix.ltx"
+```
+
+**Что значит:** секция с таким именем уже есть в базе (ваниль / другой мод / тот же патч дважды), а второй раз она объявлена как обычная `[section]` без маркера override. DLTX это считает двумя базами и валит процесс.
+
+**Стандартное решение:**
+
+1. Править существующую секцию — префикс `!`: `![имя_секции]` (или `@[имя]`, если секции может ещё не быть).
+2. Добавлять новую сущность — **уникальное** имя секции, не совпадающее с чужой/ванильной.
+3. Если в `modlist.txt` две версии одного фикса (ZIP + слот / AIO) — выключить дубль; иначе один и тот же `mod_*.ltx` грузится дважды.
+
+Подробности операторов — [`dltx.md`](dltx.md). Фикстура: `logs/samples/crash_dltx_duplicate.log`. Класс в `xraylog`: **конфиг: DLTX**.
+
 ## 9. Порядок загрузки через имя файла
 
 Для `.ltx` префикс `zzz_`/`aaa_` ничего не даёт: порядок патчей задаёт список модов в MO2. `tools/lint_addon.py` это ловит как ошибку ORDER-001.

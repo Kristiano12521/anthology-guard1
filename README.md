@@ -27,7 +27,7 @@ build/                  собранные моды для MO2
 logs/                   логи игры для разбора вылетов
 docs/                   плейбуки, справочники, готовые промпты
 docs/mods/<mod_id>/     рабочие материалы мода (ТЗ, лор-черновики) — не в пакет
-community/              правила Discord-сервера и индекс для проверки нарушений
+community/              правила Discord, шаблон отчёта о проблеме, индекс для проверки нарушений
 templates/              скелет аддона
 tools/                  инструменты анализа и сборки
 ```
@@ -135,7 +135,8 @@ Markdown в [`.cursor/commands/`](.cursor/commands/), вызов через `/` 
 - [`docs/mo2.md`](docs/mo2.md) — цепочка исходники → build → MO2 → игра
 - [`docs/prompts.md`](docs/prompts.md) — готовые промпты
 - [`docs/references.md`](docs/references.md) — внешние источники
-- [`community/README.md`](community/README.md) — правила Discord и проверка нарушений
+- [`community/README.md`](community/README.md) — правила Discord, [`BUG_REPORT.md`](community/BUG_REPORT.md), проверка нарушений
+- [`CHANGELOG.md`](CHANGELOG.md) — актуальное; старше месяца — [`CHANGELOG-archive.md`](CHANGELOG-archive.md)
 
 ## Правила самого репозитория
 
