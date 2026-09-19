@@ -1,5 +1,12 @@
 # Misc Script Error Fixes
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 ниже RAK 3DSS и Interaction Dot Marks после — `UnregisterScriptCallback`.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
+
 ## [1.0.4] — 2026-09-16
 
 **Изменено**

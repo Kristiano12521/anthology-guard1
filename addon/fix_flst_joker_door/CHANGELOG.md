@@ -1,5 +1,12 @@
 # Fallstation Joker Door Fix
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 ниже сборки; ZIP и копию `configs/scripts/fallstation/flst_roll_entrance_logic После выхода контроллер через `@exit_2` уходит в `@init` → `@wait`, если актёр уже не.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
+
 ## [1.0.0] — 2026-08-29
 
 **Изменено**

@@ -1,5 +1,12 @@
 # Dynamic Armor Visuals Nil Guard
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 рядом с Dynamic NPC Armor Visuals; скрипт грузится после него (`-- load-order`) после MT reload; safe uninstall; `callbacks_registered`.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
+
 ## [1.0.4] — 2026-09-19
 
 **Изменено**

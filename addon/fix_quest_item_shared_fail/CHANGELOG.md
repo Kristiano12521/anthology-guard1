@@ -1,5 +1,12 @@
 # Tosox vanish-fail на общем DRX stash-слоте
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 заменить Kristiano целиком После MT reload Tosox vanish-fail соседа снова проходил без rearm.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна. Активный shared DRX stash-квест лучше завершить или дождаться fail-логики с модом.
+- Может писать task var через save_var (корректный fail). Сейв не ломается; без фикса vanish-fail на общем слоте вернётся.
+
 ## [1.3.2] — 2026-09-17
 
 **Изменено**

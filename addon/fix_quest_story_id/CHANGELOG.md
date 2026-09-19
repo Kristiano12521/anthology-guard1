@@ -1,5 +1,12 @@
 # Quest Story ID Collision Fix
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 ниже сборки; ZIP и `[DBG] Kristiano Fixes ALL IN ONE` с тем же `zzzzzz_anthology_quest_story_id_runtime_fix После замены таблицы `story_objects` first-wins гард снова отваливался.
+
+**Удаление**
+
+- Если квест Левши активен — один load с модом (ремонт метки), сохранитесь, затем отключайте.
+- Починенный current_target остаётся. DLTX снятия story_id действует только с модом — коллизии на новых регистрациях могут вернуться.
+
 ## [1.0.3] — 2026-09-17
 
 **Изменено**

@@ -1,5 +1,14 @@
 # Campfires Anthology Compat
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; выключить [GAM] Campfires_* и старый Compat.
+
+**Совместимость:** пакет Campfires без полной `dynamic_objects.ltx` — ключевые пути `configs/mod_system_campfires_anthology_compat.ltx`, `configs/items/items/items_campfire.ltx`, `configs/scripts/ph_campfiremod.ltx`, `scripts/campfire_placeable.script`. Взаимоисключающе с `[GAM] Campfires_*` и старым Compat (`dynamic_objects.ltx` / `trader_autoinject.script`). При совпадении путей с другим модом нужен патч или ручное слияние.
+
+**Удаление**
+
+- Отключить слот в MO2. Если костры уже ставили — сначала уберите/сожгите их при включённом моде, затем отключайте.
+- Сейв хранит `se_anoms` / `prev_level` и alife-объекты `ph_campfiremod`. Без мода секции пропадут: missing section, «висячие» объекты. Без поставленных костров — безопасно.
+
 ## [1.1.2] — 2026-09-17
 
 **Изменено**

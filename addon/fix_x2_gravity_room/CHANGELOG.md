@@ -1,5 +1,12 @@
 # Lab X-2 Gravity Room Crash Fix
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 ниже сборки; ZIP и файл Kristiano `configs/scripts/labx2/bas_space_restrictor_0016 После MT reload снова возможен CTD на отсутствующем `bas_no_gravity_anomaly`.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
+
 ## [1.0.2] — 2026-09-17
 
 **Изменено**

@@ -1,5 +1,12 @@
 # fix_fdda_mcm_paths
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
+
 ## 1.0.0 (2026-09-02)
 
 - DLTX-патч `mod_dotmarks_defaults_fix_fdda_mcm_paths.ltx`: в секции `[mcm_paths]` DotMarks перенаправляет `fdda_anims_enabled` и `fdda_pickup_anim` с мёртвых путей `EA_settings/*` на зарегистрированные в `liz_fdda_redone_mcm.script` (`fddar/consumables/enable`, `fddar/pickup/enable`).

@@ -1,6 +1,13 @@
 CONTEXT MENU OVERHAUL 1.4.2 — ANTHOLOGY 2.1 ADAPTATION
 
-**Совместимость:** заменяет предыдущие версии этой адаптации CMO под Anthology; оригинал Context Menu Overhaul и старые ZIP адаптации выключить; в MO2 ниже CMO / QAW / Mags Redux / OPO / Exo / Toxic Air / Kristiano AIO.
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; ниже CMO / QAW / Mags / OPO / Exo / Toxic Air; старые ZIP адаптации выключить.
+
+**Совместимость:** полная адаптация CMO — перезаписывает `scripts/context_menu_overhaul*.script`, `configs/plugins/context_menu_overhaul/menu.ltx` и `mod_menu_*.ltx`, тексты/иконки CMO. Оригинал CMO и старые ZIP адаптации выключить; в MO2 ниже CMO / QAW / Mags Redux / OPO / Exo / Toxic Air / Kristiano AIO. При совпадении путей с другим модом нужен патч или ручное слияние.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна. Перезагрузить сейв/игру, чтобы UI-хуки не остались от прошлой сессии.
+- Сейв не затрагивается. Retool'нутые магазины остаются обычными предметами. Пропадут расширенные пункты ПКМ.
 
 v1.2.4 — 06.09.2026
 ------------------------------------------------

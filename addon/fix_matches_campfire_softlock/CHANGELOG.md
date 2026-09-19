@@ -1,5 +1,12 @@
 # FDDA Matches Campfire Softlock Guard
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; после `[TMA] FDDA Redone`.
+
+**Удаление**
+
+- Не отключайте во время анимации спичек. Вне разжигания — слот в MO2, новая игра не нужна.
+- Сейв не пишет. Mid-remove во время softlock может оставить disable_input; иначе только вернётся softlock FDDA.
+
 ## [1.0.1] — 2026-09-19
 
 **Изменено**

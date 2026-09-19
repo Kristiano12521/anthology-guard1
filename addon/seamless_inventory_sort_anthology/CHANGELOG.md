@@ -1,5 +1,14 @@
 # Seamless Inventory Sort / Anthology 2.1
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; выключить оригинал Seamless; не вместе с ним.
+
+**Совместимость:** заменяет пакет Seamless целиком — в т.ч. `scripts/seamless_inventory_sort_anthology.script`, `scripts/inventory_antifreeze_anthology.script`, `scripts/tooltip_*.script`, `configs/ui/ui_inventory_antifreeze.xml`. Оригинал `Seamless_Inventory_Sort_Anthology_2.1_v1.5.3_FIX_delint` выключить; копии в Kristiano AIO конфликтуют по тем же путям. При совпадении путей с другим модом нужен патч или ручное слияние.
+
+**Удаление**
+
+- Закройте инвентарь/торговлю, сохранитесь, отключите слот в MO2 (и оригинал Seamless не включайте обратно вместе с этим паком).
+- В сейв игры не пишет — только MCM. UI-хуки снимутся после reload сессии.
+
 Самодостаточная сборка: содержит все файлы мода, а не только изменённые. **Заменяет** `Seamless_Inventory_Sort_Anthology_2.1_v1.5.3_FIX_delint` — ставится вместо него, а не поверх.
 
 Авторство базовых компонентов (полный текст в `CREDITS.txt`):

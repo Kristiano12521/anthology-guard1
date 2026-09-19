@@ -1,6 +1,14 @@
 # Anthology Busy Hands Stability Fix
 
-**Совместимость:** форк BusyHands Stability Fix; full-file поверх вендора — `mon_sleep`, `guaranteed_loot`, `aes_crow_spawner.ltx` и `sequential_load_magazine.script` (MAG Redux); старые BHS ZIP и дубли в профиле выключить; в MO2 ниже BusyHands / MAG Redux / DotMarks / SortingPlus / Outfit Parts.
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; ниже BusyHands / MAG Redux / DotMarks / SortingPlus / Outfit Parts; старые BHS ZIP выключить.
+
+**Совместимость:** перезаписывает `scripts/mon_sleep.script`, `scripts/guaranteed_loot.script`, `configs/scripts/stancia_1/aes_crow_spawner.ltx`, `scripts/sequential_load_magazine.script` (из MAG Redux при сборке); плюс overlay-патчи `zzzzzz_anthology_bhs_*.script`. Старые BHS ZIP и дубли выключить; в MO2 ниже BusyHands / MAG Redux / DotMarks / SortingPlus / Outfit Parts. При совпадении путей с другим модом нужен патч или ручное слияние.
+
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не портится (своего `save_state` нет). Вернётся ванильное/вендорское поведение BusyHands и соседних модов — прежние CTD и лог-спам возможны, битого сейва нет.
 
 ## [0.6.14] — 2026-09-15
 

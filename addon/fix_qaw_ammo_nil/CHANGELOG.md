@@ -1,5 +1,12 @@
 # QAW Ammo Active Item Nil Guard
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 после Quick Action Wheel; скрипт `zzz_*` + `-- load-order: после haru_quick_action_wheel_mcm` после …` в Windows-1251 (редактор без кириллицы; линтер ENC-005).
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
+
 ## [1.0.3] — 2026-09-19
 
 **Изменено**

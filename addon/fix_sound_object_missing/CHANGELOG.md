@@ -1,89 +1,96 @@
 # Sound Object Missing Guard
 
+**РўСЂРµР±РѕРІР°РЅРёСЏ:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; Р’ MO2 РїРѕСЃР»Рµ Anthology base; РїРѕСЂСЏРґРѕРє РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ sound-РјРѕРґРѕРІ РЅРµ РІР°Р¶РµРЅ (РїР°С‚С‡ РЅР° API) РїРѕСЃР»Рµ `aaa_sound_object_patch`: РїСЂРѕРІРµСЂРєР° `getFS():exist("$game_sounds$", path.
+
+**РЈРґР°Р»РµРЅРёРµ**
+
+- РћС‚РєР»СЋС‡РёС‚СЊ СЃР»РѕС‚ РІ MO2; РЅРѕРІР°СЏ РёРіСЂР° РЅРµ РЅСѓР¶РЅР°.
+- РЎРµР№РІ РЅРµ Р·Р°С‚СЂР°РіРёРІР°РµС‚СЃСЏ. Р‘РµР· С„РёРєСЃР° РёСЃС…РѕРґРЅС‹Р№ Р±Р°Рі РёР»Рё CTD РјРѕР¶РµС‚ РІРµСЂРЅСѓС‚СЊСЃСЏ.
+
 ## [1.0.2] - 2026-09-16
 
-**Изменено**
+**РР·РјРµРЅРµРЅРѕ**
 
-- `gamedata/scripts/fix_sound_object_missing.script` — stub с полным no-op API (`play_no_feedback`, `stop_deffered`, `attach_tail`, `get_position`, `frequency` / `min_distance` / `max_distance` + `__index` на неизвестные методы). `get_safe_sound_object` на missing тоже возвращает stub, не `nil`. Stub кэшируется по path. Второй аргумент конструктора (`s2d`/`s3d`) пробрасывается в реальный ctor.
+- `gamedata/scripts/fix_sound_object_missing.script` вЂ” stub СЃ РїРѕР»РЅС‹Рј no-op API (`play_no_feedback`, `stop_deffered`, `attach_tail`, `get_position`, `frequency` / `min_distance` / `max_distance` + `__index` РЅР° РЅРµРёР·РІРµСЃС‚РЅС‹Рµ РјРµС‚РѕРґС‹). `get_safe_sound_object` РЅР° missing С‚РѕР¶Рµ РІРѕР·РІСЂР°С‰Р°РµС‚ stub, РЅРµ `nil`. Stub РєСЌС€РёСЂСѓРµС‚СЃСЏ РїРѕ path. Р’С‚РѕСЂРѕР№ Р°СЂРіСѓРјРµРЅС‚ РєРѕРЅСЃС‚СЂСѓРєС‚РѕСЂР° (`s2d`/`s3d`) РїСЂРѕР±СЂР°СЃС‹РІР°РµС‚СЃСЏ РІ СЂРµР°Р»СЊРЅС‹Р№ ctor.
 
-**Причина**
+**РџСЂРёС‡РёРЅР°**
 
-v1.0.1 закрыл CTD ambient, но `get_safe` + `:play_no_feedback` (как в `xr_effects`) падал бы на missing file: ваниль отдаёт объект, мы отдавали `nil`. Неполный stub и новый table на каждый skip — лишний риск и GC в `sound_ambient` (`playing()` всегда false).
+v1.0.1 Р·Р°РєСЂС‹Р» CTD ambient, РЅРѕ `get_safe` + `:play_no_feedback` (РєР°Рє РІ `xr_effects`) РїР°РґР°Р» Р±С‹ РЅР° missing file: РІР°РЅРёР»СЊ РѕС‚РґР°С‘С‚ РѕР±СЉРµРєС‚, РјС‹ РѕС‚РґР°РІР°Р»Рё `nil`. РќРµРїРѕР»РЅС‹Р№ stub Рё РЅРѕРІС‹Р№ table РЅР° РєР°Р¶РґС‹Р№ skip вЂ” Р»РёС€РЅРёР№ СЂРёСЃРє Рё GC РІ `sound_ambient` (`playing()` РІСЃРµРіРґР° false).
 
-**Не затронуто**
+**РќРµ Р·Р°С‚СЂРѕРЅСѓС‚Рѕ**
 
 - `aaa_sound_object_patch.script`
-- сами `.ogg` / sound-моды
-- пустые слоты в `sounds=` каналов (корневой конфиг не чистим)
+- СЃР°РјРё `.ogg` / sound-РјРѕРґС‹
+- РїСѓСЃС‚С‹Рµ СЃР»РѕС‚С‹ РІ `sounds=` РєР°РЅР°Р»РѕРІ (РєРѕСЂРЅРµРІРѕР№ РєРѕРЅС„РёРі РЅРµ С‡РёСЃС‚РёРј)
 
-**Совместимость**
+**РЎРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ**
 
 - Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
-- Сейвы: совместим, состояние не пишется
+- РЎРµР№РІС‹: СЃРѕРІРјРµСЃС‚РёРј, СЃРѕСЃС‚РѕСЏРЅРёРµ РЅРµ РїРёС€РµС‚СЃСЏ
 
-**Проверено**
+**РџСЂРѕРІРµСЂРµРЅРѕ**
 
 - lint: `python tools/lint_addon.py fix_sound_object_missing`
-- в игре: не подтверждено. Ожидание: нет CTD ambient; нет SCRIPT ERROR на `get_safe`+`play_no_feedback` для missing path; разовые `skip missing sound path=...`.
+- РІ РёРіСЂРµ: РЅРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРѕ. РћР¶РёРґР°РЅРёРµ: РЅРµС‚ CTD ambient; РЅРµС‚ SCRIPT ERROR РЅР° `get_safe`+`play_no_feedback` РґР»СЏ missing path; СЂР°Р·РѕРІС‹Рµ `skip missing sound path=...`.
 
 ## [1.0.1] - 2026-09-16
 
-**Изменено**
+**РР·РјРµРЅРµРЅРѕ**
 
-- `gamedata/scripts/fix_sound_object_missing.script` - при отсутствии `.ogg` proxy `sound_object(path)` возвращает no-op stub (`play` / `play_at_pos` / `stop` / `playing` / `volume`), а не `nil`. `xr_sound.get_safe_sound_object` по-прежнему возвращает `nil`. Счётчики в логе через `%s` (printf сборки не подставлял `%d`).
+- `gamedata/scripts/fix_sound_object_missing.script` - РїСЂРё РѕС‚СЃСѓС‚СЃС‚РІРёРё `.ogg` proxy `sound_object(path)` РІРѕР·РІСЂР°С‰Р°РµС‚ no-op stub (`play` / `play_at_pos` / `stop` / `playing` / `volume`), Р° РЅРµ `nil`. `xr_sound.get_safe_sound_object` РїРѕ-РїСЂРµР¶РЅРµРјСѓ РІРѕР·РІСЂР°С‰Р°РµС‚ `nil`. РЎС‡С‘С‚С‡РёРєРё РІ Р»РѕРіРµ С‡РµСЂРµР· `%s` (printf СЃР±РѕСЂРєРё РЅРµ РїРѕРґСЃС‚Р°РІР»СЏР» `%d`).
 
-**Причина**
+**РџСЂРёС‡РёРЅР°**
 
-v1.0.0 возвращал `nil` из конструктора. Ванильный `sound_ambient.script:146` делает `ch.snd:play_at_pos` без проверки ? CTD (`attempt to index field 'snd'`). В логе перед падением: `skip missing sound path=` (пустой слот в канале).
+v1.0.0 РІРѕР·РІСЂР°С‰Р°Р» `nil` РёР· РєРѕРЅСЃС‚СЂСѓРєС‚РѕСЂР°. Р’Р°РЅРёР»СЊРЅС‹Р№ `sound_ambient.script:146` РґРµР»Р°РµС‚ `ch.snd:play_at_pos` Р±РµР· РїСЂРѕРІРµСЂРєРё ? CTD (`attempt to index field 'snd'`). Р’ Р»РѕРіРµ РїРµСЂРµРґ РїР°РґРµРЅРёРµРј: `skip missing sound path=` (РїСѓСЃС‚РѕР№ СЃР»РѕС‚ РІ РєР°РЅР°Р»Рµ).
 
-**Как исправлено**
+**РљР°Рє РёСЃРїСЂР°РІР»РµРЅРѕ**
 
-Конструктор снова всегда даёт объект; тихий stub вместо C++ `super` на битый путь. Safe-API без изменений.
+РљРѕРЅСЃС‚СЂСѓРєС‚РѕСЂ СЃРЅРѕРІР° РІСЃРµРіРґР° РґР°С‘С‚ РѕР±СЉРµРєС‚; С‚РёС…РёР№ stub РІРјРµСЃС‚Рѕ C++ `super` РЅР° Р±РёС‚С‹Р№ РїСѓС‚СЊ. Safe-API Р±РµР· РёР·РјРµРЅРµРЅРёР№.
 
-**Не затронуто**
+**РќРµ Р·Р°С‚СЂРѕРЅСѓС‚Рѕ**
 
-- `aaa_sound_object_patch.script`, кэш `soundCache`
-- сами `.ogg` / sound-моды
-- `get_safe_sound_object` (nil при отсутствии файла)
+- `aaa_sound_object_patch.script`, РєСЌС€ `soundCache`
+- СЃР°РјРё `.ogg` / sound-РјРѕРґС‹
+- `get_safe_sound_object` (nil РїСЂРё РѕС‚СЃСѓС‚СЃС‚РІРёРё С„Р°Р№Р»Р°)
 
-**Совместимость**
+**РЎРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ**
 
 - Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
-- Сейвы: совместим, состояние не пишется
+- РЎРµР№РІС‹: СЃРѕРІРјРµСЃС‚РёРј, СЃРѕСЃС‚РѕСЏРЅРёРµ РЅРµ РїРёС€РµС‚СЃСЏ
 
-**Проверено**
+**РџСЂРѕРІРµСЂРµРЅРѕ**
 
 - lint: `python tools/lint_addon.py fix_sound_object_missing`
-- в игре: не подтверждено. Ожидание: нет CTD в `sound_ambient` на missing/empty path; в логе разовые `skip missing sound path=...` с числами unique/total.
+- РІ РёРіСЂРµ: РЅРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРѕ. РћР¶РёРґР°РЅРёРµ: РЅРµС‚ CTD РІ `sound_ambient` РЅР° missing/empty path; РІ Р»РѕРіРµ СЂР°Р·РѕРІС‹Рµ `skip missing sound path=...` СЃ С‡РёСЃР»Р°РјРё unique/total.
 
 ## [1.0.0] - 2026-09-15
 
-**Изменено**
+**РР·РјРµРЅРµРЅРѕ**
 
-- `gamedata/scripts/fix_sound_object_missing.script` - proxy на `_G.sound_object` и обёртка `xr_sound.get_safe_sound_object`: если `.ogg` нет в `$game_sounds$`, конструктор не вызывается, возвращается `nil`. Каждый отсутствующий путь логируется один раз.
+- `gamedata/scripts/fix_sound_object_missing.script` - proxy РЅР° `_G.sound_object` Рё РѕР±С‘СЂС‚РєР° `xr_sound.get_safe_sound_object`: РµСЃР»Рё `.ogg` РЅРµС‚ РІ `$game_sounds$`, РєРѕРЅСЃС‚СЂСѓРєС‚РѕСЂ РЅРµ РІС‹Р·С‹РІР°РµС‚СЃСЏ, РІРѕР·РІСЂР°С‰Р°РµС‚СЃСЏ `nil`. РљР°Р¶РґС‹Р№ РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‰РёР№ РїСѓС‚СЊ Р»РѕРіРёСЂСѓРµС‚СЃСЏ РѕРґРёРЅ СЂР°Р·.
 
-**Причина**
+**РџСЂРёС‡РёРЅР°**
 
-Недостающие файлы (`sound_revamp\fireflies\*.ogg`, `tb_growls\tb_lurk_*.ogg` и т.п.) дают спам `File not found` + `aaa_sound_object_patch.script(18) : super` (x17 в логе mg9000). Это шум, не CTD.
+РќРµРґРѕСЃС‚Р°СЋС‰РёРµ С„Р°Р№Р»С‹ (`sound_revamp\fireflies\*.ogg`, `tb_growls\tb_lurk_*.ogg` Рё С‚.Рї.) РґР°СЋС‚ СЃРїР°Рј `File not found` + `aaa_sound_object_patch.script(18) : super` (x17 РІ Р»РѕРіРµ mg9000). Р­С‚Рѕ С€СѓРј, РЅРµ CTD.
 
-**Как исправлено**
+**РљР°Рє РёСЃРїСЂР°РІР»РµРЅРѕ**
 
-Monkey-patch после `aaa_sound_object_patch`: проверка `getFS():exist("$game_sounds$", path .. ".ogg")` до `super`/`sound_object(path)`. Ассеты не восстанавливаются - только заглушка спама.
+Monkey-patch РїРѕСЃР»Рµ `aaa_sound_object_patch`: РїСЂРѕРІРµСЂРєР° `getFS():exist("$game_sounds$", path .. ".ogg")` РґРѕ `super`/`sound_object(path)`. РђСЃСЃРµС‚С‹ РЅРµ РІРѕСЃСЃС‚Р°РЅР°РІР»РёРІР°СЋС‚СЃСЏ - С‚РѕР»СЊРєРѕ Р·Р°РіР»СѓС€РєР° СЃРїР°РјР°.
 
-**Не затронуто**
+**РќРµ Р·Р°С‚СЂРѕРЅСѓС‚Рѕ**
 
-- `aaa_sound_object_patch.script`, кэш `soundCache`
-- сами `.ogg` / sound-моды
+- `aaa_sound_object_patch.script`, РєСЌС€ `soundCache`
+- СЃР°РјРё `.ogg` / sound-РјРѕРґС‹
 - `stop_hud_motion` / FDDA
 - travel / `alife_object`
 
-**Совместимость**
+**РЎРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ**
 
 - Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT
-- Сейвы: совместим, состояние не пишется
-- В MO2 после Anthology base; порядок относительно sound-модов не важен (патч на API)
+- РЎРµР№РІС‹: СЃРѕРІРјРµСЃС‚РёРј, СЃРѕСЃС‚РѕСЏРЅРёРµ РЅРµ РїРёС€РµС‚СЃСЏ
+- Р’ MO2 РїРѕСЃР»Рµ Anthology base; РїРѕСЂСЏРґРѕРє РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ sound-РјРѕРґРѕРІ РЅРµ РІР°Р¶РµРЅ (РїР°С‚С‡ РЅР° API)
 
-**Проверено**
+**РџСЂРѕРІРµСЂРµРЅРѕ**
 
 - lint: `python tools/lint_addon.py fix_sound_object_missing`
-- в игре: не подтверждено. Ожидание: нет кадров `aaa_sound_object_patch.script(18) : super`; в логе разовые `skip missing sound path=...`.
+- РІ РёРіСЂРµ: РЅРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРѕ. РћР¶РёРґР°РЅРёРµ: РЅРµС‚ РєР°РґСЂРѕРІ `aaa_sound_object_patch.script(18) : super`; РІ Р»РѕРіРµ СЂР°Р·РѕРІС‹Рµ `skip missing sound path=...`.

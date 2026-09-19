@@ -1,5 +1,12 @@
 # DotMarks InteractPrompt InitStatic Guard
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; после Interaction Dot Marks / Catspaw utils (`-- load-order` в шапке).
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
+
 ## [1.0.0] — 2026-09-18
 
 **Изменено**

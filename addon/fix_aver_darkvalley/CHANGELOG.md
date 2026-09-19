@@ -1,5 +1,12 @@
 # Aver Dark Valley Transition Fix
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 ниже сборки в MO2 после rewrite dest / already fixed по обеим routes (лучше один load с логом); новая и.
+
+**Удаление**
+
+- Отключить слот в MO2 после rewrite dest / already fixed по обеим routes (лучше один load с логом); новая игра не нужна.
+- Исправленные dest_position level_changer остаются в сейве навсегда — плюс. Runtime rescue больше не сработает (нужен только до переписи). Перед снятием ничего убирать не надо.
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**

@@ -1,5 +1,14 @@
 # Burn Shit Inventory Destroy
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; ниже Burn Shit и CMO; ZIP v1.0.0–v1.0.5 выключить.
+
+**Совместимость:** свои файлы `scripts/anthology_burnshit_inventory_destroy.script`, `scripts/burnshit_inventory_destroy_mcm.script`, `scripts/burnshit_inventory_destroy_config.script`, `configs/plugins/context_menu_overhaul/mod_menu_burnshit_inventory_destroy.ltx`. В MO2 ниже Burn Shit и Context Menu Overhaul; ZIP v1.0.0–v1.0.5 выключить. При совпадении путей с другим модом нужен патч или ручное слияние.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Уже уничтоженные через ПКМ предметы не вернутся (`alife_release_id` — штатное действие, не артефакт мода). Сейв остаётся консистентным; пунктов уничтожения больше не будет.
+
 ## [1.0.6] — 2026-08-29
 
 **Изменено**

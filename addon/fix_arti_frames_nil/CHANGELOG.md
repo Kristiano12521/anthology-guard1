@@ -1,5 +1,12 @@
 # Arti Frames Nil Guard
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 после BS Attachments / `arti_frames_control`; префикс не нужен (`-- load-order`) После MT reload снова возможен FATAL `obj:id()` на Move_All.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без guard'а снова возможен CTD при move-all с Arti Frames — исходный баг, не след отключения.
+
 ## [1.0.3] — 2026-09-19
 
 **Изменено**

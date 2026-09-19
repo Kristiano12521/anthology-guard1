@@ -1,5 +1,12 @@
 # PDA Buy Info GUI Fix
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 ниже `[GAM] Interactive PDA` после MT reload; uninstall только если указатель ещё наш; always re-capture orig.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
+
 ## [1.1.3] — 2026-09-19
 
 **Изменено**

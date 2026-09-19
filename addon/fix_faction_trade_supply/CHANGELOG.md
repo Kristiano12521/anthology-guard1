@@ -1,5 +1,12 @@
 # Faction Trade UI supply_level crash fix
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; после мода с `faction_trade_ui` / `action_trade_ui` (Faction Based HUD / Kristiano pa.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
+
 ## [1.0.1] — 2026-09-17
 
 **Изменено**

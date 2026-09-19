@@ -1,5 +1,12 @@
 # Attribute Assistant Crash and Hostility Fix
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 ниже сборки; ZIP DreamCatcher_AllFixes выключить после MT reload; `callbacks_registered`.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
+
 ## [1.0.3] — 2026-09-19
 
 **Изменено**

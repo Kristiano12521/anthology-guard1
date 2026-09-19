@@ -1,5 +1,12 @@
 # Charon Red Forest Travel Fix
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 ниже сборки и Hard+ (`SYS radioactive_air_toxic_air_rework`) после MT reload; always re-capture; uninstall только если указатель ещё наш.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
+
 ## [1.0.2] — 2026-09-17
 
 **Изменено**

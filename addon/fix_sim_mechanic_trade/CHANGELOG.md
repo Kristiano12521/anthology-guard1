@@ -1,5 +1,12 @@
 # Sim Mechanic Trade Fix
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 ниже сборки (после `aaaa_script_fixes_mp`) после MT reload; always re-capture; safe uninstall.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
+
 ## [1.0.3] — 2026-09-19
 
 **Изменено**

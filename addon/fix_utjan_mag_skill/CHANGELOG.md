@@ -1,5 +1,14 @@
 # Utjan Mag Skill Magazines Guard
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; ниже HarukaSkillSystem.
+
+**Совместимость:** перезаписывает `scripts/utjan_mag_skill.script` (HarukaSkillSystem). В MO2 ниже Haruka (и Magazines Redux, если есть). При совпадении путей с другим модом нужен патч или ручное слияние.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна. Вернётся файл HarukaSkillSystem из нижележащего мода.
+- Сейв не трогает. Без этой замены и без Magazines Redux снова SCRIPT ERROR на загрузке utjan_mag_skill.
+
 ## [1.0.0] - 2026-09-16
 
 **Изменено**

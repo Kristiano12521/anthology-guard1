@@ -1,5 +1,12 @@
 # WTF / PDA Taskboard Macro Guard
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 ниже WTF, iTheon PDA Taskboard и `[ANTHFIX] Taskboard + Weather` После замены таблиц WTF/PDA guard (pcall / offline object) отваливался.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
+
 ## [1.0.3] — 2026-09-17
 
 **Изменено**

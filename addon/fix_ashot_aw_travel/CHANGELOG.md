@@ -1,5 +1,12 @@
 # Ashot Army Warehouses Travel Fix
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 ниже Western Goods После MT reload снова возможен телепорт в X-18.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не меняется. Маршрут «Армейские склады» у Ашота снова может вести в X-18 — баг Western Goods, не corruption.
+
 ## [1.0.2] — 2026-09-17
 
 **Изменено**

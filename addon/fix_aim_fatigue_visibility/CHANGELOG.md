@@ -1,5 +1,12 @@
 # Aim Fatigue Visibility Fix
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; нужен [HARD] Aim Fatigue.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв Aim Fatigue не ломается. MCM-галочки видимости HUD снова могут «не отключаться» — исходный баг `[HARD] Aim Fatigue`, не порча сейва.
+
 ## [1.0.2] — 2026-09-17
 
 **Изменено**

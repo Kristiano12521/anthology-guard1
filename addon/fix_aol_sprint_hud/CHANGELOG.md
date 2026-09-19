@@ -1,5 +1,12 @@
 # AOL Sprint HUD Motion Guard
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв без изменений. Вернётся spam `invalid script_anim_part 255` при спринте с AOL Sprint Cancel — лог/косметика, не corruption.
+
 ## [1.0.1] - 2026-09-16
 
 **Изменено**

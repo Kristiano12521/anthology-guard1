@@ -1,5 +1,12 @@
 # fix_stale_fetch_marker
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; после `actor_on_first_update`.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Очищенные ключи *_fetch в pstor остаются очищенными — плюс. Без мода устаревшие маркеры fetch могут появиться снова.
+
 ## 1.0.3
 
 - `is_stale`: учитывает Utjans `last_check_task` (`complete` / `fail`), не только `status` / `stage` / engine.

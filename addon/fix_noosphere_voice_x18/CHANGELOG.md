@@ -1,5 +1,12 @@
 # Noosphere Voice X18 Fix
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 ниже сборки; ZIP и `[DBG] Kristiano Fixes ALL IN ONE` с тем же `zzzzzzzzzzzzzz_anthology_lttz_noosphere_voice_x18_fix после Эйдолона чинится при загрузке в X-18 за 8–15 с.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
+
 ## [1.0.1] — 2026-08-31
 
 **Изменено**

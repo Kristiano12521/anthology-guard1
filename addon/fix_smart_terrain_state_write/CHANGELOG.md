@@ -1,5 +1,12 @@
 # Smart Terrain STATE_Write Nil Guard
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 после ядра Anthology; префикс не нужен (`-- load-order: after smart_terrain После снятия CTD на smart terrain при quicksave может вернуться.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Своей схемы сейва нет — только nil→{} перед STATE_Write. После снятия CTD на smart terrain при quicksave может вернуться.
+
 ## [1.0.3] — 2026-09-19
 
 **Изменено**

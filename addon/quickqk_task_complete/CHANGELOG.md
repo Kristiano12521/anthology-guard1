@@ -1,5 +1,12 @@
 # QuickQK Task Status Tool
 
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; В MO2 выключить предыдущие QuickQK и копию из сборки `[GFX] QuickQK Task Status Tool Anthology` выключить предыдущие QuickQK и копию из сборки `[GFX] QuickQK Task Status Tool Anthology`.
+
+**Удаление**
+
+- Отключить слот в MO2; новая игра не нужна.
+- Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
+
 ## [1.4.2] — 2026-08-31
 
 **Изменено**
