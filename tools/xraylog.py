@@ -57,7 +57,11 @@ FIELD_RE = re.compile(
     r"^\s*(?:\[error\])?\s*(Expression|Function|File|Line|Description|Arguments)\s*:\s*(.*)$",
     re.I,
 )
-STACK_RE = re.compile(r"^\s*stack trace:", re.I)
+# С таймстемпом Modded Exes: `[22:19:50.005] stack trace:` — без префикса детект ломается.
+STACK_RE = re.compile(
+    r"^(?:\s*|\[\d{2}:\d{2}:\d{2}(?:\.\d+)?\]\s*)stack trace:",
+    re.I,
+)
 LUA_TRACEBACK_RE = re.compile(r"^\s*[!~]?\s*STACK TRACEBACK\s*:?\s*$", re.I)
 SEPARATOR_RE = re.compile(r"^\s*[!~]?\s*-{5,}\s*$")
 SCRIPT_REF_RE = re.compile(r"([\w\-]+\.(?:script|lua))[:(](\d+)")

@@ -3,6 +3,10 @@
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 Записи старше месяца — в [`CHANGELOG-archive.md`](CHANGELOG-archive.md).
 
+## [0.1.71] — xraylog: stack trace с таймстемпом; журнал CTD на Баре
+
+`tools/xraylog.py`: `STACK_RE` ловит `[HH:MM:SS.mmm] stack trace:` (Modded Exes) — иначе native AV без FATAL терялся. Тест. Журнал: UnhandledFilter `UpdateDynamicDamage` / `InitContact` на `l05_bar`, sound abort PA black_valley, BTR `ph_car` при `stype=nil`, WTF `gt_guard`. Карточка `logs/cards/2026-09-19_newxray_nikit.md`. Changelog бандла: AIO 1.0.0 и gigant 1.1.2.
+
 ## [0.1.70] — версия пакета AIO для бета-отчётов
 
 `tools/_pack_kristiano_aio.py`: константа `AIO_VERSION` (сейчас `1.0.0`, semver) пишется в `BUILD_INFO.txt` (`version:`), `meta.ini` (поле Version в MO2), `CONTENTS.txt` / `README_RU.txt`. Раньше в meta была дата дня сборки, в BUILD_INFO версии не было. Дата остаётся в `built:`. Separate (CMO / QuickQK / ST2 / Campfires) уже берут version из мода в meta и BUILD_INFO — без правок. `community/BUG_REPORT.md` — поле «версия пакета» и где взять. Тест на строки version в AIO zip.

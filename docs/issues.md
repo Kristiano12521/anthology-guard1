@@ -19,6 +19,42 @@
 
 ---
 
+## [issue] native `UnhandledFilter` / `CPHSimpleCharacter::UpdateDynamicDamage` + `InitContact`
+
+- дата: 2026-09-19
+- мод: нативный xrPhysics (актор); падение на `l05_bar` ~1.7 с после закрытия UIInventory (лут `bar_bar_drunk_dolg` / duty-трупов); DotMarks `block_loot_window` в логе есть, но инвентарь всё равно открывался
+- итог: **не чинится скриптом** — AV в `UpdateDynamicDamage` на контакте (`InitContact` → `CollideDynamics` → `PHWorld::Step` → `GameThread`). Адрес `0x1C53C00160` вне модулей (`SymGetModuleInfo64` 1114) — типичный битый указатель/UAF в колбэке контакта, не Lua. На уровне в той же сессии: `smart-cover repair … invalid=40`, exclusive job smartcover `[nil]` у `bar_visitors` — возможный фон, связь с CTD **не доказана**. Не DrawHint / DoRenderDialogs / ScreenResolution.
+- карточка: [2026-09-19_newxray_nikit.md](../logs/cards/2026-09-19_newxray_nikit.md) (источник `newxray_nikit.log`; 9 загрузок)
+- pitfalls: нет
+- подробности: mdmp `logs/xray_nikit_09-19-26_22-19-50.mdmp`; детект `stack trace:` с таймстемпом — `tools/xraylog.py` (`STACK_RE`). Следующий шаг: повтор на Баре (A) без лута, (B) с лутом без DotMarks; mdmp в WinDbg; при стабильном повторе — в Anthology/Modded Exes с PDB.
+
+## [issue] `sound_theme` abort: `There are no sound collection with path: scenario\black_valley\blck_val_robbery_scene_come_here_pda`
+
+- дата: 2026-09-19
+- мод: PA black_valley — секция `[blck_val_robbery_scene_see_actor]` в `script_sound_pa_black_valley.ltx` (`path = scenario\black_valley\blck_val_robbery_scene_come_here_pda`); загрузка через `sound_theme` `object_sound`/`actor_sound` → `abort` (ваниль)
+- итог: **ассет сборки** — в runtime нет `.ogg` по этому path (коллекция пустая → abort). Нефатально (×2 на 1-й загрузке `black_valley`). Нашего фикса нет: чинить пакет звуков PA / Anthology, не monkey-patch `abort`.
+- карточка: [2026-09-19_newxray_nikit.md](../logs/cards/2026-09-19_newxray_nikit.md)
+- pitfalls: нет
+- подробности: эталон LTX `reference/anomaly/configs/misc/sound/script_sound_pa_black_valley.ltx:49–54`; abort `sound_theme.script:459` / `:644`
+
+## [issue] `! ERROR: veh_btr… trying to use a scheme not intended for stype scheme=ph_car stype=nil`
+
+- дата: 2026-09-19
+- мод: `ph_car` зарегистрирован на `stype_item` (`modules.script`); ошибка из `xr_logic.activate_by_section` когда `db.storage[id].stype == nil`. Типичный путь: `logic_enforcer.assign` (WG / `tasks_veh_destroy`) → `switch_to_section` на объекте, у которого `st` уже есть (после `bind_car:reinit`), но `initialize_obj` ещё не выставил `stype`
+- итог: **игнор / гонка биндера** — ×4 BTR одним кадром на загрузке Escape (`veh_btr56839…41`); схема не ставится (`return`), CTD нет. Нашего фикса нет, пока нет повторяемого геймплейного бага (машина без AI). Опциональный гард: в `logic_enforcer` не вызывать switch, пока `st.stype` nil.
+- карточка: [2026-09-19_newxray_nikit.md](../logs/cards/2026-09-19_newxray_nikit.md)
+- pitfalls: нет
+- подробности: `xr_logic.script:226–228`, `bind_car.script:17–29`, `logic_enforcer.script:56–89`
+
+## [issue] `WTF ERROR: Task crashed` — `ghentuongsupply*` / макрос `gt_guard` + `fix_wtf_taskboard_guard`
+
+- дата: 2026-09-19
+- мод: WTF/IGI quest `ghentuongsupply46074` + наш `fix_wtf_taskboard_guard` (`is_valid_quest`); макрос `$ igi_helper.db_ini:r_value('gt_guard', |this.faction|)`
+- итог: **гард сработал** (quest rejected during validation) — не CTD; апстрим квеста / faction-ключ `gt_guard`. Соседний класс к уже известному WTF `communitytracking_shot`.
+- карточка: [2026-09-19_newxray_nikit.md](../logs/cards/2026-09-19_newxray_nikit.md)
+- pitfalls: [§18](pitfalls.md)
+- подробности: нет
+
 ## [issue] `[DLTX] Duplicate section 'af_indeikam_breeding_1'` (`mod_system_anthology_indeikam_breeding_fix.ltx`)
 
 - дата: 2026-09-19

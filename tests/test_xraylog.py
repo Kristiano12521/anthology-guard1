@@ -241,6 +241,18 @@ class NativeCrashTests(unittest.TestCase):
         crash_class, _ = clean.classify()
         self.assertEqual(crash_class, xraylog.CLEAN_SESSION_CLASS)
 
+    def test_timestamp_prefixed_stack_trace_detected(self):
+        """Modded Exes пишет `[HH:MM:SS.mmm] stack trace:` — без этого native AV теряется."""
+        src = (SAMPLES / "crash_native_av.log").read_text(encoding="utf-8", errors="replace")
+        stamped = src.replace("stack trace:\n", "[22:19:50.005] stack trace:\n", 1)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "stamped_native.log"
+            path.write_text(stamped, encoding="utf-8")
+            report = xraylog.LogReport(path)
+            report.parse(context_lines=40)
+        self.assertTrue(report.native_crash)
+        self.assertEqual(report.classify()[0], xraylog.NATIVE_CRASH_CLASS)
+
 
 class DltxFatalTests(unittest.TestCase):
     def test_duplicate_section_not_unclassified(self):
