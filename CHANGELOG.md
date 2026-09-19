@@ -2,6 +2,12 @@
 
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 
+## [0.1.65] — xraylog: нативный вылет без FATAL
+
+`tools/xraylog.py` больше не помечает AV с `UnhandledFilter` + `stack trace:` как «вылета в логе нет». Новый класс **`нативный вылет (не Lua)`**: в карточке — верхние кадры стека (`DoRenderDialogs` / `rp_ScreenResolutionChanged` и т.п.), без пустой секции FATAL. Штатный выход (`* Quitting...`, фикстура `clean_session.log`) по-прежнему clean.
+
+FATAL `[DLTX] Duplicate section` / `CInifile::StashCurrentSection` — класс **`конфиг: DLTX`** вместо «не классифицировано». Фикстуры `logs/samples/crash_native_av.log`, `crash_dltx_duplicate.log`; тесты; отпечаток архива `("native", …)`. На логах mg9000 19.09: два UnhandledFilter → нативный класс, DLTX → конфиг: DLTX, Lua pcall без регрессии.
+
 ## [0.1.64] — ENC-005 и docs/mods/
 
 `tools/lint_addon.py`: ошибка ENC-005 на подряд идущие `?` (≥2) в комментарии `-- load-order:` — порча кириллицы «после» редактором без cp1251; ENC-004 (EF BF BD) этот случай не ловит. Детектор `tools/_common.py::has_load_order_question_marks`. Тесты на порчу, одиночный `?` и целый cp1251. В `addon/fix_qaw_ammo_nil` снова восстановлено `-- load-order: после …` в Windows-1251.

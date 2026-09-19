@@ -1,0 +1,20 @@
+'xrCore' build 10063, Aug 28 2026
+Initializing File System...
+using fs-ltx ../fsgame.ltx
+Starting engine...
+* Game mg9000 - tempsave.scop is successfully saved to file 'c:/games/anthology/appdata\savedgames\mg9000 - tempsave.scop'
+* total loading time: 8453 ms
+stack trace:
+
+SymInit: Symbol-SearchPath: '.;C:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\bin;', symOptions: 530, UserName: 'MG9000'
+OS-Version: 6.2.9200 () 0x300-0x1
+C:\Games\ANTHOLOGY\Anomaly-1.5.3-Anthology 2.1\bin\AnomalyDX11AVX.exe:AnomalyDX11AVX.exe (0000000140000000), size: 48513024 (result: 0), SymType: 'PDB', PDB: '.\AnomalyDX11AVX.pdb'
+X:\S.T.A.L.K.E.R\A.N.T.H.O.L.O.G.Y\ANTHOLOGY\anthology-mt-engine-alex-src\src\xrCore\xrDebugNew.cpp (816): UnhandledFilter
+X:\S.T.A.L.K.E.R\A.N.T.H.O.L.O.G.Y\ANTHOLOGY\anthology-mt-engine-alex-src\src\xrGame\UIDialogHolder.cpp (185): CDialogHolder::DoRenderDialogs
+X:\S.T.A.L.K.E.R\A.N.T.H.O.L.O.G.Y\ANTHOLOGY\anthology-mt-engine-alex-src\src\xrGame\MainMenu.cpp (468): CMainMenu::OnRenderPPUI_main
+X:\S.T.A.L.K.E.R\A.N.T.H.O.L.O.G.Y\ANTHOLOGY\anthology-mt-engine-alex-src\src\xrEngine\device.cpp (1143): CRenderDevice::Run
+X:\S.T.A.L.K.E.R\A.N.T.H.O.L.O.G.Y\ANTHOLOGY\anthology-mt-engine-alex-src\src\xrEngine\x_ray.cpp (1454): WinMain
+
+[error][     126] : module not found.
+
+at address 0x00000001401F8957

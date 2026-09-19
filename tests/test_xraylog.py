@@ -209,6 +209,51 @@ class ResourceCrashTests(unittest.TestCase):
         self.assertTrue(any("OOM" in hint or "VRAM" in hint for hint in hints))
 
 
+class NativeCrashTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.report = parse("crash_native_av.log")
+
+    def test_detects_native_without_fatal_block(self):
+        self.assertTrue(self.report.crashed)
+        self.assertTrue(self.report.native_crash)
+        self.assertEqual(self.report.fatal_lines, [])
+        self.assertFalse(self.report.fields)
+
+    def test_classified_as_native_not_clean(self):
+        crash_class, hints = self.report.classify()
+        self.assertEqual(crash_class, xraylog.NATIVE_CRASH_CLASS)
+        self.assertNotEqual(crash_class, xraylog.CLEAN_SESSION_CLASS)
+        self.assertTrue(any("UnhandledFilter" in hint for hint in hints))
+        self.assertTrue(any("DoRenderDialogs" in hint for hint in hints))
+
+    def test_markdown_shows_stack_without_fatal_section(self):
+        card = self.report.to_markdown(max_warnings=10, warnings_only=False)
+        self.assertNotIn("## FATAL ERROR", card)
+        self.assertIn("## Стек", card)
+        self.assertIn("UnhandledFilter", card)
+        self.assertIn("CDialogHolder::DoRenderDialogs", card)
+        self.assertIn("Верхние кадры:", card)
+
+    def test_clean_quit_not_native(self):
+        clean = parse("clean_session.log")
+        self.assertFalse(clean.crashed)
+        self.assertFalse(clean.native_crash)
+        crash_class, _ = clean.classify()
+        self.assertEqual(crash_class, xraylog.CLEAN_SESSION_CLASS)
+
+
+class DltxFatalTests(unittest.TestCase):
+    def test_duplicate_section_not_unclassified(self):
+        report = parse("crash_dltx_duplicate.log")
+        self.assertTrue(report.crashed)
+        self.assertFalse(report.native_crash)
+        crash_class, hints = report.classify()
+        self.assertEqual(crash_class, "конфиг: DLTX")
+        self.assertNotEqual(crash_class, "не классифицировано")
+        self.assertTrue(any("Duplicate" in hint or "DLTX" in hint for hint in hints))
+        self.assertEqual(report.fields["Function"], "CInifile::StashCurrentSection")
+
+
 class FatalSampleRegressionTests(unittest.TestCase):
     def test_lua_crash_classification_unchanged(self):
         report = parse("crash_lua_nil.log")
@@ -426,6 +471,7 @@ class ArchiveCardTests(unittest.TestCase):
             xraylog.is_clean_session_class("вылета нет, есть повторяющиеся ошибки (1 групп)")
         )
         self.assertFalse(xraylog.is_clean_session_class("Lua error"))
+        self.assertFalse(xraylog.is_clean_session_class(xraylog.NATIVE_CRASH_CLASS))
 
     def test_fingerprint_roundtrip_via_card_markdown(self):
         report = parse("crash_lua_nil.log")
@@ -447,6 +493,13 @@ class ArchiveCardTests(unittest.TestCase):
             xraylog.report_fingerprint(clean),
         )
         self.assertEqual(xraylog.report_fingerprint(clean), ("clean",))
+        native = parse("crash_native_av.log")
+        card_native = native.to_markdown(max_warnings=10, warnings_only=False)
+        self.assertEqual(
+            xraylog.fingerprint_from_card_text(card_native),
+            xraylog.report_fingerprint(native),
+        )
+        self.assertEqual(xraylog.report_fingerprint(native)[0], "native")
 
     def test_fingerprint_changes_when_nonfatal_count_changes(self):
         report = parse("nonfatal_traceback.log")

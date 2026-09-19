@@ -2,9 +2,9 @@
 """Сжимает лог X-Ray / Anomaly в карточку вылета для разбора в Cursor.
 
 Лог игры — это мегабайты, из которых полезны сотни байт. Скрипт вытаскивает
-блок FATAL ERROR, нефатальные STACK TRACEBACK, Lua-кадры, осмысленные строки
-перед падением и повторяющиеся предупреждения, после чего в чат уходит карточка,
-а не весь файл.
+блок FATAL ERROR, нативный AV без FATAL (`UnhandledFilter` + `stack trace:`),
+нефатальные STACK TRACEBACK, Lua-кадры, осмысленные строки перед падением и
+повторяющиеся предупреждения, после чего в чат уходит карточка, а не весь файл.
 
     python3 tools/xraylog.py logs/xray_ivan.log --out logs/card.md
     python3 tools/xraylog.py logs/xray_ivan.log --archive
@@ -39,8 +39,20 @@ DEFAULT_ARCHIVE_DIR = REPO_ROOT / "logs" / "cards"
 # Чистая сессия без FATAL и без нефатальных Lua — в базу карточек не кладём:
 # фиксирует пустоту и за месяц забивает logs/cards/. Архивация только с --archive-clean.
 CLEAN_SESSION_CLASS = "вылета в логе нет"
+NATIVE_CRASH_CLASS = "нативный вылет (не Lua)"
+# Хвост после последнего stack trace: SymInit + кадры движка; дальше — уже не краш.
+NATIVE_STACK_TAIL = 80
 
 FATAL_RE = re.compile(r"^\s*(?:-+\s*)?fatal error\s*(?:-+)?\s*$", re.I)
+UNHANDLED_FILTER_RE = re.compile(r"UnhandledFilter")
+# Кадр PDB: `path\file.cpp (N): Class::Method` или `…: rp_ScreenResolutionChanged`.
+ENGINE_FRAME_RE = re.compile(
+    r"\):\s*(?:UnhandledFilter|[\w:]+::[\w:~]+|rp_\w+|WinMain\w*)",
+)
+DLTX_FATAL_RE = re.compile(
+    r"\[DLTX\]|Duplicate section|StashCurrentSection",
+    re.I,
+)
 FIELD_RE = re.compile(
     r"^\s*(?:\[error\])?\s*(Expression|Function|File|Line|Description|Arguments)\s*:\s*(.*)$",
     re.I,
@@ -215,6 +227,8 @@ class LogReport:
         self.engine_build: str | None = None
         self.exe: str | None = None
         self.crashed = False
+        # True: AV без блока FATAL ERROR (UnhandledFilter в хвосте).
+        self.native_crash = False
 
     # -- разбор ------------------------------------------------------
 
@@ -343,10 +357,62 @@ class LogReport:
         )
 
         if not self.crashed:
+            self._detect_native_crash(context_lines)
+
+        if not self.crashed:
             self.context = list(recent)
 
         catalog = discover_addon_mods(self.addon_dir)
         self.mod_scan = scan_log_for_mods(self.log_lines, catalog)
+
+    def _detect_native_crash(self, context_lines: int) -> None:
+        """Нативный AV без FATAL: хвост с ``stack trace:`` + ``UnhandledFilter``.
+
+        Штатный выход (`* Quitting...`) такого блока не пишет. ``RM_Dump`` в
+        середине сессии не мешает: важен обрыв без дампа *после* падения.
+        """
+        last_stack = -1
+        for i in range(len(self.log_lines) - 1, -1, -1):
+            if STACK_RE.match(self.log_lines[i]):
+                last_stack = i
+                break
+        if last_stack < 0:
+            return
+        if len(self.log_lines) - last_stack > NATIVE_STACK_TAIL:
+            return
+        block = self.log_lines[last_stack + 1 :]
+        if not any(UNHANDLED_FILTER_RE.search(line) for line in block):
+            return
+
+        frames: list[str] = []
+        for line in block:
+            if UNHANDLED_FILTER_RE.search(line) or ENGINE_FRAME_RE.search(line):
+                frames.append(line)
+            elif frames and re.search(r"at address\s+0x", line, re.I):
+                frames.append(line)
+                break
+
+        self.crashed = True
+        self.native_crash = True
+        self.stack_lines = frames
+        before = self.log_lines[max(0, last_stack - context_lines) : last_stack]
+        self.context = [line for line in before if not is_noise(line)][-context_lines:]
+
+    def native_top_frames(self, limit: int = 8) -> list[str]:
+        """Короткие имена верхних кадров нативного стека для карточки/hints."""
+        out: list[str] = []
+        for line in self.stack_lines:
+            if UNHANDLED_FILTER_RE.search(line):
+                out.append("UnhandledFilter")
+                continue
+            match = re.search(r"\):\s*(.+)$", line)
+            if match:
+                out.append(match.group(1).strip())
+            elif re.search(r"at address\s+0x", line, re.I):
+                out.append(line.strip())
+            if len(out) >= limit:
+                break
+        return out
 
     # -- выводы ------------------------------------------------------
 
@@ -399,17 +465,38 @@ class LogReport:
                     ],
                 )
             return (
-                "вылета в логе нет",
+                CLEAN_SESSION_CLASS,
                 [
                     "Блок FATAL ERROR не найден: либо лог от нормального сеанса, "
                     "либо игра упала без записи (проверь конец файла вручную).",
                 ],
             )
 
+        if self.native_crash:
+            tops = self.native_top_frames()
+            chain = " → ".join(tops[:5]) if tops else "стек пуст"
+            hints = [
+                "Класс: нативный вылет без блока FATAL ERROR (`UnhandledFilter` + `stack trace:`).",
+                "Не Lua: ACCESS_VIOLATION / unhandled exception в C++ (UI, рендер, шедулер, устройство).",
+                f"Верх стека: {chain}.",
+                "Штатный выход пишет `* Quitting...` и не оставляет UnhandledFilter.",
+            ]
+            return NATIVE_CRASH_CLASS, hints
+
         text = self.haystack.lower()
         section = self.missing_section()
         variable = self.missing_variable()
         include = self.missing_include()
+
+        if DLTX_FATAL_RE.search(self.haystack) or "stashcurrentsection" in text:
+            args = self.fields.get("Arguments", "").strip()
+            hints = [
+                "Класс: FATAL от DLTX / `CInifile` (часто Duplicate section без `!`/`@`).",
+                "Смотри Arguments: какой файл объявил секцию повторно и чем её пометить.",
+            ]
+            if args:
+                hints.append(f"Arguments: {args[:240]}")
+            return "конфиг: DLTX", hints
 
         if "lua_pcall_failed" in text:
             refs = self.lua_refs()
@@ -582,12 +669,13 @@ class LogReport:
         out.append("")
 
         if self.crashed and not hide_crash:
-            out.append("## FATAL ERROR")
-            out.append("")
-            out.append("```")
-            out.extend(self.fatal_lines[:40])
-            out.append("```")
-            out.append("")
+            if self.fatal_lines:
+                out.append("## FATAL ERROR")
+                out.append("")
+                out.append("```")
+                out.extend(self.fatal_lines[:40])
+                out.append("```")
+                out.append("")
 
             refs = self.lua_refs()
             if refs:
@@ -600,6 +688,11 @@ class LogReport:
             if self.stack_lines:
                 out.append("## Стек")
                 out.append("")
+                if self.native_crash:
+                    tops = self.native_top_frames()
+                    if tops:
+                        out.append("Верхние кадры: " + " → ".join(f"`{frame}`" for frame in tops[:6]))
+                        out.append("")
                 out.append("```")
                 out.extend(self.stack_lines[:20])
                 out.append("```")
@@ -706,12 +799,17 @@ def normalize_signature_text(text: str) -> str:
 
 
 def report_fingerprint(report: LogReport) -> tuple:
-    """Отпечаток для сравнения с архивом: FATAL / топ нефатальных групп / clean.
+    """Отпечаток для сравнения с архивом: FATAL / native / топ нефатальных / clean.
 
     Для нефатальных берём те же MAX_NONFATAL_GROUPS, что попадают в markdown
     карточки — иначе round-trip с уже лежащими файлами не сойдётся.
     """
     if report.crashed:
+        if report.native_crash:
+            tops = tuple(
+                normalize_signature_text(frame) for frame in report.native_top_frames(5)
+            )
+            return ("native", tops)
         return (
             "fatal",
             report.fields.get("Function", "").strip(),
@@ -762,6 +860,33 @@ def fingerprint_from_card_text(text: str) -> tuple | None:
             desc = match.group(1).strip()
     if func or desc:
         return ("fatal", func, normalize_signature_text(desc))
+
+    if crash_class == NATIVE_CRASH_CLASS or crash_class.startswith("нативный вылет"):
+        tops: list[str] = []
+        in_stack = False
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("## "):
+                in_stack = stripped == "## Стек"
+                continue
+            if not in_stack:
+                continue
+            if stripped.startswith("Верхние кадры:"):
+                for part in re.findall(r"`([^`]+)`", stripped):
+                    tops.append(normalize_signature_text(part))
+                break
+            if stripped.startswith("```"):
+                continue
+            if UNHANDLED_FILTER_RE.search(stripped) or ENGINE_FRAME_RE.search(stripped):
+                if UNHANDLED_FILTER_RE.search(stripped):
+                    tops.append("UnhandledFilter")
+                else:
+                    match = re.search(r"\):\s*(.+)$", stripped)
+                    if match:
+                        tops.append(normalize_signature_text(match.group(1)))
+                if len(tops) >= 5:
+                    break
+        return ("native", tuple(tops[:5]))
 
     if is_clean_session_class(crash_class):
         return ("clean",)

@@ -11,7 +11,7 @@ python3 tools/xraylog.py logs/xray_ivan.log --out logs/card.md --archive
 python3 tools/xraylog.py logs/xray_ivan.log --errors-only
 ```
 
-Карточка: класс, блок `FATAL ERROR` если он есть, иначе секция «Нефатальные ошибки». FATAL может отсутствовать — для этой сборки основной класс проблем как раз повторяющиеся traceback'и. `--errors-only` показывает только эту секцию, без вылета и warning'ов. Дальше работаем по карточке. Сырые логи временные; постоянная база разборов — `logs/cards/` (`--archive`; чистая сессия без FATAL/нефатальных Lua — только с `--archive-clean`).
+Карточка: класс, блок `FATAL ERROR` если он есть, иначе нативный стек (`UnhandledFilter`) или секция «Нефатальные ошибки». FATAL может отсутствовать при реальном CTD — тогда ищи `stack trace:` + `UnhandledFilter` в хвосте. `--errors-only` — только нефатальные Lua, без вылета и warning'ов. Дальше работаем по карточке. Сырые логи временные; постоянная база разборов — `logs/cards/` (`--archive`; чистая сессия без FATAL/нефатальных Lua/нативного AV — только с `--archive-clean`).
 
 ## Этап 1. Классификация
 
@@ -30,6 +30,8 @@ python3 tools/xraylog.py logs/xray_ivan.log --errors-only
 | --- | --- | --- |
 | `CScriptEngine::lua_error`, `...script:NN:` | Lua | какая строка и что там nil |
 | `CScriptEngine::lua_pcall_failed` | Lua / pcall | какой `pcall` и что дальше по стеку — это не обычный `lua_error` |
+| `stack trace:` + `UnhandledFilter` без `FATAL ERROR` | нативный вылет (не Lua) | верх стека (`DoRenderDialogs` / `rp_ScreenResolutionChanged` / …); не скрипт |
+| `[DLTX] Duplicate section` / `CInifile::StashCurrentSection` | конфиг: DLTX | какой файл объявил секцию повторно; нужен `!`/`@` |
 | повторяющийся `STACK TRACEBACK` без `FATAL` | нефатальная ошибка | заголовок группы (первый кадр не из `_g.script` / `axr_main.script`) |
 | `![axr_main callback_set] callback X doesn't exist` или `... to nil function` | Lua / callback | опечатка в имени callback либо нет функции-обработчика в вызывающем скрипте |
 | `CInifile::r_section`, `Can't open section 'X'` | конфиг | кто ждёт секцию `X` и кто должен был её объявить |

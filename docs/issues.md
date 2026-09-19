@@ -24,7 +24,7 @@
 - дата: 2026-09-19
 - мод: старый ZIP / Kristiano AIO (`mod_system_anthology_indeikam_breeding_fix.ltx`), не наш `mod_system_fix_indeikam_breeding.ltx`
 - итог: **конфликт установки** — FATAL на старте `CInifile::StashCurrentSection`; секция уже есть (или создана другим патчем), дубликат без `!`/`@`. Наш `fix_indeikam_breeding` **1.1.0** именует файл иначе и использует `@[…]`. В MO2 выключить старый ZIP / копию в Kristiano AIO.
-- карточка: [2026-09-19_xray_mg9000.md](../logs/cards/2026-09-19_xray_mg9000.md) (источник `xray_mg9000 (2).log`)
+- карточка: [2026-09-19_xray_mg9000.md](../logs/cards/2026-09-19_xray_mg9000.md) (источник `xray_mg9000 (2).log`; класс xraylog: **конфиг: DLTX**)
 - pitfalls: нет
 - подробности: `addon/fix_indeikam_breeding/CHANGELOG.md` [1.1.0] (явный конфликт имён файлов)
 
@@ -41,7 +41,7 @@
 
 - дата: 2026-09-19
 - мод: нативный (не Lua); падение после успешного save `tempsave`
-- итог: **не разобрано** — класс карточки «вылета в логе нет», в хвосте `UnhandledFilter` → `rp_ScreenResolutionChanged` → `FrameMove`. Отдельно от PDA `CUIMapWnd::DrawHint`.
+- итог: **не разобрано** — класс **`нативный вылет (не Lua)`** (`UnhandledFilter` → `rp_ScreenResolutionChanged` → `FrameMove`). Отдельно от PDA `CUIMapWnd::DrawHint`.
 - карточка: [2026-09-19_xray_mg9000-3.md](../logs/cards/2026-09-19_xray_mg9000-3.md) (источник `xray_mg9000.log`; `(1).log` — байтовый дубль)
 - pitfalls: нет
 - подробности: нет
@@ -50,7 +50,7 @@
 
 - дата: 2026-09-19
 - мод: нативный UI; падение после успешной загрузки `quicksave_5`
-- итог: **не разобрано** — нет Lua FATAL; стек `DoRenderDialogs` → `CMainMenu::OnRenderPPUI_main`. Соседний класс к PDA-хинту, но другой кадр.
+- итог: **не разобрано** — класс **`нативный вылет (не Lua)`**; стек `DoRenderDialogs` → `CMainMenu::OnRenderPPUI_main`. Соседний класс к PDA-хинту, но другой кадр.
 - карточка: [2026-09-19_xray_mg9000-4.md](../logs/cards/2026-09-19_xray_mg9000-4.md) (источник `xray_mg9000 (4).log`, ~14 сессий в одном файле)
 - pitfalls: нет
 - подробности: нет
