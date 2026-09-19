@@ -19,6 +19,42 @@
 
 ---
 
+## [issue] `CUILine::Draw` / `CUIMapWnd::DrawHint` (native ACCESS_VIOLATION, PDA map hint)
+
+- дата: 2026-09-19
+- мод: не скриптовый; подозреваемые споты — Milspec PDA / PAW / placeable waypoints / DotMarks (тип спота не зафиксирован)
+- итог: **не чинится** без повтора — нет Lua FATAL; AV при отрисовке хинта карты PDA. Lua-кадр `haru_specialized_storage_boxes` в момент падения — смежный снимок VM, не причина. Нужен повтор с типом спота под курсором.
+- карточка: нет (дампы 2026-09-19 сняты вместе с сырыми логами)
+- pitfalls: нет
+- подробности: mdmp `logs/xray_nikit_09-19-26_14-16-50.mdmp` (на момент разбора)
+
+## [issue] `fix_sim_mechanic_trade.script:65: attempt to call upvalue 'orig_trade_init' (a nil value)`
+
+- дата: 2026-09-19
+- мод: `fix_sim_mechanic_trade` (обёртка `trade_init` сорвалась — `orig_trade_init` nil)
+- итог: **починено в 1.0.3** — re-wrap больше не обнуляет `orig_*`; лог korisnik был до/без этого пакета. Если у тестера снова всплывёт — смотреть, стоит ли 1.0.3.
+- карточка: нет (дамп korisnik 2026-09-19 снят вместе с сырым логом)
+- pitfalls: нет
+- подробности: `addon/fix_sim_mechanic_trade/CHANGELOG.md` [1.0.3]
+
+## [issue] `fix_milspec_exo_craft.script:198` / `kristiano_kx1_exo.script:358` — `LUA error: DebuggerMode` (рекурсия `orig_load`)
+
+- дата: 2026-09-19
+- мод: `fix_milspec_exo_craft` + Kristiano KX1 exo (взаимная обёртка `orig_load`)
+- итог: **не разобрано** — FATAL `DebuggerMode`, в логе сотни тысяч кадров рекурсии; один и тот же краш у mg900011 и teres
+- карточка: нет (дамп mg900011 2026-09-19 снят вместе с сырым логом)
+- pitfalls: нет
+- подробности: нет
+
+## [issue] `CUIXmlInit::InitFont` / `unknown font` `letterica14`
+
+- дата: 2026-09-15
+- мод: UI/шрифты (не наш `fix_*` напрямую); контекст PDA OVCD
+- итог: **не разобрано** — нативный FATAL unknown font
+- карточка: нет (дамп pda_ovcd 2026-09-19 снят вместе с сырым логом)
+- pitfalls: нет
+- подробности: нет
+
 ## [issue] `pda_inter_x_banter.script:170: attempt to index field 'GUI' (a nil value)`
 
 - дата: 2026-09-13
