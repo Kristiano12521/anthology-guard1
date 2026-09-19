@@ -19,14 +19,68 @@
 
 ---
 
+## [issue] `[DLTX] Duplicate section 'af_indeikam_breeding_1'` (`mod_system_anthology_indeikam_breeding_fix.ltx`)
+
+- дата: 2026-09-19
+- мод: старый ZIP / Kristiano AIO (`mod_system_anthology_indeikam_breeding_fix.ltx`), не наш `mod_system_fix_indeikam_breeding.ltx`
+- итог: **конфликт установки** — FATAL на старте `CInifile::StashCurrentSection`; секция уже есть (или создана другим патчем), дубликат без `!`/`@`. Наш `fix_indeikam_breeding` **1.1.0** именует файл иначе и использует `@[…]`. В MO2 выключить старый ZIP / копию в Kristiano AIO.
+- карточка: [2026-09-19_xray_mg9000.md](../logs/cards/2026-09-19_xray_mg9000.md) (источник `xray_mg9000 (2).log`)
+- pitfalls: нет
+- подробности: `addon/fix_indeikam_breeding/CHANGELOG.md` [1.1.0] (явный конфликт имён файлов)
+
+## [issue] `actor_status.script:32: table index is nil` (`scan_boosters_effect` / `BoosterForEach`)
+
+- дата: 2026-09-19
+- мод: ваниль `actor_status` — `active_boosters[ boost_name[typ] ]`; `boost_name[typ]` nil (неизвестный `typ` из `BoosterForEach`, таблица из `invert_table(BoosterID)`)
+- итог: **не разобрано** — FATAL `lua_pcall_failed` на `actor_on_update` сразу после загрузки сейва. Какой booster/мод отдаёт неизвестный `typ` — не зафиксирован; нужен повтор с инвентарём бустеров / модами на `BoosterID`.
+- карточка: [2026-09-19_xray_mg9000-2.md](../logs/cards/2026-09-19_xray_mg9000-2.md) (источник `xray_mg9000 (3).log`)
+- pitfalls: нет
+- подробности: `reference/anomaly/scripts/actor_status.script:24–32` (`prepare_boosters_effect` / `scan_current_booster_effect`)
+
+## [issue] native `UnhandledFilter` / `rp_ScreenResolutionChanged` (без блока FATAL)
+
+- дата: 2026-09-19
+- мод: нативный (не Lua); падение после успешного save `tempsave`
+- итог: **не разобрано** — класс карточки «вылета в логе нет», в хвосте `UnhandledFilter` → `rp_ScreenResolutionChanged` → `FrameMove`. Отдельно от PDA `CUIMapWnd::DrawHint`.
+- карточка: [2026-09-19_xray_mg9000-3.md](../logs/cards/2026-09-19_xray_mg9000-3.md) (источник `xray_mg9000.log`; `(1).log` — байтовый дубль)
+- pitfalls: нет
+- подробности: нет
+
+## [issue] native `UnhandledFilter` / `CDialogHolder::DoRenderDialogs` (меню после load)
+
+- дата: 2026-09-19
+- мод: нативный UI; падение после успешной загрузки `quicksave_5`
+- итог: **не разобрано** — нет Lua FATAL; стек `DoRenderDialogs` → `CMainMenu::OnRenderPPUI_main`. Соседний класс к PDA-хинту, но другой кадр.
+- карточка: [2026-09-19_xray_mg9000-4.md](../logs/cards/2026-09-19_xray_mg9000-4.md) (источник `xray_mg9000 (4).log`, ~14 сессий в одном файле)
+- pitfalls: нет
+- подробности: нет
+
+## [issue] guard NOT installed: `se_*on_unregister` / `QAmmoWheelOption.LoadInActiveWeapon` / `InteractPrompt.on_option_change`
+
+- дата: 2026-09-19
+- мод: `fix_nil_crash_guards` 1.1.1, `fix_qaw_ammo_nil` 1.0.2–1.0.3, `fix_dotmarks_interact_prompt` 1.0.0
+- итог: **цель API не найдена у тестера** — гарды пишут `… not found - guard NOT installed` (остальные wrap'ы nil-guards встают). Не «install() упал молча»: цель отсутствует или имя/путь другое в его пакете. Следующий шаг — сверить символы через `refindex` / наличие QAW и DotMarks InteractPrompt.
+- карточка: [2026-09-19_xray_mg9000-3.md](../logs/cards/2026-09-19_xray_mg9000-3.md), [2026-09-19_xray_mg9000-4.md](../logs/cards/2026-09-19_xray_mg9000-4.md), также (3)-FATAL card
+- pitfalls: [§9](pitfalls.md) (порядок `.script`); см. также issue про fallback `actor_on_first_update`
+- подробности: нет
+
+## [issue] mg9000 2026-09-19: 0 нефатальных Lua-групп (динамика vs baseline)
+
+- дата: 2026-09-19
+- мод: пакет mg9000 после nil-guards
+- итог: **динамика** — `nonfatal_groups=0` (было 2 в baseline 2026-09-13: `game_backpack_travel` / `game_fast_travel`). Вылеты теперь нативные / DLTX / `actor_status`, не те traceback'и. Baseline 13.09 не отменяем; эта точка — после сдвига.
+- карточка: [2026-09-19_xray_mg9000-3.md](../logs/cards/2026-09-19_xray_mg9000-3.md), [2026-09-19_xray_mg9000-4.md](../logs/cards/2026-09-19_xray_mg9000-4.md); baseline 13.09: `## [issue] mg9000 после nil-guards: 2 нефатальные группы`
+- pitfalls: нет
+- подробности: нет
+
 ## [issue] `CUILine::Draw` / `CUIMapWnd::DrawHint` (native ACCESS_VIOLATION, PDA map hint)
 
 - дата: 2026-09-19
 - мод: не скриптовый; подозреваемые споты — Milspec PDA / PAW / placeable waypoints / DotMarks (тип спота не зафиксирован)
 - итог: **не чинится** без повтора — нет Lua FATAL; AV при отрисовке хинта карты PDA. Lua-кадр `haru_specialized_storage_boxes` в момент падения — смежный снимок VM, не причина. Нужен повтор с типом спота под курсором.
-- карточка: нет (дампы 2026-09-19 сняты вместе с сырыми логами)
+- карточка: нет; mdmp на месте: `logs/xray_nikit_09-19-26_14-16-50.mdmp`
 - pitfalls: нет
-- подробности: mdmp `logs/xray_nikit_09-19-26_14-16-50.mdmp` (на момент разбора)
+- подробности: mdmp `logs/xray_nikit_09-19-26_14-16-50.mdmp`
 
 ## [issue] `fix_sim_mechanic_trade.script:65: attempt to call upvalue 'orig_trade_init' (a nil value)`
 
