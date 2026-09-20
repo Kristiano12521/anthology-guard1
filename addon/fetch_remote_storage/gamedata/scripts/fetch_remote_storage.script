@@ -1,124 +1,57 @@
 -- Fetch Remote Storage
 -- Anomaly 1.5.3 / Anthology 2.1
 --
--- Optional MCM (default OFF): cyclic fetch / multifetch count and remove items
--- from Hideout Furniture workshop_stash and The Anomalous Stash hidden box.
--- Soft-deps: missing mods / missing m_data keys / offline boxes = no-op.
+-- Always on, no MCM. PDA Announcements (Utjans fetch count): show how many
+-- of the *required* section are in nearby online boxes - player-created
+-- stashes + Hideout Furniture workshop + Anomalous hidden stash - with the
+-- same red / yellow / green markers as inventory.
 --
--- Does NOT call alife():set_switch_online. HF GetStash forces online permanently
--- without restore; that CSE flag survives save after the mod is removed.
--- Offline boxes are skipped this tick (same for status and turn-in).
+-- Soft-deps: Utjans z_fetch_shows_count, HF / Anomalous m_data keys.
+-- Offline boxes are skipped (same as Utjans player stashes). Does not call
+-- set_switch_online. Does not change quest status or turn-in.
 --
--- load-order: after tasks_fetch / tasks_multifetch (monkey-patch in on_game_start;
--- re-install on actor_on_first_update if another mod rewrote the same slots)
+-- load-order: after z_fetch_shows_count (re-wrap on actor_on_first_update)
 
 local LOG_TAG = "[fetch_remote_storage]"
-local VERSION = "1.0.0"
-local MCM_ID = "fetch_remote_storage"
-local CACHE_TTL_MS = 1000
+local VERSION = "1.1.0"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
-local orig = {}
+local orig_extend = nil
 local installed = false
 local callbacks_registered = false
-local session_stats_logged = false
-
--- Cache of all sections found in online remote boxes (rebuilt on miss).
-local cache = {
-	until_ms = 0,
-	sections = {}, -- [section] = { count = n, items = { {id=, amt=}, ... } }
-}
-
--- Session metrics (one summary line on on_game_end).
-local metrics = {
-	cache_misses = 0,
-	items_scanned_sum = 0,
-	items_scanned_max = 0,
-	boxes_online_max = 0,
-	boxes_skipped_offline = 0,
-}
-
-local function opt_enable()
-	if ui_mcm and type(ui_mcm.get) == "function" then
-		local v = ui_mcm.get(MCM_ID .. "/enable")
-		if v ~= nil then
-			return v and true or false
-		end
-	end
-	return false
-end
 
 local function log(fmt, ...)
 	printf(LOG_TAG .. " " .. fmt, ...)
 end
 
-local function reset_runtime()
-	cache.until_ms = 0
-	cache.sections = {}
-	metrics.cache_misses = 0
-	metrics.items_scanned_sum = 0
-	metrics.items_scanned_max = 0
-	metrics.boxes_online_max = 0
-	metrics.boxes_skipped_offline = 0
-	session_stats_logged = false
-end
-
-local function invalidate_cache()
-	cache.until_ms = 0
-	cache.sections = {}
-end
-
-local function item_amount(obj, section)
-	if not obj then
+-- Match Utjans multiuse counting so board markers stay consistent.
+local function count_matching_item(item, section)
+	if not item then
 		return 0
 	end
 	local ok_sec, sec = pcall(function()
-		return obj:section()
+		return item:section()
 	end)
 	if not (ok_sec and sec == section) then
 		return 0
 	end
-	if IsItem and IsItem("multiuse", section) then
-		local ok_u, uses = pcall(function()
-			return obj:get_remaining_uses()
-		end)
-		if ok_u and type(uses) == "number" and uses > 0 then
-			return uses
-		end
+	local ok_u, uses = pcall(function()
+		return item:get_remaining_uses()
+	end)
+	if ok_u and type(uses) == "number" and uses > 1 then
+		return uses
 	end
 	return 1
 end
 
--- Collect stash ids from save state only. Never CreateStash / never create boxes.
-local function collect_stash_ids()
-	local ids = {}
-	local seen = {}
-
-	local ok, m_data = pcall(function()
-		return alife_storage_manager.get_state()
-	end)
-	if not (ok and type(m_data) == "table") then
-		return ids
+local function color_number(cnt, amount)
+	if cnt == 0 then
+		return utils_xml.get_color("d_red")
+	elseif cnt >= amount then
+		return utils_xml.get_color("pda_green")
 	end
-
-	local function add_id(id)
-		if type(id) == "number" and id > 0 and not seen[id] then
-			seen[id] = true
-			ids[#ids + 1] = id
-		end
-	end
-
-	if type(m_data.workshop_stashes) == "table" then
-		for _, stash_id in pairs(m_data.workshop_stashes) do
-			add_id(stash_id)
-		end
-	end
-
-	-- Real storage for Anomalous Stash (anom_inv_stash is UI proxy only).
-	add_id(m_data.anomalous_hidden_stash)
-
-	return ids
+	return utils_xml.get_color("pda_yellow")
 end
 
 local function online_box(id)
@@ -135,475 +68,133 @@ local function online_box(id)
 	return go
 end
 
--- Full online-box scan. No set_switch_online. Offline ids are skipped.
-local function rebuild_cache()
-	local now = time_global()
-	local sections = {}
-	local items_scanned = 0
-	local boxes_online = 0
-	local boxes_skipped = 0
+-- Nearby online only: player stashes + HF workshop boxes + Anomalous hidden.
+local function collect_nearby_stash_ids()
+	local ids = {}
+	local seen = {}
 
-	local stash_ids = collect_stash_ids()
-	for i = 1, #stash_ids do
-		local box = online_box(stash_ids[i])
-		if not box then
-			boxes_skipped = boxes_skipped + 1
-		else
-			boxes_online = boxes_online + 1
-			local ok_iter = pcall(function()
-				box:iterate_inventory_box(function(_, obj)
-					if not obj then
-						return
-					end
-					items_scanned = items_scanned + 1
-					local ok_sec, sec = pcall(function()
-						return obj:section()
-					end)
-					if not (ok_sec and type(sec) == "string") then
-						return
-					end
-					local amt = item_amount(obj, sec)
-					if amt <= 0 then
-						return
-					end
-					local entry = sections[sec]
-					if not entry then
-						entry = { count = 0, items = {} }
-						sections[sec] = entry
-					end
-					entry.count = entry.count + amt
-					local ok_id, oid = pcall(function()
-						return obj:id()
-					end)
-					if ok_id and type(oid) == "number" then
-						entry.items[#entry.items + 1] = { id = oid, amt = amt }
-					end
-				end, box)
-			end)
-			if not ok_iter then
-				-- box vanished mid-iterate; ignore
-			end
+	local function add_id(id)
+		if type(id) == "number" and id > 0 and not seen[id] then
+			seen[id] = true
+			ids[#ids + 1] = id
 		end
 	end
 
-	cache.until_ms = now + CACHE_TTL_MS
-	cache.sections = sections
+	local ok, m_data = pcall(function()
+		return alife_storage_manager.get_state()
+	end)
+	if not (ok and type(m_data) == "table") then
+		return ids
+	end
 
-	metrics.cache_misses = metrics.cache_misses + 1
-	metrics.items_scanned_sum = metrics.items_scanned_sum + items_scanned
-	if items_scanned > metrics.items_scanned_max then
-		metrics.items_scanned_max = items_scanned
+	if type(m_data.player_created_stashes) == "table" then
+		for stash_id, _ in pairs(m_data.player_created_stashes) do
+			add_id(stash_id)
+		end
 	end
-	if boxes_online > metrics.boxes_online_max then
-		metrics.boxes_online_max = boxes_online
+
+	if type(m_data.workshop_stashes) == "table" then
+		for _, stash_id in pairs(m_data.workshop_stashes) do
+			add_id(stash_id)
+		end
 	end
-	metrics.boxes_skipped_offline = metrics.boxes_skipped_offline + boxes_skipped
+
+	-- Real storage for Anomalous Stash (anom_inv_stash is UI proxy only).
+	add_id(m_data.anomalous_hidden_stash)
+
+	return ids
 end
 
-local function ensure_cache()
-	if not opt_enable() then
-		return
-	end
-	local now = time_global()
-	if now < cache.until_ms then
-		return
-	end
-	rebuild_cache()
-end
-
-local function box_count(section)
+local function count_section_in_nearby_stashes(section)
+	local cnt = 0
 	if type(section) ~= "string" then
 		return 0
 	end
-	ensure_cache()
-	local entry = cache.sections[section]
-	return entry and entry.count or 0
-end
-
-local function actor_amount(section)
-	if not (db.actor and section and utils_item and type(utils_item.get_amount) == "function") then
-		return 0
-	end
-	local ok, n = pcall(utils_item.get_amount, db.actor, section, 1)
-	if ok and type(n) == "number" then
-		return n
-	end
-	return 0
-end
-
--- Move items from online remote boxes onto the actor until need is met.
--- Used before vanilla remove/reward so their inventory-only logic works.
--- Collect ids first, then transfer (safe vs mutate-during-iterate).
-local function pull_to_actor(section, need)
-	if not (db.actor and type(section) == "string" and type(need) == "number" and need > 0) then
-		return
-	end
-	local short = need - actor_amount(section)
-	if short <= 0 then
-		return
-	end
-
-	local to_move = {} -- { box_id=, item_id=, amt= }
-	local stash_ids = collect_stash_ids()
-	for s = 1, #stash_ids do
-		if short <= 0 then
-			break
-		end
-		local box_id = stash_ids[s]
-		local box = online_box(box_id)
+	local ids = collect_nearby_stash_ids()
+	for i = 1, #ids do
+		local box = online_box(ids[i])
 		if box then
 			pcall(function()
-				box:iterate_inventory_box(function(_, obj)
-					if short <= 0 or not obj then
-						return short <= 0
-					end
-					local amt = item_amount(obj, section)
-					if amt > 0 then
-						to_move[#to_move + 1] = {
-							box_id = box_id,
-							item_id = obj:id(),
-							amt = amt,
-						}
-						short = short - amt
-					end
+				box:iterate_inventory_box(function(_, item)
+					cnt = cnt + count_matching_item(item, section)
 				end, box)
 			end)
 		end
 	end
-
-	for i = 1, #to_move do
-		local info = to_move[i]
-		local box = online_box(info.box_id)
-		local ok_item, item = pcall(level.object_by_id, info.item_id)
-		if box and ok_item and item then
-			pcall(function()
-				box:transfer_item(item, db.actor)
-			end)
-		end
-	end
-
-	invalidate_cache()
+	return cnt
 end
 
-local function pull_fetch_var(var_name)
-	if not (db.actor and var_name) then
-		return
-	end
-	local section = load_var(db.actor, var_name)
-	if not section then
-		return
-	end
-	local count = load_var(db.actor, var_name .. "_count") or 1
-	pull_to_actor(section, count)
-end
-
-----------------------------------------------------------------------
--- Status / remove wrappers
-----------------------------------------------------------------------
-
-local function patched_actor_has_fetch_item(tsk, task_id)
-	if not opt_enable() then
-		return orig.actor_has_fetch_item(tsk, task_id)
-	end
-
-	local actor = db.actor
-	local section = actor and load_var(actor, task_id .. "_fetch")
-	if not section then
-		return
-	end
-
-	-- Condition-gated story fetch: keep vanilla (actor inventory only).
-	if task_id == "esc_2_12_stalker_nimble_task_1" or task_id == "jup_b220_trapper_task_3" then
-		return orig.actor_has_fetch_item(tsk, task_id)
-	end
-
-	local count = load_var(actor, task_id .. "_fetch_count")
-	local need = (count and count > 1) and count or 1
-
-	if need > 1 then
-		local have = actor_amount(section)
-		if have >= need then
-			tsk.stage = 1
-		elseif have + box_count(section) >= need then
-			tsk.stage = 1
-		else
-			tsk.stage = 0
-		end
-		return
-	end
-
-	-- need == 1: actor inventory first, boxes only if missing
-	if actor:object(section) then
-		tsk.stage = 1
-		return
-	end
-	if box_count(section) >= 1 then
-		tsk.stage = 1
-		return
-	end
-
-	if sfind and sfind(section, "af_") then
-		if actor:object(section .. "_af_aam")
-			or actor:object(section .. "_af_iam")
-			or actor:object(section .. "_af_aac")
-			or actor:object(section .. "_lead_box")
-		then
-			tsk.stage = 1
-		else
-			tsk.stage = 0
-		end
-		return
-	end
-
-	tsk.stage = 0
-end
-
-local function patched_fetch_reward_and_remove(actor, npc, p)
-	if opt_enable() and p and p[1] then
-		pull_fetch_var(p[1])
-	end
-	return orig.fetch_reward_and_remove(actor, npc, p)
-end
-
-local function patched_remove_fetch_item(actor, npc, p)
-	if opt_enable() and p and p[1] then
-		pull_fetch_var(p[1])
-	end
-	return orig.remove_fetch_item(actor, npc, p)
-end
-
--- Count matching objects in actor inventory + online remote boxes (multifetch: +1 per object).
--- Box side uses the TTL section cache; condition checked on live game objects.
-local function count_section_cond(section, mincd)
-	local found = 0
-	mincd = mincd or -1
-	if db.actor then
-		pcall(function()
-			db.actor:iterate_inventory(function(_, item)
-				if item and item:section() == section and (item:condition() or 1) > mincd then
-					found = found + 1
-				end
-			end, db.actor)
-		end)
-	end
-	ensure_cache()
-	local entry = cache.sections[section]
-	if entry and entry.items then
-		for i = 1, #entry.items do
-			local info = entry.items[i]
-			local ok, obj = pcall(level.object_by_id, info.id)
-			if ok and obj and (obj:condition() or 1) > mincd then
-				found = found + 1
-			end
-		end
-	end
-	return found
-end
-
-local function multifetch_cfg(tid)
-	if not (task_manager and task_manager.task_ini and utils_data
-		and type(utils_data.parse_ini_section_to_array) == "function")
+local function patched_extend_news_text(text, section, amount)
+	if not (section and db and db.actor and utils_xml and utils_data
+		and type(utils_data.parse_string_keys) == "function")
 	then
-		return nil
-	end
-	local ok, cfg = pcall(utils_data.parse_ini_section_to_array, task_manager.task_ini, tid)
-	if ok and type(cfg) == "table" then
-		return cfg
-	end
-	return nil
-end
-
-local function patched_has_items(tid)
-	if not opt_enable() then
-		return orig.has_items(tid)
-	end
-	if orig.has_items(tid) then
-		return true
-	end
-	local cfg = multifetch_cfg(tid)
-	if not cfg then
-		return false
-	end
-	local i = 1
-	local any = false
-	while cfg["required_item_" .. i] do
-		any = true
-		local sec = cfg["required_item_" .. i]
-		local num = tonumber(cfg["required_item_" .. i .. "_num"]) or 1
-		local mincd = tonumber(cfg["required_item_" .. i .. "_cond"]) or -1
-		if count_section_cond(sec, mincd) < num then
-			return false
+		if orig_extend then
+			return orig_extend(text, section, amount)
 		end
-		i = i + 1
+		return text
 	end
-	return any
-end
 
-local function patched_remove_items_and_pay(tid, do_pay)
-	if opt_enable() and tid then
-		local cfg = multifetch_cfg(tid)
-		if cfg then
-			local i = 1
-			while cfg["required_item_" .. i] do
-				pull_to_actor(cfg["required_item_" .. i], tonumber(cfg["required_item_" .. i .. "_num"]) or 1)
-				i = i + 1
-			end
-			i = 1
-			while cfg["optional_item_" .. i] do
-				pull_to_actor(cfg["optional_item_" .. i], tonumber(cfg["optional_item_" .. i .. "_num"]) or 1)
-				i = i + 1
-			end
-		end
-	end
-	return orig.remove_items_and_pay(tid, do_pay)
-end
+	amount = amount or 1
+	local gc = game.translate_string
+	local parse_keys = utils_data.parse_string_keys
+	local clr_txt = utils_xml.get_color("pda_white")
 
-local function patched_has_optional_items(tid)
-	if not opt_enable() then
-		return orig.has_optional_items(tid)
-	end
-	if orig.has_optional_items(tid) then
-		return true
-	end
-	local cfg = multifetch_cfg(tid)
-	if not cfg then
-		return false
-	end
-	local i = 1
-	local any = false
-	while cfg["optional_item_" .. i] do
-		any = true
-		local sec = cfg["optional_item_" .. i]
-		local num = tonumber(cfg["optional_item_" .. i .. "_num"]) or 1
-		local mincd = tonumber(cfg["optional_item_" .. i .. "_cond"]) or -1
-		if count_section_cond(sec, mincd) < num then
-			return false
-		end
-		i = i + 1
-	end
-	return any
-end
+	-- Inventory line (same rules / colors as Utjans).
+	local inv_cnt = 0
+	pcall(function()
+		db.actor:iterate_inventory(function(_, item)
+			inv_cnt = inv_cnt + count_matching_item(item, section)
+		end, nil)
+	end)
+	text = text
+		.. "\\n"
+		.. parse_keys(gc("st_fetch_count_have"), {
+			["count"] = inv_cnt,
+			["clr_txt"] = clr_txt,
+			["clr_number"] = color_number(inv_cnt, amount),
+		})
 
-----------------------------------------------------------------------
--- Install / uninstall
-----------------------------------------------------------------------
+	-- Nearby stashes: required section only; player + workshop + anom.
+	local stash_cnt = count_section_in_nearby_stashes(section)
+	text = text
+		.. "\\n"
+		.. parse_keys(gc("st_fetch_count_in_stashes"), {
+			["count"] = stash_cnt,
+			["clr_txt"] = clr_txt,
+			["clr_number"] = color_number(stash_cnt, amount),
+		})
+
+	return text
+end
 
 local function install()
-	if installed then
-		-- Re-bind if another mod overwrote our slots.
-		local need = false
-		if task_status_functor and task_status_functor.actor_has_fetch_item ~= patched_actor_has_fetch_item then
-			need = true
-		end
-		if need then
-			installed = false
-		else
-			return true
-		end
-	end
-
-	if not (task_status_functor and type(task_status_functor.actor_has_fetch_item) == "function") then
-		printf("%s task_status_functor.actor_has_fetch_item not found - guard NOT installed", LOG_TAG)
-		return false
-	end
-	if not (xr_effects and type(xr_effects.fetch_reward_and_remove) == "function") then
-		printf("%s xr_effects.fetch_reward_and_remove not found - guard NOT installed", LOG_TAG)
+	local zfc = rawget(_G, "z_fetch_shows_count")
+	if not (type(zfc) == "table" and type(zfc.extend_news_text) == "function") then
+		printf("%s z_fetch_shows_count.extend_news_text not found - guard NOT installed", LOG_TAG)
 		return false
 	end
 
-	orig.actor_has_fetch_item = task_status_functor.actor_has_fetch_item
-	task_status_functor.actor_has_fetch_item = patched_actor_has_fetch_item
-
-	orig.fetch_reward_and_remove = xr_effects.fetch_reward_and_remove
-	xr_effects.fetch_reward_and_remove = patched_fetch_reward_and_remove
-
-	if type(xr_effects.remove_fetch_item) == "function" then
-		orig.remove_fetch_item = xr_effects.remove_fetch_item
-		xr_effects.remove_fetch_item = patched_remove_fetch_item
+	if installed and zfc.extend_news_text == patched_extend_news_text then
+		return true
 	end
 
-	local mf = rawget(_G, "tasks_multifetch")
-	if type(mf) == "table" then
-		if type(mf.has_items) == "function" then
-			orig.has_items = mf.has_items
-			mf.has_items = patched_has_items
-		end
-		if type(mf.has_optional_items) == "function" then
-			orig.has_optional_items = mf.has_optional_items
-			mf.has_optional_items = patched_has_optional_items
-		end
-		if type(mf.remove_items_and_pay) == "function" then
-			orig.remove_items_and_pay = mf.remove_items_and_pay
-			mf.remove_items_and_pay = patched_remove_items_and_pay
-		end
-	else
-		printf("%s tasks_multifetch not found - multifetch wrappers skipped", LOG_TAG)
+	if zfc.extend_news_text ~= patched_extend_news_text then
+		orig_extend = zfc.extend_news_text
+		zfc.extend_news_text = patched_extend_news_text
 	end
 
 	installed = true
-	log("installed v%s", VERSION)
+	log("installed v%s (PDA stash markers)", VERSION)
 	return true
 end
 
 local function uninstall()
-	if task_status_functor and orig.actor_has_fetch_item
-		and task_status_functor.actor_has_fetch_item == patched_actor_has_fetch_item
-	then
-		task_status_functor.actor_has_fetch_item = orig.actor_has_fetch_item
+	local zfc = rawget(_G, "z_fetch_shows_count")
+	if type(zfc) == "table" and orig_extend and zfc.extend_news_text == patched_extend_news_text then
+		zfc.extend_news_text = orig_extend
 	end
-	if xr_effects and orig.fetch_reward_and_remove
-		and xr_effects.fetch_reward_and_remove == patched_fetch_reward_and_remove
-	then
-		xr_effects.fetch_reward_and_remove = orig.fetch_reward_and_remove
-	end
-	if xr_effects and orig.remove_fetch_item
-		and xr_effects.remove_fetch_item == patched_remove_fetch_item
-	then
-		xr_effects.remove_fetch_item = orig.remove_fetch_item
-	end
-	local mf = rawget(_G, "tasks_multifetch")
-	if type(mf) == "table" then
-		if orig.has_items and mf.has_items == patched_has_items then
-			mf.has_items = orig.has_items
-		end
-		if orig.has_optional_items and mf.has_optional_items == patched_has_optional_items then
-			mf.has_optional_items = orig.has_optional_items
-		end
-		if orig.remove_items_and_pay and mf.remove_items_and_pay == patched_remove_items_and_pay then
-			mf.remove_items_and_pay = orig.remove_items_and_pay
-		end
-	end
-	orig = {}
+	orig_extend = nil
 	installed = false
-end
-
-local function log_session_stats()
-	if session_stats_logged then
-		return
-	end
-	session_stats_logged = true
-	local misses = metrics.cache_misses
-	local avg = 0
-	if misses > 0 then
-		avg = math.floor(metrics.items_scanned_sum / misses + 0.5)
-	end
-	log(
-		"session cache_misses=%s items_scanned_max=%s items_scanned_avg=%s boxes_online_max=%s boxes_skipped_offline_sum=%s ttl_ms=%s",
-		tostring(misses),
-		tostring(metrics.items_scanned_max),
-		tostring(avg),
-		tostring(metrics.boxes_online_max),
-		tostring(metrics.boxes_skipped_offline),
-		tostring(CACHE_TTL_MS)
-	)
-end
-
-----------------------------------------------------------------------
--- Callbacks
-----------------------------------------------------------------------
-
-function on_game_load()
-	reset_runtime()
 end
 
 function actor_on_first_update()
@@ -611,25 +202,19 @@ function actor_on_first_update()
 end
 
 function on_game_start()
-	reset_runtime()
 	install()
 	if callbacks_registered then
 		return
 	end
-	RegisterScriptCallback("on_game_load", on_game_load)
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	callbacks_registered = true
 end
 
 function on_game_end()
-	log_session_stats()
 	uninstall()
 	if not callbacks_registered then
-		reset_runtime()
 		return
 	end
-	UnregisterScriptCallback("on_game_load", on_game_load)
 	UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	callbacks_registered = false
-	reset_runtime()
 end

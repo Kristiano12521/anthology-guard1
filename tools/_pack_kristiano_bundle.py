@@ -133,7 +133,7 @@ def write_changelog(count: int) -> str:
         "# Kristiano Fixes Bundle - 2026-09-20\n\n"
         "## Что нового\n\n"
         "### 2026-09-20\n\n"
-        "- fetch_remote_storage: опция «забрать из схрона» без поездки.\n"
+        "- fetch_remote_storage: метки нужного предмета в верстаке/anom/тайниках на доске (без MCM).\n"
         "- fix_quest_stash_hint: подсказка квестового схрона на карте.\n"
         "- fix_taskboard_sync: синхронизация офферов доски заданий.\n"
         "- AIO: 77 аддонов (было 74).\n\n"
