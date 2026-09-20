@@ -3,6 +3,10 @@
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 Записи старше месяца — в [`CHANGELOG-archive.md`](CHANGELOG-archive.md).
 
+## [0.1.72] — список сигнатур, ожидающих подтверждения
+
+`docs/awaiting-confirmation.md` — 9 позиций из CHANGELOG модов с пометкой «чужой лог» / Discord-скрины без наших cards: 8 гардов `fix_nil_crash_guards` + `fix_create_squad_nil_smart`. По каждой: что искать в логе, мод, источник, смысл отсутствия/появления. Команда `/logfull` (файл не было — создан) и шаг в `/crash`: при разборе чужого лога сверяться со списком. `docs/prompts.md` — ссылка на `/logfull`.
+
 ## [0.1.71] — xraylog: stack trace с таймстемпом; журнал CTD на Баре
 
 `tools/xraylog.py`: `STACK_RE` ловит `[HH:MM:SS.mmm] stack trace:` (Modded Exes) — иначе native AV без FATAL терялся. Тест. Журнал: UnhandledFilter `UpdateDynamicDamage` / `InitContact` на `l05_bar`, sound abort PA black_valley, BTR `ph_car` при `stype=nil`, WTF `gt_guard`. Карточка `logs/cards/2026-09-19_newxray_nikit.md`. Changelog бандла: AIO 1.0.0 и gigant 1.1.2.

@@ -2,7 +2,7 @@
 
 Копируются как есть. Общий принцип: в первом сообщении явно называем workflow и явно ограничиваем этап. Правила `workflow-*` подключаются агентом по описанию, но явное упоминание надёжнее автодетекта.
 
-Промпты ниже, ставшие командами Cursor (`.cursor/commands/`), вызываются через `/` в чате агента: `/check`, `/crash <лог>`, `/newmod <mod_id>`, `/mine <лог>`, `/verify`, `/fork <mod_id>`, `/deploy`, `/modcheck`.
+Промпты ниже, ставшие командами Cursor (`.cursor/commands/`), вызываются через `/` в чате агента: `/check`, `/crash <лог>`, `/logfull <лог>`, `/newmod <mod_id>`, `/mine <лог>`, `/verify`, `/fork <mod_id>`, `/deploy`, `/modcheck`.
 
 ## Команды и разовые промпты
 
@@ -26,7 +26,7 @@ python3 tools/refindex.py build
 
 ## Разбор вылета
 
-Команда: `/crash <путь к логу>`.
+Команда: `/crash <путь к логу>` или `/logfull <путь к логу>` (чужой полный лог; после карточки — сверка с [`awaiting-confirmation.md`](awaiting-confirmation.md)).
 
 ```bash
 python3 tools/xraylog.py logs/xray_<user>.log --out logs/card.md --archive

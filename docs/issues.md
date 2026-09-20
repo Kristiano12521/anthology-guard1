@@ -19,6 +19,15 @@
 
 ---
 
+## [issue] native `UnhandledFilter` / `CDialogHolder::OnFrame` (меню сразу после load)
+
+- дата: 2026-09-20
+- мод: нативный UI (`UIDialogHolder.cpp` / `MainMenu.cpp`); mg9000, Припять (`pri_b306`); падение сразу после успешной загрузки `quicksave_4` (ещё до `actor-spawn-addon`), пока тикает `CMainMenu`
+- итог: **не чинится скриптом** — класс **`нативный вылет (не Lua)`**; стек `UnhandledFilter` → `CDialogHolder::OnFrame` → `CMainMenu::OnFrame` → `FrameMove`. FATAL ERROR нет. Соседний класс к `DoRenderDialogs` (19.09, другой кадр того же держателя диалогов). Контекст: 24-я загрузка сейва в одном процессе, третья подряд `quicksave_4` (два предыдущих раза тот же сейв доходил до `actor_on_first_update`); на последней — `static level already active`. Нефатальные `ui_inventory`/`ish_fast_transfer` и `xr_logic.parse_condlist` — далеко по времени, к CTD не ведут. mdmp от этой сессии в `logs/` нет.
+- карточка: [2026-09-20_111xray_mg9000.md](../logs/cards/2026-09-20_111xray_mg9000.md) (источник `111xray_mg9000 (1).log`)
+- pitfalls: нет
+- подробности: повтор — (A) свежий exe + один load `quicksave_4`; (B) после N load в одном процессе. При стабильном повторе — mdmp + PDB в Anthology/Modded Exes. Связанные: `DoRenderDialogs` 19.09, `rp_ScreenResolutionChanged` 19.09.
+
 ## [issue] native `UnhandledFilter` / `CPHSimpleCharacter::UpdateDynamicDamage` + `InitContact`
 
 - дата: 2026-09-19
