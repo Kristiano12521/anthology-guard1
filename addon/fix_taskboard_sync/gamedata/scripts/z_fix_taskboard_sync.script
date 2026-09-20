@@ -1,0 +1,500 @@
+-- load-order: after pda_taskboard / axr_task_manager / tasks_* (z_ prefix)
+-- Taskboard <-> dialog offer sync
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- 1) Reuse offer-time save_var rolls (bounty/stash/fetch/delivery/assault)
+--    so PDA prepare and NPC dialog show the same target/item.
+-- 2) Sort available_tasks by task_id so dialog [1] is deterministic.
+-- 3) Categorize drx_sl_create_quest_stash as setup_fetch_task on the board.
+
+local LOG_TAG = "[fix_taskboard_sync]"
+local VERSION = "1.0.0"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local orig = {}
+local installed = false
+local callbacks_registered = false
+local wraps = {}
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function actor_ok()
+	return db and db.actor
+end
+
+-- Offer cache lives in actor save_var until accept (then kept) or
+-- axr_task_manager.on_before_level_changing clears unused keys.
+local function load_offer(task_id)
+	if not (actor_ok() and type(task_id) == "string" and task_id ~= "") then
+		return nil
+	end
+	return load_var(db.actor, task_id)
+end
+
+local function clear_offer(task_id)
+	if actor_ok() and type(task_id) == "string" then
+		save_var(db.actor, task_id, nil)
+	end
+end
+
+local function se_alive_stalker(id)
+	local se = id and alife_object(id)
+	if not se then
+		return nil
+	end
+	if not IsStalker(nil, se:clsid()) then
+		return nil
+	end
+	if se.alive and not se:alive() then
+		return nil
+	end
+	return se
+end
+
+local function schedule_talk(event_name, fn, ...)
+	CreateTimeEvent(0, event_name, 0, fn, ...)
+end
+
+----------------------------------------------------------------------
+-- Bounty
+----------------------------------------------------------------------
+
+local function show_bounty_details(task_id, target_id)
+	local se_target = alife_object(target_id)
+	if not (se_target and db.actor) then
+		return true
+	end
+	local level_target = alife():level_name(game_graph():vertex(se_target.m_game_vertex_id):level_id())
+	local news_caption = game.translate_string(task_manager.task_ini:r_string_ex(task_id, "title")) or "error"
+	local news_text = game.translate_string("st_mm_new_game_name") .. " " .. se_target:character_name()
+		.. "\\n " .. game.translate_string("st_mm_new_game_faction_2") .. " " .. game.translate_string(se_target:community())
+		.. "\\n " .. game.translate_string("st_location") .. " " .. game.translate_string(level_target)
+	db.actor:give_talk_message2(news_caption, news_text, se_target:character_icon(), "iconed_answer_item")
+	return true
+end
+
+local function try_reuse_bounty(p)
+	local task_id = p and p[1]
+	local var = load_offer(task_id)
+	if not (var and var.target_id) then
+		return false
+	end
+	local se = se_alive_stalker(var.target_id)
+	if not se then
+		clear_offer(task_id)
+		return false
+	end
+	local atm = rawget(_G, "axr_task_manager")
+	if atm and atm.bounties_by_id then
+		atm.bounties_by_id[task_id] = var.target_id
+	end
+	local squad = se.group_id and se.group_id ~= 65535 and alife_object(se.group_id)
+	if squad and sim_offline_combat and sim_offline_combat.task_squads then
+		sim_offline_combat.task_squads[squad.id] = true
+	end
+	schedule_talk("setup_bounty_task", show_bounty_details, task_id, var.target_id)
+	log("reuse bounty %s target=%s", tostring(task_id), tostring(var.target_id))
+	return true
+end
+
+local function patched_setup_bounty_task(actor, npc, p)
+	if try_reuse_bounty(p) then
+		return
+	end
+	return orig.setup_bounty_task(actor, npc, p)
+end
+
+----------------------------------------------------------------------
+-- Quest stash (documents / bring item from cache)
+----------------------------------------------------------------------
+
+local function show_stash_details(task_id, level_target, icon)
+	if not db.actor then
+		return true
+	end
+	local news_caption = game.translate_string(task_manager.task_ini:r_string_ex(task_id, "title")) or "error"
+	local news_icon = icon or task_manager.task_ini:r_string_ex(task_id, "icon") or "ui_inGame2_Poslednie_razrabotki"
+	local news_text = game.translate_string("st_location") .. " " .. game.translate_string(level_target)
+	db.actor:give_talk_message2(news_caption, news_text, news_icon, "iconed_answer_item")
+	return true
+end
+
+local function try_reuse_stash(p)
+	local task_id = p and p[1]
+	local var = load_offer(task_id)
+	if not (var and var.target_id) then
+		return false
+	end
+	local se = alife_object(var.target_id)
+	if not se then
+		clear_offer(task_id)
+		return false
+	end
+	local level_target = var.lvl_target
+		or alife():level_name(game_graph():vertex(se.m_game_vertex_id):level_id())
+	schedule_talk("setup_bounty_task", show_stash_details, task_id, level_target,
+		task_manager.task_ini:r_string_ex(task_id, "icon"))
+	log("reuse stash %s target=%s", tostring(task_id), tostring(var.target_id))
+	return true
+end
+
+local function patched_drx_sl_create_quest_stash(actor, npc, p)
+	if try_reuse_stash(p) then
+		return
+	end
+	return orig.drx_sl_create_quest_stash(actor, npc, p)
+end
+
+----------------------------------------------------------------------
+-- Fetch (item section string under *_fetch key)
+----------------------------------------------------------------------
+
+local function try_reuse_fetch(p)
+	local key = p and p[1]
+	if not (actor_ok() and type(key) == "string") then
+		return false
+	end
+	local sec = load_var(db.actor, key)
+	if type(sec) ~= "string" or sec == "" then
+		return false
+	end
+	if not (ini_sys and ini_sys:section_exist(sec)) then
+		save_var(db.actor, key, nil)
+		save_var(db.actor, key .. "_count", nil)
+		return false
+	end
+	local cnt = load_var(db.actor, key .. "_count") or 1
+	if dialogs then
+		dialogs._FETCH_TEXT = ui_item.get_sec_name(sec)
+	end
+	local postpone = rawget(_G, "tasks_fetch") and tasks_fetch.postpone_fetch_for_next_frame
+	if type(postpone) == "function" then
+		schedule_talk("setup_fetch_task", postpone, key, sec, cnt)
+	else
+		-- Fallback: still set text; orig would re-roll without DIALOG_ID.
+		schedule_talk("setup_fetch_task", function()
+			if not db.actor then
+				return true
+			end
+			local news_caption = game.translate_string("ui_inv_needs") .. ":"
+			local news_ico = task_manager.task_ini:r_string_ex(string.sub(key, 1, -7) or "", "icon")
+				or "ui_inGame2_D_Sisshik"
+			db.actor:give_talk_message2(news_caption, ui_item.get_sec_name(sec) .. " (x" .. tostring(cnt) .. ")",
+				news_ico, "iconed_answer_item")
+			return true
+		end)
+	end
+	log("reuse fetch %s sec=%s x%s", tostring(key), tostring(sec), tostring(cnt))
+	return true
+end
+
+local function patched_setup_fetch_task(actor, npc, p)
+	if try_reuse_fetch(p) then
+		return
+	end
+	return orig.setup_fetch_task(actor, npc, p)
+end
+
+local function patched_setup_generic_fetch_task(actor, npc, p)
+	if try_reuse_fetch(p) then
+		return
+	end
+	return orig.setup_generic_fetch_task(actor, npc, p)
+end
+
+local function patched_setup_supplies_fetch_task_lostzone_patch(actor, npc, p)
+	if try_reuse_fetch(p) then
+		return
+	end
+	return orig.setup_supplies_fetch_task_lostzone_patch(actor, npc, p)
+end
+
+----------------------------------------------------------------------
+-- Delivery
+----------------------------------------------------------------------
+
+local function show_delivery_details(task_id, target_id, level_target)
+	local se_target = alife_object(target_id)
+	if not (se_target and db.actor) then
+		return true
+	end
+	local news_caption = game.translate_string(task_manager.task_ini:r_string_ex(task_id, "title")) or "error"
+	local news_text = game.translate_string("st_mm_new_game_name") .. " " .. se_target:character_name()
+		.. "\\n " .. game.translate_string("st_mm_new_game_faction_2") .. " " .. game.translate_string(se_target:community())
+		.. "\\n " .. game.translate_string("st_location") .. " " .. game.translate_string(level_target)
+	db.actor:give_talk_message2(news_caption, news_text, se_target:character_icon(), "iconed_answer_item")
+	return true
+end
+
+local function try_reuse_delivery(p)
+	local task_id = p and p[1]
+	local var = load_offer(task_id)
+	if not (var and var.target_id and var.item_1_sec) then
+		return false
+	end
+	local se = se_alive_stalker(var.target_id)
+	if not se then
+		clear_offer(task_id)
+		return false
+	end
+	local level_target = var.lvl_target
+		or alife():level_name(game_graph():vertex(se.m_game_vertex_id):level_id())
+	schedule_talk("on_init_delivery_task", show_delivery_details, task_id, var.target_id, level_target)
+	log("reuse delivery %s target=%s item=%s", tostring(task_id), tostring(var.target_id), tostring(var.item_1_sec))
+	return true
+end
+
+local function patched_on_init_delivery_task(actor, npc, p)
+	if try_reuse_delivery(p) then
+		return
+	end
+	return orig.on_init_delivery_task(actor, npc, p)
+end
+
+----------------------------------------------------------------------
+-- Assault (memory cache_assault is local; restore via save_var)
+----------------------------------------------------------------------
+
+local function assault_var_valid(var)
+	if not (var and var.squad_id and var.smart_id) then
+		return false
+	end
+	local squad = alife_object(var.squad_id)
+	local smart = alife_object(var.smart_id)
+	if not (squad and smart) then
+		return false
+	end
+	if squad.current_target_id and squad.current_target_id ~= var.smart_id then
+		return false
+	end
+	return true, squad, smart
+end
+
+local function patched_validate_assault_task(actor, npc, p)
+	local task_id = p and p[1]
+	local var = load_offer(task_id)
+	local ok = assault_var_valid(var)
+	if ok then
+		return true
+	end
+	if var then
+		clear_offer(task_id)
+	end
+	return orig.validate_assault_task(actor, npc, p)
+end
+
+local function patched_setup_assault_task(actor, npc, p)
+	local task_id = p and p[1]
+	local var = load_offer(task_id)
+	local ok, squad = assault_var_valid(var)
+	if ok then
+		squad.stay_time = game.get_game_time()
+		if sim_offline_combat and sim_offline_combat.task_squads then
+			sim_offline_combat.task_squads[var.squad_id] = true
+		end
+		local postpone = rawget(_G, "tasks_assault") and tasks_assault.postpone_for_next_frame
+		if type(postpone) == "function" then
+			schedule_talk("setup_assault_task", postpone, task_id, var.squad_id)
+		end
+		log("reuse assault %s squad=%s smart=%s", tostring(task_id), tostring(var.squad_id), tostring(var.smart_id))
+		return
+	end
+	if var then
+		clear_offer(task_id)
+	end
+	return orig.setup_assault_task(actor, npc, p)
+end
+
+----------------------------------------------------------------------
+-- Deterministic available_tasks order
+----------------------------------------------------------------------
+
+local function patched_generate_available_tasks(npc, is_sim)
+	orig.generate_available_tasks(npc, is_sim)
+	if not npc then
+		return
+	end
+	local atm = rawget(_G, "axr_task_manager")
+	local list = atm and atm.available_tasks and atm.available_tasks[npc:id()]
+	if list and #list > 1 then
+		table.sort(list)
+	end
+end
+
+----------------------------------------------------------------------
+-- PDA category: stash quests under fetch, not bounty
+----------------------------------------------------------------------
+
+local function patched_get_task_effect(task_id)
+	if type(task_id) == "string" and task_manager and task_manager.task_ini then
+		local raw = task_manager.task_ini:r_string_ex(task_id, "on_job_descr") or ""
+		if string.find(raw, "drx_sl_create_quest_stash", 1, true) then
+			return "setup_fetch_task", true
+		end
+	end
+	return orig.get_task_effect(task_id)
+end
+
+local function patch_normalizer()
+	local board = rawget(_G, "pda_taskboard")
+	if board and board.normalizer then
+		board.normalizer.drx_sl_create_quest_stash = "setup_fetch_task"
+	end
+end
+
+----------------------------------------------------------------------
+-- Install / uninstall
+----------------------------------------------------------------------
+
+local function wrap_effect(name, patched)
+	local effects = rawget(_G, "xr_effects")
+	if effects and type(effects[name]) == "function" then
+		orig[name] = effects[name]
+		effects[name] = patched
+		wraps[#wraps + 1] = "xr_effects." .. name
+		return true
+	end
+	log("%s not found - NOT installed", name)
+	return false
+end
+
+local function wrap_condition(name, patched)
+	local cond = rawget(_G, "xr_conditions")
+	if cond and type(cond[name]) == "function" then
+		orig[name] = cond[name]
+		cond[name] = patched
+		wraps[#wraps + 1] = "xr_conditions." .. name
+		return true
+	end
+	log("%s not found - NOT installed", name)
+	return false
+end
+
+local function wraps_still_ours()
+	local effects = rawget(_G, "xr_effects")
+	local cond = rawget(_G, "xr_conditions")
+	local atm = rawget(_G, "axr_task_manager")
+	local board = rawget(_G, "pda_taskboard")
+	if orig.setup_bounty_task and effects and effects.setup_bounty_task ~= patched_setup_bounty_task then
+		return false
+	end
+	if orig.validate_assault_task and cond and cond.validate_assault_task ~= patched_validate_assault_task then
+		return false
+	end
+	if orig.generate_available_tasks and atm and atm.generate_available_tasks ~= patched_generate_available_tasks then
+		return false
+	end
+	if orig.get_task_effect and board and board.get_task_effect ~= patched_get_task_effect then
+		return false
+	end
+	return true
+end
+
+local function install()
+	if installed and wraps_still_ours() then
+		patch_normalizer()
+		return
+	end
+
+	uninstall()
+	wraps = {}
+
+	wrap_effect("setup_bounty_task", patched_setup_bounty_task)
+	wrap_effect("drx_sl_create_quest_stash", patched_drx_sl_create_quest_stash)
+	wrap_effect("setup_fetch_task", patched_setup_fetch_task)
+	wrap_effect("setup_generic_fetch_task", patched_setup_generic_fetch_task)
+	wrap_effect("setup_supplies_fetch_task_lostzone_patch", patched_setup_supplies_fetch_task_lostzone_patch)
+	wrap_effect("on_init_delivery_task", patched_on_init_delivery_task)
+	wrap_effect("setup_assault_task", patched_setup_assault_task)
+	wrap_condition("validate_assault_task", patched_validate_assault_task)
+
+	local atm = rawget(_G, "axr_task_manager")
+	if atm and type(atm.generate_available_tasks) == "function" then
+		orig.generate_available_tasks = atm.generate_available_tasks
+		atm.generate_available_tasks = patched_generate_available_tasks
+		wraps[#wraps + 1] = "axr_task_manager.generate_available_tasks"
+	else
+		log("generate_available_tasks not found - NOT installed")
+	end
+
+	local board = rawget(_G, "pda_taskboard")
+	if board and type(board.get_task_effect) == "function" then
+		orig.get_task_effect = board.get_task_effect
+		board.get_task_effect = patched_get_task_effect
+		wraps[#wraps + 1] = "pda_taskboard.get_task_effect"
+	else
+		log("pda_taskboard.get_task_effect not found - category remap NOT installed")
+	end
+	patch_normalizer()
+
+	if #wraps > 0 then
+		installed = true
+		log("v%s wrapped: %s", VERSION, table.concat(wraps, ", "))
+	else
+		log("v%s guard NOT installed - no targets", VERSION)
+	end
+end
+
+function uninstall()
+	local effects = rawget(_G, "xr_effects")
+	local cond = rawget(_G, "xr_conditions")
+	local atm = rawget(_G, "axr_task_manager")
+	local board = rawget(_G, "pda_taskboard")
+
+	local function restore_effect(name)
+		if effects and orig[name] then
+			effects[name] = orig[name]
+		end
+	end
+	restore_effect("setup_bounty_task")
+	restore_effect("drx_sl_create_quest_stash")
+	restore_effect("setup_fetch_task")
+	restore_effect("setup_generic_fetch_task")
+	restore_effect("setup_supplies_fetch_task_lostzone_patch")
+	restore_effect("on_init_delivery_task")
+	restore_effect("setup_assault_task")
+
+	if cond and orig.validate_assault_task then
+		cond.validate_assault_task = orig.validate_assault_task
+	end
+	if atm and orig.generate_available_tasks then
+		atm.generate_available_tasks = orig.generate_available_tasks
+	end
+	if board and orig.get_task_effect then
+		board.get_task_effect = orig.get_task_effect
+	end
+	if board and board.normalizer then
+		board.normalizer.drx_sl_create_quest_stash = "setup_bounty_task"
+	end
+
+	orig = {}
+	installed = false
+end
+
+function actor_on_first_update()
+	if not installed or not wraps_still_ours() then
+		installed = false
+		install()
+	else
+		patch_normalizer()
+	end
+end
+
+function on_game_start()
+	install()
+	if not callbacks_registered then
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
+	uninstall()
+end

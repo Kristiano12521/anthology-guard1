@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="ui_mcm_fetch_remote_storage">
+		<text>Fetch Remote Storage</text>
+	</string>
+	<string id="ui_mcm_fetch_remote_storage_title">
+		<text>Fetch Remote Storage</text>
+	</string>
+	<string id="ui_mcm_fetch_remote_storage_desc">
+		<text>Опциональное изменение правил (по умолчанию выкл.). С включённой опцией цикличные fetch-задания засчитывают и снимают предметы из хранилища верстака Hideout Furniture и аномального рюкзака The Anomalous Stash. Задание можно сдать, не имея предмета при себе.</text>
+	</string>
+	<string id="ui_mcm_fetch_remote_storage_enable">
+		<text>Засчитывать верстак и аномальный рюкзак в цикличных заданиях</text>
+	</string>
+</string_table>

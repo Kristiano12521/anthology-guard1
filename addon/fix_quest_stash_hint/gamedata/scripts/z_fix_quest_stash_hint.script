@@ -1,0 +1,301 @@
+-- load-order: after treasure_manager / tasks_stash / fix_quest_stash (z_ prefix)
+-- Quest stash map marker after accept (branch B)
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Offer already shows st_location via give_talk_message2 (branch A OK on
+-- the Levsha/documents repro). Marker is added only in
+-- treasure_manager.set_random_stash during status after accept. With
+-- Grok's Stash Overhaul that path can leave the quest box without a
+-- visible treasure spot; Anomalous Stash boxes (anom_inv_stash) must not
+-- be chosen as DRX quest targets (inv_box pool).
+--
+-- Does not replace Grok/Anomalous files. Spots go through
+-- level.map_add_object_spot_ser after their set_random_stash returns.
+
+local LOG_TAG = "[fix_quest_stash_hint]"
+local VERSION = "1.0.1"
+local QUEST_ITEM_PREFIX = "drx_sl_quest_item_"
+local SPOT_TREASURE = "treasure"
+local SPOT_RARE = "treasure_searched"
+-- Park at most this many banned inv_box hits, then unfiltered orig.
+-- Anom boxes are rarely in caches; 8 covers a cluster without extra orig spam.
+local FILTER_ATTEMPTS = 8
+
+local BANNED_SECTIONS = {
+	anom_inv_stash = true,
+	hidden_anom_stash = true,
+}
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local orig = {}
+local installed = false
+local callbacks_registered = false
+local filter_fallback_count = 0
+local filter_fallback_logged = false
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function reset_session_counters()
+	filter_fallback_count = 0
+	filter_fallback_logged = false
+end
+
+local function bonus_has_quest_item(bonus_items)
+	if type(bonus_items) ~= "table" then
+		return false
+	end
+	for _, sec in ipairs(bonus_items) do
+		if type(sec) == "string" and string.sub(sec, 1, #QUEST_ITEM_PREFIX) == QUEST_ITEM_PREFIX then
+			return true
+		end
+	end
+	return false
+end
+
+local function section_of(id)
+	local se = id and alife_object(id)
+	if not se then
+		return nil
+	end
+	local ok, sec = pcall(function()
+		return se:section_name()
+	end)
+	return ok and sec or nil
+end
+
+local function has_treasure_spot(id)
+	if not (id and level and type(level.map_has_object_spot) == "function") then
+		return false
+	end
+	local a = level.map_has_object_spot(id, SPOT_TREASURE)
+	local b = level.map_has_object_spot(id, SPOT_RARE)
+	return (a ~= 0 and a ~= false and a ~= nil) or (b ~= 0 and b ~= false and b ~= nil)
+end
+
+-- Same API Grok/vanilla use for stash markers (no parallel custom spot type).
+local function ensure_treasure_spot(id, hint)
+	if not id then
+		return false
+	end
+	if has_treasure_spot(id) then
+		return false
+	end
+	if not (level and type(level.map_add_object_spot_ser) == "function") then
+		return false
+	end
+	-- level.map_add_object_spot_ser(id, spot, hint) - not a colon-method (lua_help / vanilla call).
+	local ok, err = pcall(level.map_add_object_spot_ser, id, SPOT_TREASURE, hint or "")
+	if not ok then
+		log("map_add_object_spot_ser failed id=%s err=%s", tostring(id), tostring(err))
+		return false
+	end
+	log("ensured %s spot id=%s section=%s", SPOT_TREASURE, tostring(id), tostring(section_of(id)))
+	return true
+end
+
+----------------------------------------------------------------------
+-- Skip Anomalous Stash boxes when DRX asks for inv_box pool
+----------------------------------------------------------------------
+
+local function patched_get_random_stash(no_spot, hint, spawn_local, inv_box)
+	if not inv_box then
+		return orig.get_random_stash(no_spot, hint, spawn_local, inv_box)
+	end
+
+	local tm = treasure_manager
+	local caches = tm and tm.caches
+	local parked = {}
+
+	local function park(id)
+		if not (caches and id) then
+			return
+		end
+		parked[id] = caches[id]
+		caches[id] = true
+	end
+
+	local function restore()
+		if not caches then
+			return
+		end
+		for id, prev in pairs(parked) do
+			caches[id] = prev
+		end
+	end
+
+	local function fallback_unfiltered(reason)
+		restore()
+		filter_fallback_count = filter_fallback_count + 1
+		if not filter_fallback_logged then
+			filter_fallback_logged = true
+			log(
+				"inv_box anom filter fallback: %s (attempts=%s); further fallbacks this session counted only, total=%s",
+				tostring(reason),
+				tostring(FILTER_ATTEMPTS),
+				tostring(filter_fallback_count)
+			)
+		end
+		return orig.get_random_stash(no_spot, hint, spawn_local, inv_box)
+	end
+
+	local id, a, b, c
+	for _ = 1, FILTER_ATTEMPTS do
+		id, a, b, c = orig.get_random_stash(no_spot, hint, spawn_local, inv_box)
+		if not id then
+			-- Empty even with banned parked: restore and try plain orig (may still be nil).
+			return fallback_unfiltered("orig returned nil while filtering")
+		end
+		local sec = section_of(id)
+		if not (sec and BANNED_SECTIONS[sec]) then
+			restore()
+			return id, a, b, c
+		end
+		park(id)
+	end
+
+	return fallback_unfiltered("only banned inv_box ids in " .. tostring(FILTER_ATTEMPTS) .. " draws")
+end
+
+----------------------------------------------------------------------
+-- After Grok/vanilla set_random_stash: guarantee treasure spot for quest
+----------------------------------------------------------------------
+
+local function patched_set_random_stash(no_spot, hint, bonus_items, id, dbg)
+	local result = orig.set_random_stash(no_spot, hint, bonus_items, id, dbg)
+	if dbg or no_spot == true then
+		return result
+	end
+	if not bonus_has_quest_item(bonus_items) then
+		return result
+	end
+	if not id then
+		return result
+	end
+	ensure_treasure_spot(id, hint)
+	return result
+end
+
+----------------------------------------------------------------------
+-- Re-assert spots for active DRX stash tasks (load / MT reload)
+----------------------------------------------------------------------
+
+local function refresh_active_quest_spots()
+	if not (db and db.actor) then
+		return
+	end
+	local tm = rawget(_G, "task_manager")
+	local mgr = tm and tm.get_task_manager and tm.get_task_manager()
+	local info = mgr and mgr.task_info
+	if type(info) ~= "table" then
+		return
+	end
+	for task_id, _ in pairs(info) do
+		local var = load_var(db.actor, task_id)
+		if type(var) == "table" and var.target_id and var.stash_created then
+			ensure_treasure_spot(var.target_id, nil)
+		end
+	end
+end
+
+----------------------------------------------------------------------
+-- Install
+----------------------------------------------------------------------
+
+local function wraps_ours()
+	local tm = rawget(_G, "treasure_manager")
+	if not tm then
+		return false
+	end
+	if orig.get_random_stash and tm.get_random_stash ~= patched_get_random_stash then
+		return false
+	end
+	if orig.set_random_stash and tm.set_random_stash ~= patched_set_random_stash then
+		return false
+	end
+	return true
+end
+
+local function uninstall()
+	local tm = rawget(_G, "treasure_manager")
+	if tm then
+		if orig.get_random_stash then
+			tm.get_random_stash = orig.get_random_stash
+		end
+		if orig.set_random_stash then
+			tm.set_random_stash = orig.set_random_stash
+		end
+	end
+	orig = {}
+	installed = false
+end
+
+local function install()
+	if installed and wraps_ours() then
+		return
+	end
+	uninstall()
+
+	local tm = rawget(_G, "treasure_manager")
+	if not tm then
+		printf("%s treasure_manager not found - guard NOT installed", LOG_TAG)
+		return
+	end
+
+	local wrapped = {}
+	if type(tm.get_random_stash) == "function" then
+		orig.get_random_stash = tm.get_random_stash
+		tm.get_random_stash = patched_get_random_stash
+		wrapped[#wrapped + 1] = "get_random_stash"
+	else
+		log("get_random_stash not found - NOT installed")
+	end
+
+	if type(tm.set_random_stash) == "function" then
+		orig.set_random_stash = tm.set_random_stash
+		tm.set_random_stash = patched_set_random_stash
+		wrapped[#wrapped + 1] = "set_random_stash"
+	else
+		log("set_random_stash not found - NOT installed")
+	end
+
+	if #wrapped > 0 then
+		installed = true
+		log("v%s wrapped: %s", VERSION, table.concat(wrapped, ", "))
+	else
+		printf("%s guard NOT installed - no targets", LOG_TAG)
+	end
+end
+
+function on_game_load()
+	reset_session_counters()
+end
+
+function actor_on_first_update()
+	if not installed or not wraps_ours() then
+		installed = false
+		install()
+	end
+	refresh_active_quest_spots()
+end
+
+function on_game_start()
+	install()
+	if not callbacks_registered then
+		RegisterScriptCallback("on_game_load", on_game_load)
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
+	uninstall()
+	reset_session_counters()
+end

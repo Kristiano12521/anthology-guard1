@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="ui_mcm_fetch_remote_storage">
+		<text>Fetch Remote Storage</text>
+	</string>
+	<string id="ui_mcm_fetch_remote_storage_title">
+		<text>Fetch Remote Storage</text>
+	</string>
+	<string id="ui_mcm_fetch_remote_storage_desc">
+		<text>Optional rule change (off by default). When enabled, cyclic fetch quests also count and remove items stored in the Hideout Furniture workbench stash and The Anomalous Stash backpack. You can turn in a quest without carrying the item on your person.</text>
+	</string>
+	<string id="ui_mcm_fetch_remote_storage_enable">
+		<text>Count workbench and anomalous backpack for fetch quests</text>
+	</string>
+</string_table>
