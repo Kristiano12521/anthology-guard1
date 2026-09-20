@@ -22,16 +22,16 @@
 ## [issue] softlock PDA Объявление — клик по заданию (accept)
 
 - дата: 2026-09-20
-- мод: `fix_drx_enemy_task_gate` 1.0.2 + `fix_hostage_task_collision` 1.0.1 + `fix_taskboard_sync` 1.0.3; diag `diag_taskboard_accept` 1.0.0–1.0.3
+- мод: `fix_drx_enemy_task_gate` 1.0.2 + `fix_hostage_task_collision` 1.0.1 + `fix_taskboard_sync` 1.0.3; временно diag `diag_taskboard_accept` 1.0.0–1.0.3 (снят из репо)
 - симптом: клик по заданию в Объявлении → «залипание» (ввод мёртв / мир не отвечает), без FATAL. Примеры: `bar_visitors_barman_stalker_trader_task_4`, `simulation_task_48`.
 - классы (триаж по кадрам):
   - **Кадры продолжают идти** после «залипания» → Lua/update живы, завис **ввод**: сток `pda_taskboard.accept_task` держит `currently_processed_npc_id`, `z_taskboard_overrides` делает `is_talking()==true`; если `give_task` не дошёл до сброса id — softlock ввода. Не путать с зависанием `prepare_task` / генерации офферов (там клика ещё нет).
   - **Кадры стоят**, HEARTBEAT/`actor_on_update` молчит → синхронный hang в Lua на пути `accept`→`CRandomTask.give_task` (этот случай).
-- диагностика: `diag_taskboard_accept` — `accept begin` без `done`; 1.0.2 `before next-hop` без `after`; 1.0.3 `next-hop src=fix_drx_enemy_task_gate.script:177`. Подтвердило: late `install()` у DRX/hostage переназначал `orig.give_task` на peer → цикл DRX↔hostage (tail-call), `give_task` не возвращается.
+- диагностика: временный diag — `accept begin` без `done`; 1.0.2 `before next-hop` без `after`; 1.0.3 `next-hop src=fix_drx_enemy_task_gate.script:177`. Подтвердило: late `install()` у DRX/hostage переназначал `orig.give_task` на peer → цикл DRX↔hostage (tail-call), `give_task` не возвращается.
 - итог: **починено и проверено** — `orig` только при первом захвате; sync accept под `pcall` без окна `currently_processed`. Лог 20:55–20:57: **13×** `accept begin` → ванильный `CRandomTask:give_task()` → `accept done` (fetch + delivery), FATAL нет, diag снят.
 - карточка: нет; `logs/xray_nikit_softlock_fixed.log`, локализация `logs/xray_nikit_diag_103.log`
-- pitfalls: два monkey-patch на один `give_task` не перезаписывают `orig` при reclaim; diag не должен re-wrap `CRandomTask.give_task` в цикле с peer
-- подробности: CHANGELOG `fix_drx_enemy_task_gate` [1.0.2], `fix_hostage_task_collision` [1.0.1], `fix_taskboard_sync` [1.0.3], `diag_taskboard_accept`
+- pitfalls: два monkey-patch на один `give_task` не перезаписывают `orig` при reclaim; временный diag не должен re-wrap `CRandomTask.give_task` в цикле с peer
+- подробности: CHANGELOG `fix_drx_enemy_task_gate` [1.0.2], `fix_hostage_task_collision` [1.0.1], `fix_taskboard_sync` [1.0.3]
 
 
 ## [issue] `rvr_storage_system_engine.script:1835: attempt to index global 'ActiveStorages' (a nil value)`
