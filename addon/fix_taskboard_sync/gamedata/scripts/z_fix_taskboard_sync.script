@@ -8,7 +8,7 @@
 -- 3) Categorize drx_sl_create_quest_stash as setup_fetch_task on the board.
 
 local LOG_TAG = "[fix_taskboard_sync]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -54,7 +54,15 @@ local function se_alive_stalker(id)
 	return se
 end
 
+-- Must go through z_taskboard_overrides.CreateTimeEventOverride (same as
+-- tasks_assault/tasks_bounty/...). Global CreateTimeEvent skips the steal
+-- during prepare_category -> no give_talk_message2 capture -> empty icons.
 local function schedule_talk(event_name, fn, ...)
+	local ov = rawget(_G, "z_taskboard_overrides")
+	if ov and type(ov.CreateTimeEventOverride) == "function" then
+		ov.CreateTimeEventOverride(0, event_name, 0, fn, ...)
+		return
+	end
 	CreateTimeEvent(0, event_name, 0, fn, ...)
 end
 

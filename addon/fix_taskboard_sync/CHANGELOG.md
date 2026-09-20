@@ -1,41 +1,66 @@
 # fix_taskboard_sync
 
-**����������:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; ���� `[ANTHFIX] Taskboard + Weather`.
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; рядом с `[ANTHFIX] Taskboard + Weather`.
 
-**��������**
+**Удаление**
 
-- ��������� ���� � MO2; ����� ���� �� �����.
-- �������� `save_var` �������� �� ����� ������ / ����� - ����.
+- Отключить слот в MO2; новая игра не нужна.
+- Сохранённые `save_var` офферов до сдачи задания / смены уровня - плюс.
+
+## [1.0.1] - 2026-09-20
+
+**Изменено**
+
+- schedule_talk: вызывает z_taskboard_overrides.CreateTimeEventOverride, а не глобальный CreateTimeEvent.
+
+**Причина**
+
+При reuse assault/bounty/stash/fetch/delivery CreateTimeEvent шёл из окружения sync-скрипта и не попадал в steal z_taskboard_overrides во время prepare_category. give_talk_message2 не захватывался — на доске «Объявление» пустые иконки (шум) и нет title/локации. Лог: reuse assault ... без ошибок guard.
+
+**Не затронуто**
+
+- Логика reuse save_var, сортировка available_tasks, remap stash→fetch
+- fix_wtf_taskboard_guard
+
+**Совместимость**
+
+- Как 1.0.0; нужен iTheon/ANTHFIX Taskboard (z_taskboard_overrides)
+- Сейвы: без изменений
+
+**Проверено**
+
+- lint: python tools/lint_addon.py fix_taskboard_sync
+- в игре: не прогонялось. Ожидание: категория штурм/мутанты — иконка, title, вид/группировка, местонахождение как без sync
 
 ## [1.0.0] - 2026-09-20
 
-**��������**
+**Изменено**
 
-- `gamedata/scripts/z_fix_taskboard_sync.script` - monkey-patch:
-  - reuse `save_var` � `setup_bounty_task`, `drx_sl_create_quest_stash`, fetch-setup, `on_init_delivery_task`, `setup_assault_task` / `validate_assault_task`;
-  - ���������� `available_tasks` �� ����� ������ ����� `generate_available_tasks`;
-  - ��������� `drx_sl_create_quest_stash` -> `setup_fetch_task` �� �����.
+- gamedata/scripts/z_fix_taskboard_sync.script - monkey-patch:
+  - reuse save_var в setup_bounty_task, drx_sl_create_quest_stash, fetch-setup, on_init_delivery_task, setup_assault_task / validate_assault_task;
+  - сортировка available_tasks по task_id после generate_available_tasks;
+  - категория drx_sl_create_quest_stash -> setup_fetch_task на доске.
 
-**�������**
+**Причина**
 
-����� � ������ �������� setup �������� � ������ ������� ����/������� ����� ������. `pairs(CFG_CACHE)` ����� ������ ���� ������� ������������. Stash-������ �� ����� �������� � bounty ��-�� `normalizer`.
+Доска и диалог вызывают setup независимо и дают разные цели/предметы между оффером. pairs(CFG_CACHE) делает порядок слотов недетерминированным. Stash-задания на доске попадали в bounty из-за normalizer.
 
-**��� ����������**
+**Как исправлено**
 
-��� ������ - ������������ actor `save_var` (���������� MT reload; �������� ��������� `on_before_level_changing`, ���� ������� �� �����). ������ `bounty_cache` / `DIALOG_ID` / `cache_stash` ������ �� �������� ������ ����� ��������.
+Один оффер — переиспользование actor save_var (переживает MT reload; очистка непринятых on_before_level_changing, как ваниль на уровне). Память bounty_cache / DIALOG_ID / cache_stash между двумя вызовами setup не требуется.
 
-**�� ���������**
+**Не затронуто**
 
-- ��� ������ LTX, `repeat_timeout`, balance level_mode assault (��� B).
-- ���������/������ ������� (��� C).
-- Dominance->assault remapping �� �����.
+- Сами тексты LTX, repeat_timeout, balance level_mode assault (фаза B).
+- Принятие/сдача заданий (фаза C).
+- Dominance->assault remapping на доске.
 
-**�������������**
+**Совместимость**
 
-- �����: ��� ��������; ������ `save_var` �� �������.
-- MO2 ���� Taskboard; ����� MT reload wraps ������������������� �� `actor_on_first_update`.
+- Сейвы: без миграции; старые save_var не мешают.
+- MO2 ниже Taskboard; после MT reload wraps переустанавливаются на actor_on_first_update.
 
-**���������**
+**Проверено**
 
-- lint: `python tools/lint_addon.py fix_taskboard_sync`
-- � ����: �� �����������. ��������: ������ bounty - ���� ���� �� ����� � � �������; ��������� ������� � "���� ���������".
+- lint: python tools/lint_addon.py fix_taskboard_sync
+- в игре: не прогонялось. Ожидание: один bounty — одна цель на доске и в диалоге; stash-категория в «Сбор предметов».
