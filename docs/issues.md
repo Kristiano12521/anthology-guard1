@@ -19,6 +19,24 @@
 
 ---
 
+## [issue] `rvr_storage_system_engine.script:1835: attempt to index global 'ActiveStorages' (a nil value)`
+
+- дата: 2026-09-20
+- мод: [GAM] Optimized Storage System (`rvr_storage_system_engine.og_inventory_start`) + наш `fix_rvr_active_storages_nil` 1.0.0; путь: DotMarks → `hidden_anom_stash` / inventory start
+- итог: **починено** — до фикса FATAL `lua_pcall_failed` на `ActiveStorages[obj:id()]` без nil-check (в логе краша `fix_rvr_*` ещё не было). После установки: в сессии nikit 20.09 `guard installed v1.0.0`, FATAL по этой сигнатуре нет. Подтверждение в игре (открыть anomalous stash) — в CHANGELOG ещё «не подтверждено».
+- карточка: [2026-09-20_xray_mg9000-14.md](../logs/cards/2026-09-20_xray_mg9000-14.md) (источник `xray_mg9000 (1)4.log`); пост-фикс baseline: [2026-09-20_xray_nikit.md](../logs/cards/2026-09-20_xray_nikit.md)
+- pitfalls: нет
+- подробности: `addon/fix_rvr_active_storages_nil/CHANGELOG.md` [1.0.0]
+
+## [issue] nikit 2026-09-20: чистая сессия после пакета новых фиксов (динамика)
+
+- дата: 2026-09-20
+- мод: пакет фиксов 20.09 (`fix_create_squad_nil_smart`, `fix_rvr_active_storages_nil`, `fix_drx_enemy_task_gate`, `fix_taskboard_sync` 1.0.2, `fix_wtf_taskboard_guard` 1.0.4, `fetch_remote_storage` 1.1.0, …); Бар / ~2 мин; штатный выход
+- итог: **динамика / baseline** — класс `вылета в логе нет`; `nonfatal_groups=0`. Новые wrap'ы встали (`create_squad` / `SIMBOARD.create_squad`, RVR guard, DRX hide/block ×6, taskboard reuse). Известные отказы API без динамики (см. guard NOT installed + `aim_stamina` / `fix_utjan_mag_skill` magazines). Чужой `xrs_dyn_music` → `on_game_end` (уже в журнале). `item_combination | wrong section names` ×4 — уже в журнале / WITHDRAWN.
+- карточка: [2026-09-20_xray_nikit.md](../logs/cards/2026-09-20_xray_nikit.md) (источник appdata `xray_nikit.log` 19:20–19:24)
+- pitfalls: нет
+- подробности: нет
+
 ## [issue] native `UnhandledFilter` / `CDialogHolder::OnFrame` (меню сразу после load)
 
 - дата: 2026-09-20
@@ -100,12 +118,12 @@
 - pitfalls: нет
 - подробности: нет
 
-## [issue] guard NOT installed: `se_*on_unregister` / `QAmmoWheelOption.LoadInActiveWeapon` / `InteractPrompt.on_option_change`
+## [issue] guard NOT installed: `se_*on_unregister` / `QAmmoWheelOption.LoadInActiveWeapon` / `InteractPrompt.on_option_change` / `aim_stamina.*`
 
-- дата: 2026-09-19
-- мод: `fix_nil_crash_guards` 1.1.1, `fix_qaw_ammo_nil` 1.0.2–1.0.3, `fix_dotmarks_interact_prompt` 1.0.0
-- итог: **цель API не найдена у тестера** — гарды пишут `… not found - guard NOT installed` (остальные wrap'ы nil-guards встают). Не «install() упал молча»: цель отсутствует или имя/путь другое в его пакете. Следующий шаг — сверить символы через `refindex` / наличие QAW и DotMarks InteractPrompt.
-- карточка: [2026-09-19_xray_mg9000-3.md](../logs/cards/2026-09-19_xray_mg9000-3.md), [2026-09-19_xray_mg9000-4.md](../logs/cards/2026-09-19_xray_mg9000-4.md), также (3)-FATAL card
+- дата: 2026-09-19; повтор 2026-09-20 (nikit)
+- мод: `fix_nil_crash_guards` 1.1.1, `fix_qaw_ammo_nil` 1.0.3, `fix_dotmarks_interact_prompt` 1.0.0, `fix_aim_fatigue_visibility` 1.0.2; рядом `fix_utjan_mag_skill` — `magazines module missing` (MAG Redux нет → wrappers NOT installed)
+- итог: **цель API не найдена** — гарды пишут `… not found - guard NOT installed` (остальные wrap'ы nil-guards встают). Не «install() упал молча»: цель отсутствует или имя/путь другое в пакете. На 20.09 у nikit тот же набор + `aim_stamina.on_option_change`/`load_state`. Следующий шаг — сверить символы через `refindex` / наличие QAW, DotMarks InteractPrompt, Aim Stamina.
+- карточка: [2026-09-19_xray_mg9000-3.md](../logs/cards/2026-09-19_xray_mg9000-3.md), [2026-09-19_xray_mg9000-4.md](../logs/cards/2026-09-19_xray_mg9000-4.md), [2026-09-20_xray_nikit.md](../logs/cards/2026-09-20_xray_nikit.md)
 - pitfalls: [§9](pitfalls.md) (порядок `.script`); см. также issue про fallback `actor_on_first_update`
 - подробности: нет
 
