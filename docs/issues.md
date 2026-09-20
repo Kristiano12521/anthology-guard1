@@ -19,6 +19,15 @@
 
 ---
 
+## [issue] softlock Объявление / задания на предметы (нет `CRandomTask:give_task`)
+
+- дата: 2026-09-20
+- мод: `fix_taskboard_sync` 1.0.3 (+ кандидаты `fetch_remote_storage`, PDA Taskboard / `z_taskboard_overrides`); симптом: клик по карточке задания в Объявлении → зависание ввода
+- итог: **починено (гипотеза)** — клик = `OnTaskClicked` → `accept_task`. Сток держит `currently_processed_npc_id` на время `give_task`; overrides делают `is_talking()==true`. При ошибке/обрыве до `nil` ввод мёртв. 1.0.3: свой `accept_task` — прямой `give_task` под `pcall` без этого окна + `enable_input` при ошибке. В логах nikit: доска открывалась, ванильного `CRandomTask:give_task()` printf не было. Подтверждение в игре — нужно (ожидание: `accept begin` / `accept done` в логе, ввод жив).
+- карточка: [card_nikit.md](../logs/card_nikit.md) (источник `xray_nikit.log`); сырой повтор `logs/11xray_nikit.log`
+- pitfalls: нет
+- подробности: `addon/fix_taskboard_sync/CHANGELOG.md` [1.0.3]
+
 ## [issue] `rvr_storage_system_engine.script:1835: attempt to index global 'ActiveStorages' (a nil value)`
 
 - дата: 2026-09-20

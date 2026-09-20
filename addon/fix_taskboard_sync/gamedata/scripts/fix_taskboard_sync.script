@@ -7,7 +7,7 @@
 -- 3) Categorize drx_sl_create_quest_stash as setup_fetch_task on the board.
 
 local LOG_TAG = "[fix_taskboard_sync]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -353,6 +353,34 @@ local function patch_normalizer()
 end
 
 ----------------------------------------------------------------------
+-- Accept from PDA: never leave fake is_talking stuck
+----------------------------------------------------------------------
+-- Stock pda_taskboard.accept_task sets currently_processed_npc_id around
+-- give_task so get_speaker works. z_taskboard_overrides then makes
+-- db.actor:is_talking() return true while that id is set. If give_task
+-- errors or hangs before the nil clear, input stays dead after click.
+-- Board offers are already rolled into save_var; reuse_* does not need
+-- a fake speaker. Call give_task directly under pcall instead.
+
+local function patched_accept_task(task_id, npc_id)
+	log("accept begin task=%s npc=%s", tostring(task_id), tostring(npc_id))
+	local tm = task_manager and task_manager.get_task_manager and task_manager.get_task_manager()
+	if not (tm and type(tm.give_task) == "function") then
+		log("accept abort: task manager missing")
+		return
+	end
+	local ok, err = pcall(tm.give_task, tm, task_id, npc_id)
+	if not ok then
+		log("accept error task=%s err=%s", tostring(task_id), tostring(err))
+		if level and type(level.enable_input) == "function" then
+			pcall(level.enable_input)
+		end
+		return
+	end
+	log("accept done task=%s", tostring(task_id))
+end
+
+----------------------------------------------------------------------
 -- Install / uninstall
 ----------------------------------------------------------------------
 
@@ -397,6 +425,9 @@ local function wraps_still_ours()
 	if orig.get_task_effect and board and board.get_task_effect ~= patched_get_task_effect then
 		return false
 	end
+	if orig.accept_task and board and board.accept_task ~= patched_accept_task then
+		return false
+	end
 	return true
 end
 
@@ -435,6 +466,13 @@ local function install()
 	else
 		log("pda_taskboard.get_task_effect not found - category remap NOT installed")
 	end
+	if board and type(board.accept_task) == "function" then
+		orig.accept_task = board.accept_task
+		board.accept_task = patched_accept_task
+		wraps[#wraps + 1] = "pda_taskboard.accept_task"
+	else
+		log("pda_taskboard.accept_task not found - accept softlock guard NOT installed")
+	end
 	patch_normalizer()
 
 	if #wraps > 0 then
@@ -472,6 +510,9 @@ function uninstall()
 	end
 	if board and orig.get_task_effect then
 		board.get_task_effect = orig.get_task_effect
+	end
+	if board and orig.accept_task then
+		board.accept_task = orig.accept_task
 	end
 	if board and board.normalizer then
 		board.normalizer.drx_sl_create_quest_stash = "setup_bounty_task"

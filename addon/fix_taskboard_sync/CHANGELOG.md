@@ -7,6 +7,29 @@
 - Отключить слот в MO2; новая игра не нужна.
 - Сохранённые `save_var` офферов до сдачи задания / смены уровня - плюс.
 
+## [1.0.3] - 2026-09-20
+
+**Изменено**
+
+- `pda_taskboard.accept_task` — обёртка: `give_task` под `pcall` **без** окна `currently_processed_npc_id`. При ошибке — лог + `level.enable_input()`.
+
+**Причина**
+
+Клик по заданию в Объявлении = `OnTaskClicked` → `accept_task`. Сток выставляет `currently_processed_npc_id` вокруг `give_task`; `z_taskboard_overrides` тогда делает `is_talking() == true`. Если `give_task` падает или не доходит до сброса id — ввод мёртв («нажал на задание — зависло»). В логах nikit 20.09: открытие доски есть, `CRandomTask:give_task()` printf нет (буфер / обрыв до flush или путь без ванильного printf).
+
+**Не затронуто**
+
+- reuse офферов, remap stash→fetch, prepare_category
+
+**Остаточный риск**
+
+Редкий accept без заранее сохранённого `save_var`, где `on_init` жёстко требует живого `get_speaker` — на доске офферы уже подготовлены. Если softlock останется при `accept begin` без `accept done` — висеть внутри `give_task`, не в `is_talking`.
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_taskboard_sync`
+- в игре: не прогонялось (`verified_*` не ставились)
+
 ## [1.0.2] - 2026-09-20
 
 **Изменено**
