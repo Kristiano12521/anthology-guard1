@@ -7,6 +7,31 @@
 - Отключить слот в MO2; новая игра не нужна.
 - Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
 
+## [1.0.4] — 2026-09-20
+
+**Изменено**
+
+- `actor_on_first_update`: при чужом wrap вызывает `uninstall()` перед `install()`, а не `orig = {}` без восстановления слотов.
+
+**Причина**
+
+`fix_taskboard_sync` перехватывает `generate_available_tasks`. Guard видел «не наш» слот, обнулял `orig` и early-return'ил на уже нашем `refresh_tasks` — `orig.refresh_tasks` становился nil. Лог: `refresh_tasks aborted: attempt to call a nil value` при открытии «Объявление».
+
+**Не затронуто**
+
+- Семантика pcall / dup_deep / safe_online_object
+- Список обёрнутых слотов
+
+**Совместимость**
+
+- Как 1.0.3; рядом с `fix_taskboard_sync` (MO2: sync ниже / позже guard)
+- Сейвы: без изменений
+
+**Проверено**
+
+- lint: `python tools/lint_addon.py fix_wtf_taskboard_guard`
+- в игре: не прогонялось. Ожидание: нет `refresh_tasks aborted: attempt to call a nil value`, доска «Объявление» заполняется
+
 ## [1.0.3] — 2026-09-17
 
 **Изменено**

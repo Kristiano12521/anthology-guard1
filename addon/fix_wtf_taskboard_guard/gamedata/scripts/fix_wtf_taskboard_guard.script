@@ -11,7 +11,7 @@
 -- entry points with the engine pcall and rejects only the broken candidate.
 
 local LOG_TAG = "[fix_wtf_taskboard_guard]"
-local VERSION = "1.0.3"
+local VERSION = "1.0.4"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -401,10 +401,12 @@ function on_game_load()
 end
 
 function actor_on_first_update()
-	-- MT reload can replace WTF / Taskboard module tables after on_game_start.
+	-- MT reload / another addon (e.g. fix_taskboard_sync) can steal a slot after
+	-- on_game_start. Must uninstall first: clearing orig alone leaves
+	-- patched_refresh_tasks with orig.refresh_tasks == nil, so PDA
+	-- refresh_tasks aborts with "attempt to call a nil value".
 	if not installed or not our_wraps_ok() then
-		orig = {}
-		installed = false
+		uninstall()
 		install()
 	end
 end
