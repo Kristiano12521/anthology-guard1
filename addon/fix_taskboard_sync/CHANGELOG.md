@@ -28,7 +28,7 @@
 **Проверено**
 
 - lint: `python tools/lint_addon.py fix_taskboard_sync`
-- в игре: не прогонялось (`verified_*` не ставились)
+- в игре 2026-09-20: 13× `accept begin` → `CRandomTask:give_task()` → `accept done` (в т.ч. `bar_visitors_barman_stalker_trader_task_4`, delivery); FATAL нет → `verified_*` в `meta.ini`
 
 ## [1.0.2] - 2026-09-20
 

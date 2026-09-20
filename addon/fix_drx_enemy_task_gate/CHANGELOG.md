@@ -7,6 +7,21 @@
 - Отключить слот в MO2; новая игра не нужна.
 - Сейв не затрагивается.
 
+## [1.0.2] — 2026-09-20
+
+**Изменено**
+
+- `give_task` / prerequisites / `drx_sl_is_enemy`: `orig` только при первом захвате; late `install()` не переназначает `orig` на peer-wrap (цикл с `fix_hostage_task_collision` → softlock PDA Announcements).
+- `printf wrapped:` только при первом захвате или реальном reclaim (не когда wrap уже наш).
+
+**Причина**
+
+Diag 1.0.3: `before next-hop src=fix_drx_enemy_task_gate.script:177`, нет `after` / `CGeneralTask.__init`, HEARTBEAT=0.
+
+**Не затронуто**
+
+- Логика hide/block enemy tasks
+
 ## [1.0.1] — 2026-09-20
 
 **Изменено**

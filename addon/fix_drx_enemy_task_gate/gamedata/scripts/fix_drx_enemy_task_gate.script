@@ -18,7 +18,7 @@
 -- gameplay_disguise.
 
 local LOG_TAG = "[fix_drx_enemy_task_gate]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -228,26 +228,29 @@ local function install()
 		return true
 	end
 
-	local wrapped = {}
+	local changed = {}
 	local cond = rawget(_G, "xr_conditions")
 
 	if cond and type(cond.drx_sl_is_enemy) == "function" then
-		if cond.drx_sl_is_enemy ~= patched_drx_sl_is_enemy then
+		if not orig.drx_sl_is_enemy then
 			orig.drx_sl_is_enemy = cond.drx_sl_is_enemy
-			cond.drx_sl_is_enemy = patched_drx_sl_is_enemy
 		end
-		wrapped[#wrapped + 1] = "drx_sl_is_enemy"
+		if cond.drx_sl_is_enemy ~= patched_drx_sl_is_enemy then
+			cond.drx_sl_is_enemy = patched_drx_sl_is_enemy
+			changed[#changed + 1] = "drx_sl_is_enemy"
+		end
 	else
 		log("drx_sl_is_enemy not found - disguise-aware fail NOT installed")
 	end
 
 	if cond and type(cond.has_completed_task_prerequisites) == "function" then
-		-- Re-bind over current pointer (chain with other wraps; never wipe them).
-		if cond.has_completed_task_prerequisites ~= patched_has_completed_task_prerequisites then
+		if not orig.has_completed_task_prerequisites then
 			orig.has_completed_task_prerequisites = cond.has_completed_task_prerequisites
-			cond.has_completed_task_prerequisites = patched_has_completed_task_prerequisites
 		end
-		wrapped[#wrapped + 1] = "has_completed_task_prerequisites"
+		if cond.has_completed_task_prerequisites ~= patched_has_completed_task_prerequisites then
+			cond.has_completed_task_prerequisites = patched_has_completed_task_prerequisites
+			changed[#changed + 1] = "has_completed_task_prerequisites"
+		end
 	else
 		log("has_completed_task_prerequisites not found - NOT installed")
 	end
@@ -255,18 +258,33 @@ local function install()
 	local tm = rawget(_G, "task_manager")
 	local crt = tm and tm.CRandomTask
 	if crt and type(crt.give_task) == "function" then
-		if crt.give_task ~= patched_give_task then
+		-- Capture next-hop once. Late reinstall must not set orig to a peer
+		-- wrap that already calls us (silent hang via tail-call cycle).
+		if not orig.give_task then
 			orig.give_task = crt.give_task
-			crt.give_task = patched_give_task
 		end
-		wrapped[#wrapped + 1] = "CRandomTask.give_task"
+		if crt.give_task ~= patched_give_task then
+			crt.give_task = patched_give_task
+			changed[#changed + 1] = "CRandomTask.give_task"
+		end
 	else
 		log("CRandomTask.give_task not found - accept block NOT installed")
 	end
 
-	if #wrapped > 0 then
+	if #changed > 0 then
+		local first = not orig._logged_wrap
 		installed = true
-		log("v%s wrapped: %s", VERSION, table.concat(wrapped, ", "))
+		if first then
+			log("v%s wrapped: %s", VERSION, table.concat(changed, ", "))
+			orig._logged_wrap = true
+		else
+			log("v%s reclaim: %s", VERSION, table.concat(changed, ", "))
+		end
+		return true
+	end
+
+	if orig.give_task or orig.drx_sl_is_enemy or orig.has_completed_task_prerequisites then
+		installed = true
 		return true
 	end
 	log("v%s guard NOT installed - no targets", VERSION)

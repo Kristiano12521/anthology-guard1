@@ -7,6 +7,21 @@
 - Отключить слот в MO2; новая игра не нужна.
 - Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
 
+## [1.0.1] — 2026-09-20
+
+**Изменено**
+
+- Late-reinstall `give_task` / `setup_companion_task`: `orig` захватывается один раз; reclaim outer без `orig = {}` (цикл с `fix_drx_enemy_task_gate` → softlock Объявления).
+- `printf wrapped:` только при первом захвате или реальном reclaim (не на каждом `actor_on_first_update`).
+
+**Причина**
+
+Diag 1.0.3: next-hop `fix_drx_enemy_task_gate:177`, hang без `after`. DRX после hostage делал `orig = hostage`, hostage.orig оставался DRX → взаимный tail-call.
+
+**Не затронуто**
+
+- Логика блокировки второго hostage
+
 ## [1.0.0] — 2026-09-05
 
 **Изменено**
@@ -43,4 +58,4 @@ Monkey-patch (DLTX не закрывает дыру на accept):
 **Проверено**
 
 - lint: `python tools/lint_addon.py fix_hostage_task_collision`
-- В игре: не прогонялось. Ожидаемый лог: `wrapped: give_task, setup_companion_task`; при блокировке — `blocked give_task <id> ...`
+- в игре 2026-09-20 (cycle-fix 1.0.1 + sync): 13× accept begin → give_task → accept done; FATAL нет → `verified_*` в `meta.ini`
