@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import REPO_ROOT  # noqa: E402
 
 BUILD = REPO_ROOT / "build"
-BUNDLE_NAME = "Kristiano_Fixes_Bundle_2026-09-19.zip"
+BUNDLE_NAME = "Kristiano_Fixes_Bundle_2026-09-20.zip"
 VANILLA_BUNDLE_NAME = "Kristiano_Vanilla_Anomaly_Fixes_2026-09-02.zip"
 
 ZIP_VER = re.compile(r"^(.+)-(\d+(?:\.\d+)+)\.zip$")
@@ -130,8 +130,13 @@ def write_index(individual: list[Path]) -> str:
 
 def write_changelog(count: int) -> str:
     return (
-        "# Kristiano Fixes Bundle - 2026-09-19\n\n"
+        "# Kristiano Fixes Bundle - 2026-09-20\n\n"
         "## Что нового\n\n"
+        "### 2026-09-20\n\n"
+        "- fetch_remote_storage: опция «забрать из схрона» без поездки.\n"
+        "- fix_quest_stash_hint: подсказка квестового схрона на карте.\n"
+        "- fix_taskboard_sync: синхронизация офферов доски заданий.\n"
+        "- AIO: 77 аддонов (было 74).\n\n"
         "### 2026-09-19\n\n"
         "- AIO 1.0.0: semver пакета в meta.ini / BUILD_INFO.txt "
         "(строка version:, не дата сборки).\n"
