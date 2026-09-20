@@ -1,0 +1,301 @@
+-- DRX Hostile Faction Task Gate
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- Many DRX/Anthology dynamic tasks fail immediately after accept when
+--   condlist_N = {=drx_sl_is_enemy(<faction>)} fail
+-- (e.g. milstalk tasks for an ISG actor). Fail runs on_fail and cuts
+-- goodwill. That check is NOT in precondition, so generate_available_tasks
+-- still offers them.
+--
+-- Vanilla drx_sl_is_enemy uses get_actor_true_community() (default faction),
+-- so outfit disguise is ignored and tasks still fail under a milstalk suit.
+-- This addon:
+--   1) Makes drx_sl_is_enemy use the current character_community (disguise).
+--   2) Hides such tasks in prerequisites while you are an enemy of that faction.
+--   3) Blocks give_task so accept cannot trigger on_fail.
+--
+-- No MCM. No LTX edits. load-order: after task_manager / axr_task_manager /
+-- gameplay_disguise.
+
+local LOG_TAG = "[fix_drx_enemy_task_gate]"
+local VERSION = "1.0.1"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local orig = {}
+local installed = false
+local callbacks_registered = false
+
+-- [task_id] = { "milstalk", ... } or false (no enemy-fail cond)
+local enemy_fail_cache = {}
+local logged_block = {}
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function reset_session()
+	enemy_fail_cache = {}
+	logged_block = {}
+end
+
+local function task_ini()
+	local tm = rawget(_G, "task_manager")
+	return tm and tm.task_ini
+end
+
+-- Visible / disguise community (no actor_ prefix). Falls back to true default.
+local function actor_visible_community()
+	if db and db.actor and type(character_community) == "function" then
+		local ok, raw = pcall(character_community, db.actor)
+		if ok and type(raw) == "string" and raw ~= "" then
+			return string.gsub(raw, "^actor_", "")
+		end
+	end
+	if type(get_actor_true_community) == "function" then
+		local ok, raw = pcall(get_actor_true_community)
+		if ok and type(raw) == "string" and raw ~= "" then
+			return string.gsub(raw, "^actor_", "")
+		end
+	end
+	return nil
+end
+
+-- Same relation test as vanilla, but against current (disguise) community.
+local function patched_drx_sl_is_enemy(actor, npc, p)
+	if not (p and p[1]) then
+		return false
+	end
+	local check_comm = string.gsub(tostring(p[1]), "^actor_", "")
+	local actor_comm = actor_visible_community()
+	if not actor_comm then
+		if orig.drx_sl_is_enemy then
+			return orig.drx_sl_is_enemy(actor, npc, p)
+		end
+		return false
+	end
+	if not (relation_registry and relation_registry.community_relation) then
+		if orig.drx_sl_is_enemy then
+			return orig.drx_sl_is_enemy(actor, npc, p)
+		end
+		return false
+	end
+	local ok, rel = pcall(relation_registry.community_relation, check_comm, actor_comm)
+	if not ok or type(rel) ~= "number" then
+		return false
+	end
+	return rel <= -1000
+end
+
+-- Collect factions from {=drx_sl_is_enemy(faction)} ... fail in condlist_* .
+local function enemy_fail_factions(task_id)
+	local cached = enemy_fail_cache[task_id]
+	if cached ~= nil then
+		return cached
+	end
+
+	local ini = task_ini()
+	if not (ini and type(task_id) == "string" and task_id ~= ""
+		and ini.section_exist and ini:section_exist(task_id))
+	then
+		enemy_fail_cache[task_id] = false
+		return false
+	end
+
+	local found = {}
+	local seen = {}
+	for i = 0, 15 do
+		local raw = ini:r_string_ex(task_id, "condlist_" .. i)
+		if not raw or raw == "" then
+			break
+		end
+		-- Only the positive check that leads to fail (not {!drx_sl_is_enemy}).
+		for faction in string.gmatch(raw, "=drx_sl_is_enemy%(([^%)]+)%)") do
+			faction = string.gsub(faction, "%s+", "")
+			if faction ~= "" and not seen[faction] then
+				seen[faction] = true
+				found[#found + 1] = faction
+			end
+		end
+	end
+
+	if #found == 0 then
+		enemy_fail_cache[task_id] = false
+		return false
+	end
+	enemy_fail_cache[task_id] = found
+	return found
+end
+
+local function actor_is_enemy_of(faction)
+	local cond = rawget(_G, "xr_conditions")
+	if not (cond and type(cond.drx_sl_is_enemy) == "function" and db and db.actor) then
+		return false
+	end
+	local ok, result = pcall(cond.drx_sl_is_enemy, db.actor, db.actor, { faction })
+	return ok and result and true or false
+end
+
+-- Returns faction name if task would instantly fail for current actor.
+local function blocking_enemy_faction(task_id)
+	local factions = enemy_fail_factions(task_id)
+	if not factions then
+		return nil
+	end
+	for i = 1, #factions do
+		if actor_is_enemy_of(factions[i]) then
+			return factions[i]
+		end
+	end
+	return nil
+end
+
+local function log_block_once(task_id, faction, where)
+	local key = tostring(task_id) .. "|" .. tostring(faction) .. "|" .. tostring(where)
+	if logged_block[key] then
+		return
+	end
+	logged_block[key] = true
+	log("hide/block %s (enemy of %s via %s, visible_comm=%s)",
+		tostring(task_id), tostring(faction), tostring(where), tostring(actor_visible_community()))
+end
+
+local function patched_has_completed_task_prerequisites(actor, npc, p)
+	local ok = orig.has_completed_task_prerequisites(actor, npc, p)
+	if not ok then
+		return ok
+	end
+	local task_id = p and p[1]
+	local faction = blocking_enemy_faction(task_id)
+	if faction then
+		log_block_once(task_id, faction, "prerequisites")
+		return false
+	end
+	return ok
+end
+
+local function patched_give_task(self, task_id, task_giver_id)
+	local faction = blocking_enemy_faction(task_id)
+	if faction then
+		log_block_once(task_id, faction, "give_task")
+		return
+	end
+	return orig.give_task(self, task_id, task_giver_id)
+end
+
+local function wraps_ours()
+	local cond = rawget(_G, "xr_conditions")
+	if orig.drx_sl_is_enemy and cond and cond.drx_sl_is_enemy ~= patched_drx_sl_is_enemy then
+		return false
+	end
+	if orig.has_completed_task_prerequisites
+		and cond
+		and cond.has_completed_task_prerequisites ~= patched_has_completed_task_prerequisites
+	then
+		return false
+	end
+	local tm = rawget(_G, "task_manager")
+	local crt = tm and tm.CRandomTask
+	if orig.give_task and crt and crt.give_task ~= patched_give_task then
+		return false
+	end
+	return true
+end
+
+local function uninstall()
+	local cond = rawget(_G, "xr_conditions")
+	if cond then
+		if orig.drx_sl_is_enemy and cond.drx_sl_is_enemy == patched_drx_sl_is_enemy then
+			cond.drx_sl_is_enemy = orig.drx_sl_is_enemy
+		end
+		if orig.has_completed_task_prerequisites
+			and cond.has_completed_task_prerequisites == patched_has_completed_task_prerequisites
+		then
+			cond.has_completed_task_prerequisites = orig.has_completed_task_prerequisites
+		end
+	end
+	local tm = rawget(_G, "task_manager")
+	local crt = tm and tm.CRandomTask
+	if crt and orig.give_task and crt.give_task == patched_give_task then
+		crt.give_task = orig.give_task
+	end
+	orig = {}
+	installed = false
+end
+
+local function install()
+	if installed and wraps_ours() then
+		return true
+	end
+
+	local wrapped = {}
+	local cond = rawget(_G, "xr_conditions")
+
+	if cond and type(cond.drx_sl_is_enemy) == "function" then
+		if cond.drx_sl_is_enemy ~= patched_drx_sl_is_enemy then
+			orig.drx_sl_is_enemy = cond.drx_sl_is_enemy
+			cond.drx_sl_is_enemy = patched_drx_sl_is_enemy
+		end
+		wrapped[#wrapped + 1] = "drx_sl_is_enemy"
+	else
+		log("drx_sl_is_enemy not found - disguise-aware fail NOT installed")
+	end
+
+	if cond and type(cond.has_completed_task_prerequisites) == "function" then
+		-- Re-bind over current pointer (chain with other wraps; never wipe them).
+		if cond.has_completed_task_prerequisites ~= patched_has_completed_task_prerequisites then
+			orig.has_completed_task_prerequisites = cond.has_completed_task_prerequisites
+			cond.has_completed_task_prerequisites = patched_has_completed_task_prerequisites
+		end
+		wrapped[#wrapped + 1] = "has_completed_task_prerequisites"
+	else
+		log("has_completed_task_prerequisites not found - NOT installed")
+	end
+
+	local tm = rawget(_G, "task_manager")
+	local crt = tm and tm.CRandomTask
+	if crt and type(crt.give_task) == "function" then
+		if crt.give_task ~= patched_give_task then
+			orig.give_task = crt.give_task
+			crt.give_task = patched_give_task
+		end
+		wrapped[#wrapped + 1] = "CRandomTask.give_task"
+	else
+		log("CRandomTask.give_task not found - accept block NOT installed")
+	end
+
+	if #wrapped > 0 then
+		installed = true
+		log("v%s wrapped: %s", VERSION, table.concat(wrapped, ", "))
+		return true
+	end
+	log("v%s guard NOT installed - no targets", VERSION)
+	return false
+end
+
+function on_game_load()
+	reset_session()
+end
+
+function actor_on_first_update()
+	install()
+end
+
+function on_game_start()
+	install()
+	if not callbacks_registered then
+		RegisterScriptCallback("on_game_load", on_game_load)
+		RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = true
+	end
+end
+
+function on_game_end()
+	if callbacks_registered then
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		callbacks_registered = false
+	end
+	uninstall()
+	reset_session()
+end

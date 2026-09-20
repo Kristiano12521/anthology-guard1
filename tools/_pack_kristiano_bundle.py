@@ -138,6 +138,8 @@ def write_changelog(count: int) -> str:
         "- fix_taskboard_sync: синхронизация офферов доски заданий.\n"
         "- AIO: 77 аддонов (было 74).\n\n"
         "### 2026-09-19\n\n"
+        "- AIO 1.0.1: fetch_remote_storage (метки на доске), fix_taskboard_sync, "
+        "fix_wtf_taskboard_guard 1.0.4.\n"
         "- AIO 1.0.0: semver пакета в meta.ini / BUILD_INFO.txt "
         "(строка version:, не дата сборки).\n"
         "- fix_gigant_space_restriction 1.1.2: на on_game_end сессионный "
