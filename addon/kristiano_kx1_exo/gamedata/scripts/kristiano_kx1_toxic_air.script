@@ -1,4 +1,3 @@
--- load-order: после toxic_air
 -- KX-1 Toxic Air dual capability:
 -- LTX keeps mode=filter (hud_kx1) so filters work.
 -- Tanks need mode=tank in get_active_tank_gear / get_active_tank_entry.
@@ -7,7 +6,7 @@
 -- Bonus: wrap get_active_tank_gear if upvalue is reachable.
 
 local LOG_TAG = "[kristiano_kx1_toxic_air]"
-local VERSION = "1.1.0"
+local VERSION = "1.1.1"
 local KX1 = "kristiano_kx1_exo_outfit"
 local TANK_HUD = "hud_sci"
 local FILTER_HUD = "hud_kx1"
