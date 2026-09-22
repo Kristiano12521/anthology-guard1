@@ -30,7 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import xdb_unpack  # noqa: E402
-from _common import REPO_ROOT  # noqa: E402
+from _common import REPO_ROOT, is_ignorable_filename  # noqa: E402
 from fill_reference import (  # noqa: E402
     ADDONS_DIR_NAME,
     DEFAULT_REFERENCE,
@@ -282,6 +282,8 @@ def iter_files(root: Path):
         dirnames.sort()
         filenames.sort()
         for name in filenames:
+            if is_ignorable_filename(name):
+                continue
             yield Path(dirpath) / name
 
 

@@ -12,6 +12,7 @@
 **Изменено**
 
 - Исключён из AIO (`SKIP` в `_pack_kristiano_aio.py`): в свежей Anthology тот же `scripts/fix_kupol_wrong_bone.script` уже лежит в ядре (`scripts_anthology`) байт в байт с 1.0.2. Дубль в пакете бессмысленен.
+- `meta.ini`: `core_identical=1` — линтер сообщает CORE-001 («влит в ядро, совпадает»), не LUA-001; при расхождении байт — CORE-002.
 
 **Не затронуто**
 

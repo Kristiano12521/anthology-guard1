@@ -9,6 +9,12 @@ CONTEXT MENU OVERHAUL 1.4.2 — ANTHOLOGY 2.1 ADAPTATION
 - Отключить слот в MO2; новая игра не нужна. Перезагрузить сейв/игру, чтобы UI-хуки не остались от прошлой сессии.
 - Сейв не затрагивается. Retool'нутые магазины остаются обычными предметами. Пропадут расширенные пункты ПКМ.
 
+v1.2.4.1 — 22.09.2026
+------------------------------------------------
+`meta.ini`: `vendor_omit=` — FORK-001 на переименованных compat-файлах оригинала:
+- `mod_mags_retool_context_compat.ltx` → у нас `mod_weapon_magazines_retool_context.ltx` (+ `cmo_mags_retool_compat.script`)
+- `mod_opo_integrated_helmet_context_menu_compat.ltx` → у нас `mod_menu_opo_helmet.ltx` (+ `cmo_opo_helmet_compat.script`)
+
 v1.2.4 — 06.09.2026
 ------------------------------------------------
 Дефолты MCM для комфорта ПКМ-меню:

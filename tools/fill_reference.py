@@ -32,7 +32,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import xdb_unpack  # noqa: E402
-from _common import REPO_ROOT  # noqa: E402
+from _common import REPO_ROOT, is_ignorable_filename  # noqa: E402
 
 KEEP_DIRS = ("scripts", "configs", "text", "materials")
 ADDONS_DIR_NAME = "addons"
@@ -129,6 +129,8 @@ def process_archive(
     written = 0
     unchanged = 0
     for entry in entries:
+        if is_ignorable_filename(entry.name):
+            continue
         relative = dest_relative(entry.name)
         if relative is None or entry.is_dir or entry.size_real <= 0:
             continue

@@ -9,6 +9,15 @@
 - Отключить слот в MO2. Если костры уже ставили — сначала уберите/сожгите их при включённом моде, затем отключайте.
 - Сейв хранит `se_anoms` / `prev_level` и alife-объекты `ph_campfiremod`. Без мода секции пропадут: missing section, «висячие» объекты. Без поставленных костров — безопасно.
 
+## [1.1.3] — 2026-09-22
+
+**Изменено**
+
+- `meta.ini`: `vendor_omit=` для осознанных пропусков относительно placeable-оригинала (FORK-001):
+  - `scripts/trader_autoinject.script` (+ `.mohidden`) — полная замена ломала `trader_on_restock`; сток через monkey-patch в `campfire_placeable.script`
+  - `configs/models/dynamic_objects.ltx` — форк как раз без ломки Anthology-секций
+  - `configs/mod_system_campfires_placeable_anthology.ltx` — заменён на `mod_system_campfires_anthology_compat.ltx` (имя `mod_system_*` + `@[ph_campfiremod]`)
+
 ## [1.1.2] — 2026-09-17
 
 **Изменено**

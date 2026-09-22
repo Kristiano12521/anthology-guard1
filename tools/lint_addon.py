@@ -52,6 +52,9 @@ LOAD_ORDER_HACK_RE = re.compile(r"^(z{3,}|a{3,})", re.I)
 LOAD_ORDER_JUSTIFICATION_RE = re.compile(r"--\s*load-order:\s*после\s+\S+", re.I)
 VENDOR_FORK_RE = re.compile(r"^vendor_fork\s*=\s*1$", re.I)
 VENDOR_SOURCE_RE = re.compile(r"^vendor_source\s*=\s*(.+)$", re.I)
+VENDOR_OMIT_RE = re.compile(r"^vendor_omit\s*=\s*(.+)$", re.I)
+CORE_IDENTICAL_RE = re.compile(r"^core_identical\s*=\s*1$", re.I)
+CORE_SUPERSEDES_RE = re.compile(r"^core_supersedes\s*=\s*1$", re.I)
 VERIFIED_DATE_RE = re.compile(r"^verified_date\s*=\s*(\S+)$", re.I)
 VERIFY_SKIP_NAMES = frozenset({"meta.ini", "changelog.md", "readme.md"})
 FORK_SILENCED_CODES = frozenset({"LUA-001", "LTX-001", "STRUCT-005"})
@@ -217,6 +220,66 @@ def read_vendor_source(addon_dir: Path) -> str | None:
         value = match.group(1).strip().strip("\"'")
         return value or None
     return None
+
+
+def read_vendor_omit(addon_dir: Path) -> set[str]:
+    """Пути (fork_match_key), намеренно отсутствующие в форке — FORK-001 молчит."""
+    omitted: set[str] = set()
+    for line in _meta_active_lines(addon_dir):
+        match = VENDOR_OMIT_RE.match(line)
+        if not match:
+            continue
+        raw = match.group(1).strip().strip("\"'")
+        for part in raw.split(","):
+            path = part.strip().strip("\"'").replace("\\", "/")
+            if path:
+                omitted.add(fork_match_key(path))
+    return omitted
+
+
+def is_core_identical(addon_dir: Path) -> bool:
+    """True: мод байт-в-байт совпадает с копией в reference/anthology/."""
+    return any(CORE_IDENTICAL_RE.match(line) for line in _meta_active_lines(addon_dir))
+
+
+def is_core_supersedes(addon_dir: Path) -> bool:
+    """True: мод намеренно заменяет устаревшую копию из reference/anthology/."""
+    return any(CORE_SUPERSEDES_RE.match(line) for line in _meta_active_lines(addon_dir))
+
+
+def anthology_reference_hits(existing: list[str]) -> list[str]:
+    """Пути эталона под reference/anthology/ (или относительно anthology/)."""
+    hits: list[str] = []
+    for entry in existing:
+        posix = entry.replace("\\", "/")
+        lower = posix.lower()
+        if "/anthology/" in lower or lower.startswith("anthology/"):
+            hits.append(entry)
+    return hits
+
+
+def _resolve_repo_path(entry: str) -> Path | None:
+    """Путь из хвоста ReferenceView (обычно relative to REPO_ROOT)."""
+    posix = entry.replace("\\", "/")
+    if Path(posix).is_absolute():
+        path = Path(posix)
+        return path if path.is_file() else None
+    path = REPO_ROOT.joinpath(*posix.split("/"))
+    return path if path.is_file() else None
+
+
+def pack_bhs_auto_omit_keys(addon_dir: Path) -> set[str]:
+    """Full-file из pack_bhs.VENDOR_FULL_FILES — подкладываются при сборке, не в overlay."""
+    try:
+        import pack_bhs  # noqa: PLC0415
+    except ImportError:
+        return set()
+    if addon_dir.name != getattr(pack_bhs, "OVERLAY_MOD", ""):
+        return set()
+    return {
+        fork_match_key(Path(rel).as_posix())
+        for rel in pack_bhs.VENDOR_FULL_FILES
+    }
 
 
 def strip_load_order_prefixes(name: str) -> str:
@@ -739,13 +802,15 @@ class AddonLinter:
         origin_relpaths = [
             path.relative_to(source_dir).as_posix() for path in iter_files(source_dir)
         ]
+        omit_keys = read_vendor_omit(self.dir) | pack_bhs_auto_omit_keys(self.dir)
         gamedata = self.dir / "gamedata"
         our_keys: set[str] = set()
         if gamedata.is_dir():
             for path in iter_files(gamedata):
                 our_keys.add(fork_match_key(gamedata_relpath(path)))
         for relpath in origin_relpaths:
-            if fork_match_key(relpath) in our_keys:
+            key = fork_match_key(relpath)
+            if key in our_keys or key in omit_keys:
                 continue
             self.add(
                 "FORK-001",
@@ -911,13 +976,43 @@ class AddonLinter:
 
         existing = self.reference.has_file(path)
         if existing:
-            self.add(
-                "LUA-001",
-                "warn",
-                f"Файл повторяет скрипт сборки ({existing[0]}) и заменит его целиком. "
-                "Обычно нужен monkey-patch из отдельного файла.",
-                path,
-            )
+            anth_hits = anthology_reference_hits(existing)
+            if anth_hits and is_core_identical(self.dir):
+                core_path = _resolve_repo_path(anth_hits[0])
+                try:
+                    same = (
+                        core_path is not None
+                        and core_path.is_file()
+                        and path.read_bytes() == core_path.read_bytes()
+                    )
+                except OSError:
+                    same = False
+                if same:
+                    self.add(
+                        "CORE-001",
+                        "warn",
+                        f"Влит в ядро Anthology и совпадает байт в байт ({anth_hits[0]}). "
+                        "Дубль в addon/ можно оставить; в AIO не нужен.",
+                        path,
+                    )
+                else:
+                    self.add(
+                        "CORE-002",
+                        "warn",
+                        f"core_identical=1, но ядро разошлось с addon/ ({anth_hits[0]}). "
+                        "Сверить с reference/anthology/ и обновить мод или снять флаг.",
+                        path,
+                    )
+            elif anth_hits and is_core_supersedes(self.dir):
+                pass  # намеренная замена устаревшей копии из ядра — не LUA-001
+            else:
+                self.add(
+                    "LUA-001",
+                    "warn",
+                    f"Файл повторяет скрипт сборки ({existing[0]}) и заменит его целиком. "
+                    "Обычно нужен monkey-patch из отдельного файла.",
+                    path,
+                )
 
         for match in ANON_CALLBACK_RE.finditer(text):
             self.add(

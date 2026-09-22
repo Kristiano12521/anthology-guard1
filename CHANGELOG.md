@@ -3,6 +3,12 @@
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 Записи старше месяца — в [`CHANGELOG-archive.md`](CHANGELOG-archive.md).
 
+## [0.1.75] — vendor_omit, CORE-001/002, игнор desktop.ini
+
+FORK-001: `vendor_omit=` в meta.ini — осознанные пропуски относительно вендора; BusyHands full-file (`mon_sleep`, `guaranteed_loot`, `aes_crow_spawner`) берутся из `pack_bhs.VENDOR_FULL_FILES`, не дублируются в omit. Campfires / CMO — omit + строки в CHANGELOG модов. `desktop.ini` / `Thumbs.db` не входят в FORK и не копируются fill-инструментами.
+
+LUA vs ядро Anthology: `core_identical=1` → CORE-001 при совпадении байт, CORE-002 при расхождении (`fix_kupol_wrong_bone`); `core_supersedes=1` глушит LUA-001 (`fix_ph_door_rx_reload`, ядро 1.0.1 / наш 1.0.2). Тесты; `docs/mo2.md`.
+
 ## [0.1.74] — reference/vendor/: постоянные оригиналы форков
 
 `reference/vendor/` — слепки вендорских модов для форков; `fill_reference` / `fill_reference_addons` / `--prune` не пишут и не удаляют. `vendor_source` ищется сначала в `vendor/`, потом в `addons/` (`resolve_vendor_source`: pack_bhs, FORK-001). `ReferenceView` индексирует vendor → LTX-002 видит `menu.ltx` CMO после ручного копирования. `refindex`: метка «вендор», ранг как у addons.

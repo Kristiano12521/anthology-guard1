@@ -101,4 +101,6 @@ verified_note=что именно проверялось, одной строк�
 python3 tools/lint_addon.py --unverified
 ```
 
-У форка (`vendor_fork=1`) ключ `vendor_source=<имя папки>` включает сверку состава: сначала `reference/vendor/<имя>`, иначе `reference/addons/<имя>`. `FORK-001`, если в оригинале есть файл, которого нет в моде. Префиксы `zzz`/`aaa` в имени не считаются пропажей. Файлы, которых нет в оригинале, не ловятся — это наши добавления. Без `vendor_source` проверка пропускается с одной строкой. Оригиналы форков держи в `reference/vendor/` — `fill_reference_addons` / `--prune` их не трогают (см. `docs/setup.md`).
+У форка (`vendor_fork=1`) ключ `vendor_source=<имя папки>` включает сверку состава: сначала `reference/vendor/<имя>`, иначе `reference/addons/<имя>`. `FORK-001`, если в оригинале есть файл, которого нет в моде. Префиксы `zzz`/`aaa` в имени не считаются пропажей. Файлы, которых нет в оригинале, не ловятся — это наши добавления. `vendor_omit=<путь>,<путь>` — осознанные пропуски (FORK молчит); для BusyHands full-file из `pack_bhs.VENDOR_FULL_FILES` опускаются автоматически. Без `vendor_source` проверка пропускается с одной строкой. Оригиналы форков держи в `reference/vendor/` — `fill_reference_addons` / `--prune` их не трогают (см. `docs/setup.md`).
+
+Моды, влитые в ядро (`reference/anthology/`): `core_identical=1` — байт-в-байт совпадение → CORE-001 вместо LUA-001; при расхождении → CORE-002. `core_supersedes=1` — намеренная замена устаревшей копии из ядра, LUA-001 не ставится.

@@ -31,6 +31,12 @@ GAME_TEXT_SUFFIXES = {".script", ".lua", ".ltx", ".xml", ".seq"}
 VERSION_RE = re.compile(r"^##\s*\[?v?(\d+\.\d+(?:\.\d+)?)\]?", re.M)
 
 SKIP_DIRS = {".git", ".cache", "__pycache__", "node_modules", ".idea", ".vs"}
+# Не игровые: не в эталон, не в FORK-001.
+IGNORABLE_FILE_NAMES = frozenset({"desktop.ini", "thumbs.db"})
+
+
+def is_ignorable_filename(name: str) -> bool:
+    return Path(name).name.lower() in IGNORABLE_FILE_NAMES
 
 
 def detect_version(addon_dir: Path) -> str:
@@ -120,11 +126,13 @@ def looks_like_utf8_cyrillic(data: bytes) -> bool:
 
 
 def iter_files(root: Path, suffixes: Iterable[str] | None = None) -> Iterator[Path]:
-    """Обходит дерево, пропуская служебные каталоги."""
+    """Обходит дерево, пропуская служебные каталоги и desktop.ini / Thumbs.db."""
     wanted = {s.lower() for s in suffixes} if suffixes else None
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
         for name in sorted(filenames):
+            if is_ignorable_filename(name):
+                continue
             path = Path(dirpath) / name
             if wanted is None or path.suffix.lower() in wanted:
                 yield path

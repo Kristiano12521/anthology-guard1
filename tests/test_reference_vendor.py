@@ -51,7 +51,30 @@ class ResolveVendorSourceTests(unittest.TestCase):
 
 
 class FillLeavesVendorAloneTests(unittest.TestCase):
-    def test_fill_reference_does_not_touch_vendor(self):
+    def test_fill_reference_skips_desktop_ini(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            game = root / "game"
+            db = game / "db"
+            reference = root / "reference"
+            archive = db / "pack.db0"
+            archive.parent.mkdir(parents=True)
+            archive.write_bytes(
+                build_uncompressed_archive(
+                    {
+                        "scripts\\hello.script": b"-- hi",
+                        "scripts\\desktop.ini": b"[.ShellClassInfo]\n",
+                    }
+                )
+            )
+            code, out = run_fill(game, reference)
+            self.assertEqual(code, 0, msg=out)
+            self.assertTrue(
+                (reference / "anomaly" / "scripts" / "hello.script").is_file()
+            )
+            self.assertFalse(
+                (reference / "anomaly" / "scripts" / "desktop.ini").exists()
+            )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             game = root / "game"

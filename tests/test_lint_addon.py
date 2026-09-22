@@ -482,6 +482,102 @@ class Fork001Tests(unittest.TestCase):
             self.assertIn("vendor_source", hit[0].message)
             self.assertNotIn("gone.script", hit[0].message)
 
+    def test_vendor_omit_skips_listed_paths(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            origin = root / "reference" / "vendor" / self.ORIGIN
+            self._write(origin / "scripts" / "core.script", "core")
+            self._write(origin / "scripts" / "skipped.script", "skip")
+            self._write(origin / "scripts" / "desktop.ini", "[.ShellClassInfo]\n")
+            addon = _minimal_addon(
+                root,
+                "fork_mod",
+                meta_extra=(
+                    f"vendor_fork=1\nvendor_source={self.ORIGIN}\n"
+                    "vendor_omit=scripts/skipped.script\n"
+                ),
+            )
+            self._write(addon / "gamedata" / "scripts" / "core.script", "core")
+            hit = self._fork001(addon, root / "reference")
+            self.assertEqual(hit, [], msg=[f.format() for f in hit])
+
+    def test_desktop_ini_in_origin_is_ignored(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            origin = root / "reference" / "addons" / self.ORIGIN
+            self._write(origin / "scripts" / "core.script", "core")
+            self._write(origin / "scripts" / "desktop.ini", "[.ShellClassInfo]\n")
+            self._write(origin / "Thumbs.db", "thumb")
+            addon = _minimal_addon(
+                root,
+                "fork_mod",
+                meta_extra=f"vendor_fork=1\nvendor_source={self.ORIGIN}\n",
+            )
+            self._write(addon / "gamedata" / "scripts" / "core.script", "core")
+            hit = self._fork001(addon, root / "reference")
+            self.assertEqual(hit, [], msg=[f.format() for f in hit])
+
+
+class CoreAbsorbedTests(unittest.TestCase):
+    def _lint_script(
+        self,
+        root: Path,
+        *,
+        meta_extra: str,
+        addon_body: bytes,
+        core_body: bytes | None,
+    ) -> list:
+        ref = root / "reference"
+        if core_body is not None:
+            core = ref / "anthology" / "scripts" / "fix_demo.script"
+            core.parent.mkdir(parents=True, exist_ok=True)
+            core.write_bytes(core_body)
+        addon = _minimal_addon(root, "fix_demo", meta_extra=meta_extra)
+        script = addon / "gamedata" / "scripts" / "fix_demo.script"
+        script.parent.mkdir(parents=True, exist_ok=True)
+        script.write_bytes(addon_body)
+        view = lint_addon.ReferenceView.load(ref, addon_root=root / "addon")
+        return [
+            f
+            for f in lint_addon.lint(addon, view, verify=False, reference_root=ref)
+            if f.code in {"LUA-001", "CORE-001", "CORE-002"}
+        ]
+
+    def test_core_identical_match_is_core_001(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            body = b"-- same\n"
+            hit = self._lint_script(
+                Path(tmp),
+                meta_extra="core_identical=1\n",
+                addon_body=body,
+                core_body=body,
+            )
+            self.assertEqual(len(hit), 1)
+            self.assertEqual(hit[0].code, "CORE-001")
+            self.assertIn("совпадает", hit[0].message)
+
+    def test_core_identical_mismatch_is_core_002(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            hit = self._lint_script(
+                Path(tmp),
+                meta_extra="core_identical=1\n",
+                addon_body=b"-- addon 1.0.2\n",
+                core_body=b"-- core 1.0.1\n",
+            )
+            self.assertEqual(len(hit), 1)
+            self.assertEqual(hit[0].code, "CORE-002")
+            self.assertIn("разошлось", hit[0].message)
+
+    def test_core_supersedes_silences_lua_001(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            hit = self._lint_script(
+                Path(tmp),
+                meta_extra="core_supersedes=1\n",
+                addon_body=b"-- newer\n",
+                core_body=b"-- older\n",
+            )
+            self.assertEqual(hit, [], msg=[f.format() for f in hit])
+
 
 class CrossModTests(unittest.TestCase):
     _CMO_DIR = Path("gamedata") / "configs" / "plugins" / "context_menu_overhaul"
