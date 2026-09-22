@@ -3,6 +3,12 @@
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 Записи старше месяца — в [`CHANGELOG-archive.md`](CHANGELOG-archive.md).
 
+## [0.1.73] — fill_reference: `.xdbN` и слой builtin
+
+`tools/xdb_unpack.is_db_archive` принимал `.db`/`.dbN`/`.xdb`, но не `.xdb0`/`.xdb1`/… — на свежей Anthology в `reference/anomaly` попадали только 147 файлов из `00_modded_exes_gamedata.db0`, а ваниль/`configs_anthology` в `.xdb0` пропускались. Теперь ищутся `.db`/`.dbN`/`.xdb`/`.xdbN`.
+
+`fill_reference`: классификация трёх слоёв — без `anthology` в пути → `anomaly/`; с `anthology` → `anthology/`; `db/mods/*.xdbN` → новый `reference/builtin/` (влитые в инсталлятор моды вроде MCM/Sota UI; не ваниль и не ядро Anthology). Порядок записи и `refindex`: anomaly ← anthology ← builtin ← addons. В конце — блок «По архивам:» с числом файлов из каждого. Тесты; `docs/setup.md`, README, prompts.
+
 ## [0.1.72] — список сигнатур, ожидающих подтверждения
 
 `docs/awaiting-confirmation.md` — 9 позиций из CHANGELOG модов с пометкой «чужой лог» / Discord-скрины без наших cards: 8 гардов `fix_nil_crash_guards` + `fix_create_squad_nil_smart`. По каждой: что искать в логе, мод, источник, смысл отсутствия/появления. Команда `/logfull` (файл не было — создан) и шаг в `/crash`: при разборе чужого лога сверяться со списком. `docs/prompts.md` — ссылка на `/logfull`.

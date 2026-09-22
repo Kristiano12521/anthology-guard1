@@ -73,17 +73,20 @@ class ArchiveKindTests(unittest.TestCase):
             root = Path(tmp)
             db0 = root / "scripts.db0"
             xdb = root / "pack.xdb"
+            xdb0 = root / "configs.xdb0"
+            xdb12 = root / "pack.xdb12"
             plain = root / "pack.db"
             txt = root / "readme.txt"
-            db0.write_bytes(b"x")
-            xdb.write_bytes(b"x")
-            plain.write_bytes(b"x")
-            txt.write_bytes(b"x")
+            for path in (db0, xdb, xdb0, xdb12, plain, txt):
+                path.write_bytes(b"x")
             self.assertTrue(xdb_unpack.is_db_archive(db0))
             self.assertTrue(xdb_unpack.is_db_archive(xdb))
+            self.assertTrue(xdb_unpack.is_db_archive(xdb0))
+            self.assertTrue(xdb_unpack.is_db_archive(xdb12))
             self.assertTrue(xdb_unpack.is_db_archive(plain))
             self.assertFalse(xdb_unpack.is_db_archive(txt))
             self.assertFalse(xdb_unpack.is_db_archive(root / "missing.db0"))
+            self.assertFalse(xdb_unpack.is_db_archive(root / "notes.xdbo"))
 
     def test_find_archives_nested_sorted(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -92,12 +95,17 @@ class ArchiveKindTests(unittest.TestCase):
             (db / "textures").mkdir()
             first = db / "configs" / "ai.db0"
             second = db / "textures" / "textures.db1"
+            xdb = db / "configs" / "configs.xdb0"
             extra = db / "note.txt"
             first.write_bytes(b"a")
             second.write_bytes(b"b")
-            extra.write_bytes(b"c")
+            xdb.write_bytes(b"c")
+            extra.write_bytes(b"d")
             found = [p.relative_to(db).as_posix() for p in xdb_unpack.find_archives(db)]
-            self.assertEqual(found, ["configs/ai.db0", "textures/textures.db1"])
+            self.assertEqual(
+                found,
+                ["configs/ai.db0", "configs/configs.xdb0", "textures/textures.db1"],
+            )
 
 
 class RoundTripTests(unittest.TestCase):

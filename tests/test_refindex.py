@@ -48,6 +48,7 @@ class SourceRankTests(unittest.TestCase):
     def test_kind_from_reference_child(self):
         self.assertEqual(refindex.source_kind("reference/anomaly/scripts/axr_main.script"), "anomaly")
         self.assertEqual(refindex.source_kind("reference/anthology/scripts/x.script"), "anthology")
+        self.assertEqual(refindex.source_kind("reference/builtin/scripts/x.script"), "builtin")
         self.assertEqual(refindex.source_kind("reference/addons/mod/scripts/x.script"), "addons")
         self.assertEqual(refindex.source_kind("reference/docs/readme.md"), "other")
 
@@ -63,6 +64,7 @@ class SourceRankTests(unittest.TestCase):
     def test_labels(self):
         self.assertEqual(refindex.source_label("reference/anomaly/scripts/x.script"), "ваниль")
         self.assertEqual(refindex.source_label("reference/anthology/scripts/x.script"), "anthology")
+        self.assertEqual(refindex.source_label("reference/builtin/scripts/x.script"), "builtin")
         self.assertEqual(refindex.source_label("reference/addons/mod/scripts/x.script"), "аддон")
         self.assertEqual(refindex.source_label("reference/misc/x.script"), "прочее")
 
@@ -70,13 +72,14 @@ class SourceRankTests(unittest.TestCase):
         paths = [
             "reference/addons/foo/scripts/a.script",
             "reference/docs/note.md",
+            "reference/builtin/scripts/a.script",
             "reference/anthology/scripts/a.script",
             "reference/anomaly/scripts/a.script",
         ]
         ranked = sorted(paths, key=lambda p: (refindex.source_priority(p), p))
         self.assertEqual(
             [refindex.source_kind(p) for p in ranked],
-            ["anomaly", "anthology", "addons", "other"],
+            ["anomaly", "anthology", "builtin", "addons", "other"],
         )
 
     def test_rank_entries_sorts_by_path_then_line_within_source(self):

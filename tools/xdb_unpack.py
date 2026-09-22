@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Распаковка архивов X-Ray / Anomaly (.db / .dbN / .xdb).
+"""Распаковка архивов X-Ray / Anomaly (.db / .dbN / .xdb / .xdbN).
 
 TOC — chunk id 1, при флаге CFS_COMPRESS сжат LZHUF. Полезные данные файлов
 лежат по абсолютному смещению `ptr` в файле архива: без сжатия, если
 size_real == size_compr, иначе LZO1X без фрейма (как rtc_decompress).
 
-Anomaly на диске почти всегда `name.db0`, `name.db1`, … — суффикс `.dbN`,
-не `.db`. Реже встречаются `.db` и `.xdb`. Формат один.
+Anomaly на диске: `name.db0` / `name.db1` / … или `name.xdb0` / … —
+суффикс `.dbN` / `.xdbN`, не обязательно голое `.db` / `.xdb`. Формат один.
 
     python3 tools/xdb_unpack.py path/to/scripts.db0 --list
-    python3 tools/xdb_unpack.py path/to/scripts.db0 --out unpacked/
+    python3 tools/xdb_unpack.py path/to/scripts.xdb0 --out unpacked/
     python3 tools/xdb_unpack.py path/to/scripts.db0 --out unpacked/ --filter scripts/
 """
 
@@ -442,17 +442,21 @@ def parse_toc(toc: bytes) -> list[TocEntry]:
 
 
 def is_db_archive(path: Path) -> bool:
-    """Anomaly: `.db0`/`.db1`/… ; реже `.db` и `.xdb`."""
+    """Anomaly: `.db`/`.dbN` и `.xdb`/`.xdbN` (в т.ч. configs.xdb0)."""
     if not path.is_file():
         return False
     suffix = path.suffix.lower()
     if suffix in {".db", ".xdb"}:
         return True
-    return suffix.startswith(".db") and suffix[3:].isdigit()
+    if suffix.startswith(".db") and suffix[3:].isdigit():
+        return True
+    if suffix.startswith(".xdb") and suffix[4:].isdigit():
+        return True
+    return False
 
 
 def find_archives(root: Path) -> list[Path]:
-    """Все .db/.dbN/.xdb под root, стабильный порядок."""
+    """Все .db/.dbN/.xdb/.xdbN под root, стабильный порядок."""
     found = [path for path in root.rglob("*") if is_db_archive(path)]
     return sorted(found)
 
@@ -568,7 +572,7 @@ def unpack_archive(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Распаковка .db/.dbN/.xdb архивов Anomaly (LZHUF TOC, LZO1X payload)"
+        description="Распаковка .db/.dbN/.xdb/.xdbN архивов Anomaly (LZHUF TOC, LZO1X payload)"
     )
     parser.add_argument("archive", type=Path, help="файл архива")
     parser.add_argument("--out", type=Path, help="куда писать файлы")

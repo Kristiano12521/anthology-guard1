@@ -68,8 +68,8 @@ python3 tools/build_addon.py my_fix_weapon_jam --zip
 | --- | --- |
 | `tools/xraylog.py <log> [--archive]` | сжимает лог игры в карточку вылета: класс ошибки, стек, warning'и. `--archive` пишет копию в `logs/cards/YYYY-MM-DD_<имя>.md`; чистая сессия («вылета в логе нет») — только с `--archive-clean` |
 | `tools/prune_logs.py [--dry-run\|--yes] [--keep N]` | оставляет N самых свежих `logs/*.log` (по умолчанию 3). Без `--yes` ничего не удаляет. `logs/samples/` не трогает |
-| `tools/xdb_unpack.py <archive> [--list\|--out]` | распаковка `.db`/`.dbN`/`.xdb`: TOC через LZHUF, файлы через LZO1X |
-| `tools/fill_reference.py <игра> [--dry-run]` | наполняет `reference/anomaly/` и `reference/anthology/` из `<игра>/db`: только `scripts/`, `configs/`, `text/`, `materials/` |
+| `tools/xdb_unpack.py <archive> [--list\|--out]` | распаковка `.db`/`.dbN`/`.xdb`/`.xdbN`: TOC через LZHUF, файлы через LZO1X |
+| `tools/fill_reference.py <игра> [--dry-run]` | наполняет `reference/anomaly/`, `anthology/`, `builtin/` из `<игра>/db`: только `scripts/`, `configs/`, `text/`, `materials/` |
 | `tools/fill_reference_addons.py <MO2> [--dry-run] [--profile] [--prune] [--include-own]` | наполняет `reference/addons/` из включённых модов MO2 (`modlist.txt` профиля). Тот же набор каталогов. Свои сборки по маркеру пропускает; `--include-own` включает. `--prune` без `--yes` ничего не удаляет |
 | `tools/check_installed.py [MO2] [--reinstall] [--no-mtime]` | сверка установленных пакетов (`BUILD_INFO.txt` в `mods/`) с `addon/`: устарел / актуален / не установлен; пути к zip в `build/` для переустановки. MO2: аргумент, `ANTHOLOGY_MO2` или `local.json`. SKIP/SEPARATE не считаются пропавшими. В CI, после clone (узкий разброс mtime) и при `--no-mtime` сравнение пропускается |
 | `tools/refindex.py build\|find\|section\|callback\|stats` | индекс по `reference/`: проверка, что функция/секция/callback реально существуют |

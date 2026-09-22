@@ -166,24 +166,26 @@ class Index:
         return close
 
 
-# Порядок истины внутри reference/: anomaly → anthology → addons → прочее.
+# Порядок истины внутри reference/: anomaly → anthology → builtin → addons → прочее.
 # docs/setup.md. На выводе, не в .cache/refindex.json.
 _SOURCE_RANK = {
     "anomaly": 0,
     "anthology": 1,
-    "addons": 2,
+    "builtin": 2,
+    "addons": 3,
 }
 _SOURCE_LABEL = {
     "anomaly": "ваниль",
     "anthology": "anthology",
+    "builtin": "builtin",
     "addons": "аддон",
     "other": "прочее",
 }
-_SOURCE_PRINT_ORDER = ("anomaly", "anthology", "addons", "other")
+_SOURCE_PRINT_ORDER = ("anomaly", "anthology", "builtin", "addons", "other")
 
 
 def source_kind(relpath: str) -> str:
-    """Ключ источника по пути внутри reference/: anomaly / anthology / addons / other."""
+    """Ключ источника: anomaly / anthology / builtin / addons / other."""
     parts = relpath.replace("\\", "/").split("/")
     known = _SOURCE_RANK
     try:
@@ -200,7 +202,7 @@ def source_kind(relpath: str) -> str:
 
 def source_priority(relpath: str) -> int:
     """Чем меньше число, тем раньше строка в find / section / callback."""
-    return _SOURCE_RANK.get(source_kind(relpath), 3)
+    return _SOURCE_RANK.get(source_kind(relpath), 4)
 
 
 def source_label(relpath: str) -> str:

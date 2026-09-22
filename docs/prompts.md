@@ -12,7 +12,7 @@
 
 ## Развёртывание на новой машине
 
-Первый шаг — наполнить `reference/anomaly/` и `reference/anthology/` из `db/` игры, затем `reference/addons/` из включённых модов MO2. `reference/docs/` — руками.
+Первый шаг — наполнить `reference/anomaly/`, `anthology/`, `builtin/` из `db/` игры, затем `reference/addons/` из включённых модов MO2. `reference/docs/` — руками.
 
 ```bash
 python3 tools/fill_reference.py "<папка игры>" --dry-run

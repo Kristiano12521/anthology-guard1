@@ -75,6 +75,37 @@ class PathFilterTests(unittest.TestCase):
 
 
 class ClassifyTests(unittest.TestCase):
+    def test_three_buckets(self):
+        db = Path("C:/game/db")
+        self.assertEqual(
+            fill_reference.classify_archive(db / "configs" / "configs.xdb0", db),
+            "anomaly",
+        )
+        self.assertEqual(
+            fill_reference.classify_archive(db / "configs" / "scripts.xdb0", db),
+            "anomaly",
+        )
+        self.assertEqual(
+            fill_reference.classify_archive(
+                db / "configs" / "configs_anthology.xdb0", db
+            ),
+            "anthology",
+        )
+        self.assertEqual(
+            fill_reference.classify_archive(
+                db / "configs" / "scripts_anthology.xdb0", db
+            ),
+            "anthology",
+        )
+        self.assertEqual(
+            fill_reference.classify_archive(db / "mods" / "mcm.xdb0", db),
+            "builtin",
+        )
+        self.assertEqual(
+            fill_reference.classify_archive(db / "mods" / "sota_ui.xdb0", db),
+            "builtin",
+        )
+
     def test_anthology_in_filename(self):
         db = Path("C:/game/db")
         self.assertEqual(
@@ -90,6 +121,14 @@ class ClassifyTests(unittest.TestCase):
         db = Path("/game/db")
         archive = db / "packs_anthology" / "scripts.db0"
         self.assertEqual(fill_reference.classify_archive(archive, db), "anthology")
+
+    def test_mods_without_nested_stays_anomaly(self):
+        db = Path("C:/game/db")
+        # имя с mods, но не каталог db/mods/
+        self.assertEqual(
+            fill_reference.classify_archive(db / "configs" / "mods_extra.xdb0", db),
+            "anomaly",
+        )
 
 
 class FillPipelineTests(unittest.TestCase):
@@ -158,6 +197,85 @@ class FillPipelineTests(unittest.TestCase):
         dest = self.reference / "anthology" / "scripts" / "anth.script"
         self.assertTrue(dest.exists(), msg=out)
         self.assertFalse((self.reference / "anomaly" / "scripts" / "anth.script").exists())
+
+    def test_xdb0_archive_is_found(self):
+        self._put_archive(
+            "configs/configs.xdb0",
+            {"configs\\items\\a.ltx": b"[a]\n"},
+        )
+        code, out = run_fill(self.game, self.reference)
+        self.assertEqual(code, 0, msg=out)
+        self.assertTrue(
+            (self.reference / "anomaly" / "configs" / "items" / "a.ltx").exists(),
+            msg=out,
+        )
+        self.assertIn("configs/configs.xdb0", out)
+
+    def test_mods_xdb0_goes_to_builtin(self):
+        self._put_archive(
+            "mods/mcm.xdb0",
+            {"scripts\\mcm.script": b"-- mcm"},
+        )
+        code, out = run_fill(self.game, self.reference)
+        self.assertEqual(code, 0, msg=out)
+        self.assertTrue(
+            (self.reference / "builtin" / "scripts" / "mcm.script").exists(),
+            msg=out,
+        )
+        self.assertFalse((self.reference / "anomaly" / "scripts" / "mcm.script").exists())
+        self.assertFalse((self.reference / "anthology" / "scripts" / "mcm.script").exists())
+
+    def test_same_path_layers_stay_separate_anthology_wins_for_tools(self):
+        """Ваниль и Anthology пишут в разные деревья; оба файла сохраняются."""
+        self._put_archive(
+            "configs/configs.xdb0",
+            {"configs\\system.ltx": b"vanilla\n"},
+        )
+        self._put_archive(
+            "configs/configs_anthology.xdb0",
+            {"configs\\system.ltx": b"anthology\n"},
+        )
+        code, out = run_fill(self.game, self.reference)
+        self.assertEqual(code, 0, msg=out)
+        self.assertEqual(
+            (self.reference / "anomaly" / "configs" / "system.ltx").read_bytes(),
+            b"vanilla\n",
+        )
+        self.assertEqual(
+            (self.reference / "anthology" / "configs" / "system.ltx").read_bytes(),
+            b"anthology\n",
+        )
+
+    def test_later_archive_overwrites_within_bucket(self):
+        self._put_archive("a_first.db0", {"scripts\\shared.script": b"first"})
+        self._put_archive("z_second.db0", {"scripts\\shared.script": b"second"})
+        code, out = run_fill(self.game, self.reference)
+        self.assertEqual(code, 0, msg=out)
+        self.assertEqual(
+            (self.reference / "anomaly" / "scripts" / "shared.script").read_bytes(),
+            b"second",
+        )
+
+    def test_archive_summary_printed(self):
+        self._put_archive(
+            "configs/configs.xdb0",
+            {"configs\\a.ltx": b"[a]\n"},
+        )
+        self._put_archive(
+            "configs/configs_anthology.xdb0",
+            {"configs\\b.ltx": b"[b]\n"},
+        )
+        self._put_archive(
+            "mods/mcm.xdb0",
+            {"scripts\\mcm.script": b"-- mcm"},
+        )
+        code, out = run_fill(self.game, self.reference)
+        self.assertEqual(code, 0, msg=out)
+        self.assertIn("По архивам:", out)
+        self.assertIn("configs/configs.xdb0  ->  anomaly: 1", out)
+        self.assertIn("configs/configs_anthology.xdb0  ->  anthology: 1", out)
+        self.assertIn("mods/mcm.xdb0  ->  builtin: 1", out)
+        self.assertIn("reference/builtin/ 1", out)
 
     def test_idempotent_second_run(self):
         self._put_archive(

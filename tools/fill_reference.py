@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
-"""Наполняет reference/anomaly/ и reference/anthology/ из db-архивов игры.
+"""Наполняет reference/anomaly/, anthology/, builtin/ из db-архивов игры.
 
-Ищет .db / .dbN / .xdb в <игра>/db (включая вложенные), читает TOC через
-xdb_unpack, пишет только scripts/, configs/, text/, materials/. Текстуры,
-модели, звуки, шейдеры и уровни пропускаются. reference/addons/ не трогает —
-аддоны ставятся из MO2 отдельно.
+Ищет .db / .dbN / .xdb / .xdbN в <игра>/db (включая вложенные), читает TOC
+через xdb_unpack, пишет только scripts/, configs/, text/, materials/.
+Текстуры, модели, звуки, шейдеры и уровни пропускаются. reference/addons/
+не трогает — аддоны ставятся из MO2 отдельно.
 
-Куда класть архив: если в относительном пути от db/ есть «anthology» —
-в reference/anthology/, иначе в reference/anomaly/. Это имя файла/папки,
-не содержимое архива: ваниль и Anthology в одном инстансе различаются
-архивами вроде scripts.db0 vs scripts_anthology.db0.
+Куда класть архив (по относительному пути от db/ и имени файла):
+  * «anthology» в пути/имени → reference/anthology/
+  * первый каталог mods/ → reference/builtin/ (моды, влитые в инсталлятор;
+    не ваниль и не патчи ядра Anthology вроде configs_anthology.xdb0)
+  * иначе → reference/anomaly/
+
+Один и тот же путь в разных деревьях: anomaly / anthology / builtin
+лежат раздельно; инструменты читают их как слои
+(anomaly ← anthology ← builtin ← addons), как в игре. Внутри одного
+дерева поздний архив (сортировка: слой, затем путь) перезаписывает
+ранний.
 
     python3 tools/fill_reference.py "C:/games/Anomaly"
     python3 tools/fill_reference.py "C:/games/Anomaly" --dry-run
@@ -31,21 +38,29 @@ KEEP_DIRS = ("scripts", "configs", "text", "materials")
 ADDONS_DIR_NAME = "addons"
 DEFAULT_REFERENCE = REPO_ROOT / "reference"
 
+# Порядок как в игре: ваниль → ядро Anthology → влитые моды db/mods/.
+BUCKET_ORDER = ("anomaly", "anthology", "builtin")
+BUCKET_RANK = {name: index for index, name in enumerate(BUCKET_ORDER)}
+
 
 def classify_archive(archive: Path, db_root: Path) -> str:
-    """'anthology' если в пути от db/ есть anthology, иначе 'anomaly'."""
+    """'anthology' | 'builtin' | 'anomaly' по пути от db/ и имени файла."""
     try:
         relative = archive.resolve().relative_to(db_root.resolve())
     except ValueError:
         relative = Path(archive.name)
-    parts = [archive.stem.lower(), *[p.lower() for p in relative.parts]]
-    if any("anthology" in part for part in parts):
+    rel_parts = [p.lower() for p in relative.parts]
+    name_parts = [archive.stem.lower(), *rel_parts]
+    if any("anthology" in part for part in name_parts):
         return "anthology"
+    # db/mods/<pack>.xdb0 — третьи стороны, вшитые в сборку.
+    if len(rel_parts) >= 2 and rel_parts[0] == "mods":
+        return "builtin"
     return "anomaly"
 
 
 def dest_relative(entry_name: str) -> str | None:
-    """Путь внутри anomaly/ или anthology/, либо None — файл не для reference/.
+    """Путь внутри anomaly/|anthology/|builtin/, либо None — не для reference/.
 
     Берётся первый каталог scripts|configs|text|materials в пути. Префикс
     gamedata/ отбрасывается вместе со всем, что левее. Каталоги (хвост \\
@@ -74,6 +89,16 @@ def resolve_db_dir(game: Path) -> Path:
     if not db_dir.is_dir():
         raise FileNotFoundError(f"нет папки db/ в {game}")
     return db_dir
+
+
+def sort_archives(archives: list[Path], db_root: Path) -> list[Path]:
+    """Слой (anomaly→anthology→builtin), затем путь — поздний перекрывает."""
+
+    def key(path: Path) -> tuple[int, str]:
+        bucket = classify_archive(path, db_root)
+        return (BUCKET_RANK.get(bucket, 99), path.as_posix().lower())
+
+    return sorted(archives, key=key)
 
 
 def write_if_changed(dest: Path, data: bytes) -> str:
@@ -127,15 +152,24 @@ def fill_reference(
     reference_root: Path,
     *,
     dry_run: bool = False,
-) -> tuple[dict[str, int], list[str]]:
+) -> tuple[dict[str, int], list[str], list[tuple[str, str, int]]]:
+    """counts, skips, per_archive [(shown, bucket, kept_count), ...]."""
     db_root = resolve_db_dir(game)
-    archives = xdb_unpack.find_archives(db_root)
-    counts = {"anomaly": 0, "anthology": 0, "written": 0, "unchanged": 0, "archives": 0}
+    archives = sort_archives(xdb_unpack.find_archives(db_root), db_root)
+    counts = {
+        "anomaly": 0,
+        "anthology": 0,
+        "builtin": 0,
+        "written": 0,
+        "unchanged": 0,
+        "archives": 0,
+    }
     skips: list[str] = []
+    per_archive: list[tuple[str, str, int]] = []
 
     if not archives:
         print(f"в {db_root} архивов .db/.xdb не найдено")
-        return counts, skips
+        return counts, skips, per_archive
 
     addons_root = (reference_root / ADDONS_DIR_NAME).resolve()
 
@@ -163,6 +197,7 @@ def fill_reference(
             shown = archive.resolve().relative_to(db_root.resolve()).as_posix()
         except ValueError:
             shown = archive.name
+        per_archive.append((shown, bucket, len(kept)))
         action = "будет" if dry_run else "взято"
         print(
             f"{shown}  ->  reference/{bucket}/  "
@@ -172,19 +207,28 @@ def fill_reference(
             for relative in kept:
                 print(f"  {relative}")
 
-    return counts, skips
+    return counts, skips, per_archive
 
 
 def print_summary(
-    counts: dict[str, int], skips: list[str], *, dry_run: bool
+    counts: dict[str, int],
+    skips: list[str],
+    per_archive: list[tuple[str, str, int]],
+    *,
+    dry_run: bool,
 ) -> None:
-    total = counts["anomaly"] + counts["anthology"]
+    total = counts["anomaly"] + counts["anthology"] + counts["builtin"]
     verb = "попало бы" if dry_run else "легло"
     print()
+    if per_archive:
+        print("По архивам:")
+        for shown, bucket, kept in per_archive:
+            print(f"  {shown}  ->  {bucket}: {kept}")
     print(
         f"Итого {verb} {total} файлов: "
         f"reference/anomaly/ {counts['anomaly']}, "
-        f"reference/anthology/ {counts['anthology']} "
+        f"reference/anthology/ {counts['anthology']}, "
+        f"reference/builtin/ {counts['builtin']} "
         f"(архивов просмотрено: {counts['archives']})."
     )
     if not dry_run:
@@ -201,7 +245,9 @@ def print_summary(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Наполнить reference/anomaly и reference/anthology из db/ игры"
+        description=(
+            "Наполнить reference/anomaly, anthology и builtin из db/ игры"
+        )
     )
     parser.add_argument("game", type=Path, help="папка установленной игры (внутри ожидается db/)")
     parser.add_argument(
@@ -222,11 +268,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"нет папки игры: {game}", file=sys.stderr)
         return 2
     try:
-        counts, skips = fill_reference(game, args.reference, dry_run=args.dry_run)
+        counts, skips, per_archive = fill_reference(
+            game, args.reference, dry_run=args.dry_run
+        )
     except FileNotFoundError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    print_summary(counts, skips, dry_run=args.dry_run)
+    print_summary(counts, skips, per_archive, dry_run=args.dry_run)
     return 0
 
 
