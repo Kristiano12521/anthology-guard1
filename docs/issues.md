@@ -19,6 +19,33 @@
 
 ---
 
+## [issue] nikit 2026-09-22: сессия Rostok Factory → Topi (динамика)
+
+- дата: 2026-09-22
+- мод: пакет фиксов в MO2 (79 без отказов + 6 с известными `guard NOT installed`); уровни `la14_rostok_factory`, `topi`; старт 21:38; штатный выход (`InternalCloseLog`), FATAL/STACK TRACEBACK нет
+- итог: **динамика / baseline** — класс `вылета в логе нет`. Wrap/guard встали и работали: BHS патчи, RVR heal, gigant quarantine (×~28 id), stale fetch cleared (orphan_no_engine), sound skip `tb_growls`, DRX/hostage reclaim, taskboard wrappers, aol sprint skip `stop_hud_motion`. Известный шум без динамики: `Alive!` minigun ×80 (WITHDRAWN), `item_combination | wrong section names` ×8 (WITHDRAWN), MCM `EA_settings/*`, `invalid script_anim_part 255` / FDDA `stop_hud_motion`. Не в логе (не в MO2 / WITHDRAWN): `fix_minigun_dead_parent`, `fix_item_combination_magnifiers`, `fix_bhs_fdda_loot`. Новые сторонние сигнатуры — см. `hidebone_comp` и `milpda` ниже.
+- карточка: [2026-09-22_xray_nikit.md](../logs/cards/2026-09-22_xray_nikit.md) (источник appdata `xray_nikit.log`)
+- pitfalls: нет
+- подробности: нет
+
+## [issue] `Cannot open file … hidebone_comp.script` / `function hidebone_comp.bind is not loaded!`
+
+- дата: 2026-09-22
+- мод: сторонний вызов `hidebone_comp.bind` при actor-spawn; файла `hidebone_comp.script` в runtime нет
+- итог: **чужой аддон / неполная установка** — не наш фикс; ×2 на загрузку актора, FATAL нет
+- карточка: [2026-09-22_xray_nikit.md](../logs/cards/2026-09-22_xray_nikit.md)
+- pitfalls: нет
+- подробности: нет
+
+## [issue] `!MCM given bad path:milpda/…`
+
+- дата: 2026-09-22
+- мод: Military PDA / MCM (`milpdagen/kiltrak`, `cfg_device_pda_*/enabled`, …)
+- итог: **чужой MCM-шум** — мёртвые пути в чужом `mcm_paths`; FATAL нет. Рядом тот же класс: `beef_nvg/nvg_gain_*`, `ui_popup_messages/apm_main/float_height`
+- карточка: [2026-09-22_xray_nikit.md](../logs/cards/2026-09-22_xray_nikit.md)
+- pitfalls: нет
+- подробности: нет
+
 ## [issue] softlock PDA Объявление — клик по заданию (accept)
 
 - дата: 2026-09-20
