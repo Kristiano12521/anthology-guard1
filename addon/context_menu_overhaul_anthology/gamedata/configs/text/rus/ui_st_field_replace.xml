@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<!-- MCM -->
+	<string id="ui_mcm_menu_field_replace">
+		<text>Замена в поле</text>
+	</string>
+
+	<string id="ui_mcm_field_replace_min_cond_gain">
+		<text>Минимальная разница в состоянии</text>
+	</string>
+
+	<string id="ui_mcm_field_replace_min_cond_gain_desc">
+		<text>Минимальная разница в состоянии, необходимая для замены текущей детали оружия деталью из инвентаря</text>
+	</string>
+
+	<string id="ui_mcm_field_replace_wep_part_min_cond">
+		<text>Минимальное состояние детали оружия</text>
+	</string>
+
+	<string id="ui_mcm_field_replace_wep_part_min_cond_desc">
+		<text>Детали оружия с состоянием не ниже этого значения не будут заменяться</text>
+	</string>
+
+	<string id="ui_mcm_field_replace_enable_log">
+		<text>Включить журнал</text>
+	</string>
+
+	<!-- In-game -->
+	<string id="st_ctx_menu_field_replace">
+		<text>заменить в поле</text>
+	</string>
+
+	<string id="st_news_field_replace">
+		<text>Заменены детали:</text>
+	</string>
+</string_table>

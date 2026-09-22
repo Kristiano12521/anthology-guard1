@@ -1,0 +1,57 @@
+-- Field Replace MCM
+-- Defaults must match get_config fallbacks in this file.
+
+local default = {
+	min_cond_gain = 5,
+	wep_part_min_cond = 90,
+	enable_log = false,
+}
+
+function get_config(key)
+	if ui_mcm then
+		return ui_mcm.get("field_replace/" .. key)
+	end
+	return default[key]
+end
+
+function on_mcm_load()
+	return {
+		id = "field_replace",
+		sh = true,
+		gr = {
+			{
+				id = "title",
+				type = "slide",
+				link = "ui_options_slider_player",
+				text = "ui_mcm_menu_field_replace",
+				size = {512, 50},
+				spacing = 20,
+			},
+			{
+				id = "min_cond_gain",
+				type = "track",
+				val = 2,
+				min = 0,
+				max = 100,
+				step = 1,
+				def = default.min_cond_gain,
+			},
+			{
+				id = "wep_part_min_cond",
+				type = "track",
+				val = 2,
+				min = 0,
+				max = 100,
+				step = 1,
+				def = default.wep_part_min_cond,
+			},
+			{ type = "line" },
+			{
+				id = "enable_log",
+				type = "check",
+				val = 1,
+				def = default.enable_log,
+			},
+		},
+	}
+end

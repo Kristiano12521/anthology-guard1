@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<!-- MCM -->
+	<string id="ui_mcm_menu_field_replace">
+		<text>Field Replace</text>
+	</string>
+
+	<string id="ui_mcm_field_replace_min_cond_gain">
+		<text>Minimum Condition Gain</text>
+	</string>
+
+	<string id="ui_mcm_field_replace_min_cond_gain_desc">
+		<text>Minimum condition difference required for an inventory part to replace the weapon's current part</text>
+	</string>
+
+	<string id="ui_mcm_field_replace_wep_part_min_cond">
+		<text>Minimum Weapon Part Condition</text>
+	</string>
+
+	<string id="ui_mcm_field_replace_wep_part_min_cond_desc">
+		<text>Weapon parts at or above this condition will not be replaced</text>
+	</string>
+
+	<string id="ui_mcm_field_replace_enable_log">
+		<text>Enable log</text>
+	</string>
+
+	<!-- In-game -->
+	<string id="st_ctx_menu_field_replace">
+		<text>field replace</text>
+	</string>
+
+	<string id="st_news_field_replace">
+		<text>Replaced parts:</text>
+	</string>
+</string_table>

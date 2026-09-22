@@ -1,0 +1,342 @@
+-- Field Replace Ч вшит в Context Menu Overhaul Anthology.
+-- Upstream: Field_Replace_v1.6 (https://www.moddb.com/mods/stalker-anomaly/addons/field-replace)
+-- Depends: custom_functor_autoinject (в сборке). »конки: mod_menu_field_replace.ltx.
+
+local LOG_TAG = "[field_replace]"
+local VERSION = "1.6.0"
+local FUNCTOR_NAME = "field_replace"
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+--#region MCM
+
+local CONFIG = {}
+
+local function load_mcm_settings()
+	local get_config = field_replace_mcm.get_config
+
+	CONFIG.min_cond_gain = get_config("min_cond_gain")
+	CONFIG.wep_part_min_cond = get_config("wep_part_min_cond")
+	CONFIG.enable_log = get_config("enable_log")
+end
+
+local function on_option_change()
+	load_mcm_settings()
+end
+
+--#endregion
+
+--#region Helper
+
+local news_msg = ""
+
+local function ronny_log(level, fmt, ...)
+	if not CONFIG.enable_log then
+		return
+	end
+	printf("[FIELD REPLACE] [%s] %s", level, string.format(fmt, ...))
+end
+
+local function is_replacable(wep)
+	return IsWeapon(wep) and not IsMelee(wep)
+end
+
+-- Without defer, refresh is inconsistent
+local function refresh_inventory()
+	CreateTimeEvent("field_replace", "ui_refresh_defer", 0.1, function()
+		local gui = ui_inventory.GUI
+		if gui and gui:IsShown() then
+			ronny_log("DEBUG", "=========== Refreshing Inventory ===========\n")
+			gui:UpdateItems()
+		end
+		return true
+	end)
+end
+
+--#endregion
+
+--#region Filter parts
+
+local function get_wep_parts(wep)
+	local sec = wep:section()
+	sec = ini_sys:r_string_ex(sec, "parent_section") or sec
+
+	local parts = itms_manager.ini_parts:r_string_ex("con_parts_list", sec)
+	parts = parts and str_explode(parts, ",")
+
+	local parts_con = item_parts.get_parts_con(wep, nil, true)
+	local result = {}
+	if not parts or not parts_con then
+		return result
+	end
+
+	for i = 1, #parts do
+		local part = parts[i]
+		local cond = parts_con[part]
+		result[part] = utils_item.get_cond_static(cond)
+		ronny_log("DEBUG", "WEP PART: %s | COND: %s", part, tostring(cond))
+	end
+
+	return result
+end
+
+local function need_replacement(part_name, cond)
+	if string.find(part_name, "barrel", 1, true) then
+		ronny_log("DEBUG", "SKIP BARREL: %s", part_name)
+		return false
+	end
+
+	if cond >= CONFIG.wep_part_min_cond then
+		ronny_log(
+			"DEBUG",
+			"SKIP: %s | COND: %s >= minimum %s",
+			part_name,
+			tostring(cond),
+			tostring(CONFIG.wep_part_min_cond)
+		)
+		return false
+	end
+
+	return true
+end
+
+local function filter_wep_parts(parts)
+	local result = {}
+	for part, cond in pairs(parts) do
+		if need_replacement(part, cond) then
+			result[part] = cond
+		end
+	end
+	return result
+end
+
+--#endregion
+
+--#region Decide
+
+local function update_best_inv_part(best_parts, obj, sec, cond)
+	local current_best = best_parts[sec]
+	if not current_best or cond > current_best.cond then
+		best_parts[sec] = {
+			obj = obj,
+			cond = cond,
+		}
+		ronny_log("DEBUG", "INV PART: %s | BEST COND: %s", sec, tostring(cond))
+	end
+end
+
+local function find_best_inv_parts_for(parts)
+	local result = {}
+
+	local inventory = ui_inventory.GUI
+	if not inventory then
+		return result
+	end
+
+	local cc_a = inventory.CC and inventory.CC["actor_bag"]
+	if cc_a and cc_a.indx_sec then
+		for sec in pairs(parts) do
+			local ids = cc_a.indx_sec[sec]
+			if ids then
+				for id in pairs(ids) do
+					local obj = level.object_by_id(id)
+					if obj then
+						local cond = math.floor(obj:condition() * 100)
+						ronny_log("DEBUG", "INV PART: %s | COND: %s", sec, tostring(cond))
+						update_best_inv_part(result, obj, sec, cond)
+					end
+				end
+			end
+		end
+	end
+
+	local box = inventory.GetPartner and inventory:GetPartner()
+	if inventory.mode == "loot" and box and IsInvbox(box) then
+		box:iterate_inventory_box(function(_, obj)
+			local sec = obj:section()
+			if parts[sec] then
+				local cond = math.floor(obj:condition() * 100)
+				ronny_log("DEBUG", "CONTAINER PART: %s | COND: %s", sec, tostring(cond))
+				update_best_inv_part(result, obj, sec, cond)
+			end
+		end)
+	end
+
+	return result
+end
+
+local function is_worth_replace(candidate, cond)
+	return candidate.cond >= cond + CONFIG.min_cond_gain
+end
+
+local function build_replacement(candidate, cond)
+	return {
+		current_condition = cond,
+		replacement = candidate.obj,
+		replacement_condition = candidate.cond,
+	}
+end
+
+local function find_replacements(wep)
+	local wep_parts = get_wep_parts(wep)
+
+	local parts_to_replace = filter_wep_parts(wep_parts)
+	if not next(parts_to_replace) then
+		ronny_log("DEBUG", "NOTHING TO REPLACE")
+		return
+	end
+
+	local best_parts = find_best_inv_parts_for(parts_to_replace)
+
+	local replacements = {}
+	for part, cond in pairs(parts_to_replace) do
+		local candidate = best_parts[part]
+		if candidate and is_worth_replace(candidate, cond) then
+			ronny_log("DEBUG", "WEP PART: %s | BEST CAND: %s", part, tostring(candidate.cond))
+			replacements[part] = build_replacement(candidate, cond)
+		end
+	end
+
+	return replacements
+end
+
+--#endregion
+
+--#region Apply parts
+
+local function install_part(wep_parts_con, part_name, new_cond)
+	wep_parts_con[part_name] = new_cond
+	ronny_log("INFO", "INSTALL: %s | COND: %s", part_name, tostring(new_cond))
+end
+
+local function swap_part(wep_parts_con, part_name, old_cond, new_cond, replacement)
+	wep_parts_con[part_name] = new_cond
+	replacement:set_condition(old_cond / 100)
+	ronny_log(
+		"INFO",
+		"SWAP: %s | OLD COND: %s%% | NEW COND: %s%%",
+		part_name,
+		tostring(old_cond),
+		tostring(new_cond)
+	)
+end
+
+local function replace_part(wep_parts_con, part_name, data)
+	local old_cond = data.current_condition
+	local new_cond = data.replacement_condition
+	local replacement = data.replacement
+
+	ronny_log(
+		"INFO",
+		"PROCESS: %s | OLD COND: %s%% | NEW COND: %s%%",
+		part_name,
+		tostring(old_cond),
+		tostring(new_cond)
+	)
+
+	if old_cond == -1 then
+		install_part(wep_parts_con, part_name, new_cond)
+		news_msg = string.format("%s \\n - Install: %s", news_msg, ui_item.get_sec_name(part_name))
+		alife_release_id(replacement:id())
+	else
+		swap_part(wep_parts_con, part_name, old_cond, new_cond, replacement)
+		news_msg = string.format(
+			"%s \\n - Swap: %s | %s%% -> %s%%",
+			news_msg,
+			ui_item.get_sec_name(part_name),
+			tostring(old_cond),
+			tostring(new_cond)
+		)
+	end
+end
+
+local function replace_wep_parts(wep, replacements)
+	local id = wep:id()
+	local wep_parts_con = item_parts.get_parts_con(wep, nil, true)
+	if not wep_parts_con then
+		ronny_log("INFO", "ABORT: no parts data on weapon id=%s", tostring(id))
+		return
+	end
+
+	for part, data in pairs(replacements) do
+		replace_part(wep_parts_con, part, data)
+	end
+
+	item_parts.set_parts_con(id, wep_parts_con)
+end
+
+--#endregion
+
+local function action_replace_parts(wep)
+	local replacements = find_replacements(wep)
+
+	news_msg = game.translate_string("st_news_field_replace")
+	if not replacements or not next(replacements) then
+		return
+	end
+
+	replace_wep_parts(wep, replacements)
+
+	news_manager.send_tip(db.actor, news_msg, nil, "disassemble", 6000)
+	news_msg = ""
+
+	refresh_inventory()
+end
+
+local function functor_condition(obj, _, mode)
+	if not is_replacable(obj) then
+		return false
+	end
+	return mode == "inventory" or mode == "loot"
+end
+
+-- String id (not pre-translated): CMO Anthology label_icons / groups / capitalize.
+local function functor_name()
+	return "st_ctx_menu_field_replace"
+end
+
+local function get_functor()
+	return custom_functor_autoinject
+end
+
+local function register_functors()
+	local Functor = get_functor()
+	if not (Functor and type(Functor.add_functor) == "function") then
+		printf("%s custom_functor_autoinject unavailable - guard NOT installed", LOG_TAG)
+		return
+	end
+
+	Functor.add_functor(
+		FUNCTOR_NAME,
+		functor_condition,
+		functor_name,
+		nil,
+		action_replace_parts,
+		true
+	)
+	printf("%s functor registered", LOG_TAG)
+end
+
+local function unregister_functors()
+	local Functor = get_functor()
+	if not (Functor and type(Functor.remove_functor) == "function") then
+		return
+	end
+	pcall(Functor.remove_functor, FUNCTOR_NAME)
+end
+
+function on_game_start()
+	load_mcm_settings()
+	register_functors()
+	RegisterScriptCallback("on_option_change", on_option_change)
+end
+
+function on_game_load()
+	load_mcm_settings()
+	register_functors()
+end
+
+function on_game_end()
+	unregister_functors()
+	UnregisterScriptCallback("on_option_change", on_option_change)
+end

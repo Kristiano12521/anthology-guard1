@@ -1,13 +1,30 @@
 CONTEXT MENU OVERHAUL 1.4.2 — ANTHOLOGY 2.1 ADAPTATION
 
-**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; ниже CMO / QAW / Mags / OPO / Exo / Toxic Air; старые ZIP адаптации выключить.
+**Требования:** Anomaly 1.5.3 / Anthology 2.1 / Modded Exes MT; ниже CMO / QAW / Mags / OPO / Exo / Toxic Air; старые ZIP адаптации и Field_Replace_v1.6 выключить.
 
 **Совместимость:** полная адаптация CMO — перезаписывает `scripts/context_menu_overhaul*.script`, `configs/plugins/context_menu_overhaul/menu.ltx` и `mod_menu_*.ltx`, тексты/иконки CMO. Оригинал CMO и старые ZIP адаптации выключить; в MO2 ниже CMO / QAW / Mags Redux / OPO / Exo / Toxic Air / Kristiano AIO. При совпадении путей с другим модом нужен патч или ручное слияние.
 
 **Удаление**
 
 - Отключить слот в MO2; новая игра не нужна. Перезагрузить сейв/игру, чтобы UI-хуки не остались от прошлой сессии.
-- Сейв не затрагивается. Retool'нутые магазины остаются обычными предметами. Пропадут расширенные пункты ПКМ.
+- Сейв не затрагивается. Retool'нутые магазины остаются обычными предметами. Пропадут расширенные пункты ПКМ. Field Replace: уже заменённые части остаются в штатном `parts`.
+
+v1.2.5 — 22.09.2026
+------------------------------------------------
+Вшит Field Replace v1.6 (ModDB) — пункт ПКМ «замена в поле» для огнестрела:
+свап/install изношенных частей из инвентаря или лут-контейнера.
+
+Файлы:
+- `scripts/field_replace.script`, `scripts/field_replace_mcm.script`
+- `configs/plugins/context_menu_overhaul/mod_menu_field_replace.ltx`
+  (`dynamic.field_replace` + `st_ctx_menu_field_replace` → `ui_cmo_screwdriver`)
+- `configs/text/eng|rus/ui_st_field_replace.xml`
+
+Адаптация под CMO Anthology: string id подписи, guard CFA, фикс MCM
+без `ui_mcm`. Отдельный аддон `field_replace` / ZIP Field_Replace_v1.6
+не нужны — выключить.
+
+Не затронуто: QAW, retool, OPO, остальная логика CMO.
 
 v1.2.4.1 — 22.09.2026
 ------------------------------------------------

@@ -1,10 +1,16 @@
 CONTEXT MENU OVERHAUL 1.4.2 — ANOMALY ANTHOLOGY 2.1 ADAPTATION
-Adaptation version: 1.2.2
-Date: 2026-08-29
+Adaptation version: 1.2.5
+Date: 2026-09-22
 
 *** This build includes an unofficial local fix layered on top of the
 *** original v1.2.1 BETA by its adapter. It is NOT an official update from
-*** that adapter. See CHANGELOG.txt for exactly what changed and why.
+*** that adapter. See CHANGELOG.md for exactly what changed and why.
+
+
+NEW IN 1.2.5
+------------
+Field Replace is built in: RMB on firearms swaps worn parts from
+inventory/loot. Do not install Field_Replace_v1.6 separately.
 
 
 NEW IN 1.2.2
