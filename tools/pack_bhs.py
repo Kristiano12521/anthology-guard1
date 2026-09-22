@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _common import detect_version  # noqa: E402
 from build_prune import BHS_MOD_ID, cleanup_before_build  # noqa: E402
-from lint_addon import read_vendor_source, vendor_source_folder  # noqa: E402
+from lint_addon import read_vendor_source, resolve_vendor_source  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 OUT_STEM = "Anthology_BusyHands_Stability_Fix"
@@ -50,7 +50,7 @@ MAIN_ZIP = "zzzzzz_anthology_busyhands_stability_fix.script"
 
 
 def reject_own_bhs_source(path: Path) -> None:
-    """Нельзя паковать из нашей же сборки — петля в reference/addons.
+    """Нельзя паковать из нашей же сборки — петля в reference/vendor|addons.
 
     BUILD_INFO.txt кладёт pack_bhs / build_addon в корень пакета. В эталоне
     после fill_reference_addons его обычно нет (копируется только gamedata/),
@@ -60,7 +60,8 @@ def reject_own_bhs_source(path: Path) -> None:
     if marker.is_file():
         raise SystemExit(
             f"BusyHands source is our own pack (BUILD_INFO.txt): {path}\n"
-            "Use the vendor folder in reference/addons/ without BUILD_INFO.txt."
+            "Use the original under reference/vendor/ (or reference/addons/) "
+            "without BUILD_INFO.txt."
         )
 
 
@@ -71,18 +72,19 @@ def bhs_source(repo: Path) -> Path:
         raise SystemExit(
             f"vendor_source missing in addon/{OVERLAY_MOD}/meta.ini (required for pack_bhs)"
         )
-    addons_root = repo / "reference" / "addons"
-    if not addons_root.is_dir():
-        raise SystemExit("reference/addons/ not found")
-    src = vendor_source_folder(addons_root, source_name)
-    if src is None:
+    reference_root = repo / "reference"
+    if not reference_root.is_dir():
+        raise SystemExit("reference/ not found")
+    if Path(source_name).name != source_name:
         raise SystemExit(
             f"vendor_source={source_name!r}: invalid folder name "
-            "(must be a single path component under reference/addons/)"
+            "(must be a single path component under reference/vendor/ or reference/addons/)"
         )
-    if not src.is_dir():
+    src = resolve_vendor_source(reference_root, source_name)
+    if src is None:
         raise SystemExit(
-            f"vendor_source={source_name}: нет папки reference/addons/{source_name}"
+            f"vendor_source={source_name}: нет папки "
+            f"reference/vendor/{source_name} и reference/addons/{source_name}"
         )
     reject_own_bhs_source(src)
     return src

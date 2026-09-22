@@ -13,7 +13,7 @@ zzz-префиксы у .ltx, анонимные callback'и, дубли DLTX-с
 
 Дополнительно предупреждает LUA-006/007 (контракт CreateTimeEvent в _g.script),
 LUA-008 (полный проход id 1..65534) и FORK-001 (у форка нет файлов оригинала
-из reference/addons/<vendor_source>/). LOG-001 (presence-строка для xraylog)
+из reference/vendor/<vendor_source>/ или reference/addons/<…>/). LOG-001 (presence-строка для xraylog)
 реализован, но отключён: 25 из 37 модов со скриптами не проходят порог >10.
 """
 
@@ -209,7 +209,7 @@ def is_vendor_fork(addon_dir: Path) -> bool:
 
 
 def read_vendor_source(addon_dir: Path) -> str | None:
-    """Имя папки оригинала в reference/addons/ из vendor_source, или None."""
+    """Имя папки оригинала из vendor_source (reference/vendor|addons/), или None."""
     for line in _meta_active_lines(addon_dir):
         match = VENDOR_SOURCE_RE.match(line)
         if not match:
@@ -243,11 +243,28 @@ def fork_match_key(relpath: str) -> str:
     return key_name
 
 
-def vendor_source_folder(addons_root: Path, name: str) -> Path | None:
-    """Папка оригинала, или None если имя не однокомпонентное."""
+VENDOR_DIR_NAME = "vendor"
+ADDONS_DIR_NAME = "addons"
+# Поиск оригинала форка: сначала постоянный vendor/, потом addons/ из MO2.
+VENDOR_SOURCE_SEARCH = (VENDOR_DIR_NAME, ADDONS_DIR_NAME)
+
+
+def vendor_source_folder(parent_root: Path, name: str) -> Path | None:
+    """Папка parent_root/<name>, или None если имя не однокомпонентное."""
     if not name or Path(name).name != name:
         return None
-    return addons_root / name
+    return parent_root / name
+
+
+def resolve_vendor_source(reference_root: Path, name: str) -> Path | None:
+    """Оригинал форка: reference/vendor/<name>, иначе reference/addons/<name>."""
+    if not name or Path(name).name != name:
+        return None
+    for folder in VENDOR_SOURCE_SEARCH:
+        candidate = reference_root / folder / name
+        if candidate.is_dir():
+            return candidate
+    return None
 
 
 def read_verified_date(addon_dir: Path) -> date | None:
@@ -687,7 +704,7 @@ class AddonLinter:
             self.findings.append(finding)
 
     def check_vendor_fork(self) -> None:
-        """FORK-001: у форка нет файлов, которые есть в оригинале reference/addons/."""
+        """FORK-001: у форка нет файлов, которые есть в оригинале (vendor/ → addons/)."""
         if not self.vendor_fork:
             return
         meta = self.dir / "meta.ini"
@@ -701,15 +718,21 @@ class AddonLinter:
                 meta_path,
             )
             return
-        addons_root = self.reference_root / "addons"
-        if not addons_root.is_dir():
-            return
-        source_dir = vendor_source_folder(addons_root, source_name)
-        if source_dir is None or not source_dir.is_dir():
+        if Path(source_name).name != source_name:
             self.add(
                 "FORK-001",
                 "warn",
-                f"vendor_source={source_name}: нет папки reference/addons/{source_name}",
+                f"vendor_source={source_name!r}: имя должно быть одним компонентом пути",
+                meta_path,
+            )
+            return
+        source_dir = resolve_vendor_source(self.reference_root, source_name)
+        if source_dir is None:
+            self.add(
+                "FORK-001",
+                "warn",
+                f"vendor_source={source_name}: нет папки "
+                f"reference/vendor/{source_name} и reference/addons/{source_name}",
                 meta_path,
             )
             return

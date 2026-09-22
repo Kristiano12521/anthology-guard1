@@ -174,7 +174,8 @@ class PackBhsTests(unittest.TestCase):
             pack_quiet(self.repo)
         msg = str(ctx.exception)
         self.assertIn("vendor_source=Anthology_BusyHands_Stability_Fix_v0_6_4", msg)
-        self.assertIn("нет папки reference/addons/", msg)
+        self.assertIn("reference/vendor/", msg)
+        self.assertIn("reference/addons/", msg)
 
     def test_build_info_lists_vendor_full_files_with_sizes(self):
         vendor = self.repo / "reference" / "addons" / VENDOR_NAME

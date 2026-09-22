@@ -1,7 +1,9 @@
 Third-party works in this repository. They are not licensed under LICENSE.
 
-`reference/` (Anomaly / Anthology / addons of the pack) is not stored in git
-and is not redistributed by this project.
+`reference/` (Anomaly / Anthology / addons of the pack / vendor originals) is
+not stored in git and is not redistributed by this project. Fork originals for
+pack_bhs / FORK-001 live in `reference/vendor/` on the developer machine only;
+see `docs/setup.md` and `reference/vendor/README.md`.
 
 addon/context_menu_overhaul_anthology
     Unofficial local fix on top of Context Menu Overhaul 1.4.2 adapted for
@@ -24,8 +26,8 @@ addon/burnshit_inventory_destroy
 
 addon/anthology_busyhands_stability_fix
     Stability overlay on vendor Busy Hands / MAG Redux. Vendor files are
-    packed from reference/addons at zip time and are not stored in git.
-    Original license is not stated in the tree.
+    packed from reference/vendor (fallback: reference/addons) at zip time and
+    are not stored in git. Original license is not stated in the tree.
 
 addon/quickqk_task_complete
     Rework of [GFX] QuickQK Task Status Tool Anthology from the pack.

@@ -39,13 +39,15 @@ SKIP = {
     "fix_minigun_dead_parent",  # withdrawn 1.1.1: registry guard ineffective
     "fix_item_combination_magnifiers",  # withdrawn 1.1.0: DLTX ! cannot delete keys with colon
     "diag_fetch_marker",  # diagnostic for stale fetch marker; fix_stale_fetch_marker stays in AIO
+    # В ядре Anthology (scripts_anthology) байт в байт с addon/ 1.0.2 — дубль в AIO не нужен.
+    "fix_kupol_wrong_bone",
 }
 BHS_MOD_ID = "anthology_busyhands_stability_fix"
 
 AIO_NAME = "[DBG] Kristiano Fixes ALL IN ONE"
 # Package semver (not per-addon). Bump when the AIO zip contents change for testers.
 # Dates stay in BUILD_INFO `built:`; do not use date-as-version (rebuild ≠ new release).
-AIO_VERSION = "1.0.4"
+AIO_VERSION = "1.0.5"
 
 
 def copy_gamedata(source: Path, destination: Path) -> int:

@@ -4,7 +4,7 @@
 Ищет .db / .dbN / .xdb / .xdbN в <игра>/db (включая вложенные), читает TOC
 через xdb_unpack, пишет только scripts/, configs/, text/, materials/.
 Текстуры, модели, звуки, шейдеры и уровни пропускаются. reference/addons/
-не трогает — аддоны ставятся из MO2 отдельно.
+и reference/vendor/ не трогает — аддоны из MO2, оригиналы форков вручную.
 
 Куда класть архив (по относительному пути от db/ и имени файла):
   * «anthology» в пути/имени → reference/anthology/
@@ -36,11 +36,14 @@ from _common import REPO_ROOT  # noqa: E402
 
 KEEP_DIRS = ("scripts", "configs", "text", "materials")
 ADDONS_DIR_NAME = "addons"
+VENDOR_DIR_NAME = "vendor"
 DEFAULT_REFERENCE = REPO_ROOT / "reference"
 
 # Порядок как в игре: ваниль → ядро Anthology → влитые моды db/mods/.
 BUCKET_ORDER = ("anomaly", "anthology", "builtin")
 BUCKET_RANK = {name: index for index, name in enumerate(BUCKET_ORDER)}
+# fill пишет только сюда; vendor/ и addons/ не трогает.
+PROTECTED_REFERENCE_DIRS = frozenset({ADDONS_DIR_NAME, VENDOR_DIR_NAME})
 
 
 def classify_archive(archive: Path, db_root: Path) -> str:
@@ -172,6 +175,7 @@ def fill_reference(
         return counts, skips, per_archive
 
     addons_root = (reference_root / ADDONS_DIR_NAME).resolve()
+    vendor_root = (reference_root / VENDOR_DIR_NAME).resolve()
 
     for archive in archives:
         try:
@@ -182,9 +186,16 @@ def fill_reference(
             print(f"не архив X-Ray, пропуск {archive}: {exc}", file=sys.stderr)
             continue
 
+        if bucket in PROTECTED_REFERENCE_DIRS:
+            print(f"отказ писать в {bucket}/: {archive}", file=sys.stderr)
+            continue
+
         dest_root = (reference_root / bucket).resolve()
         if addons_root == dest_root or addons_root in dest_root.parents:
             print(f"отказ писать в {ADDONS_DIR_NAME}/: {archive}", file=sys.stderr)
+            continue
+        if vendor_root == dest_root or vendor_root in dest_root.parents:
+            print(f"отказ писать в {VENDOR_DIR_NAME}/: {archive}", file=sys.stderr)
             continue
 
         counts["archives"] += 1
@@ -239,7 +250,7 @@ def print_summary(
     summary = xdb_unpack.format_skip_summary(skips)
     if summary:
         print(summary)
-    print("Аддоны в reference/addons/ этот скрипт не трогает — их кладут из MO2 отдельно.")
+    print("Аддоны в reference/addons/ и оригиналы в reference/vendor/ этот скрипт не трогает.")
     print("Дальше: python3 tools/refindex.py build")
 
 

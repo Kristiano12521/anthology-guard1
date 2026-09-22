@@ -50,6 +50,7 @@ class SourceRankTests(unittest.TestCase):
         self.assertEqual(refindex.source_kind("reference/anthology/scripts/x.script"), "anthology")
         self.assertEqual(refindex.source_kind("reference/builtin/scripts/x.script"), "builtin")
         self.assertEqual(refindex.source_kind("reference/addons/mod/scripts/x.script"), "addons")
+        self.assertEqual(refindex.source_kind("reference/vendor/BusyHands/scripts/x.script"), "vendor")
         self.assertEqual(refindex.source_kind("reference/docs/readme.md"), "other")
 
     def test_kind_from_fixture_layout(self):
@@ -66,20 +67,27 @@ class SourceRankTests(unittest.TestCase):
         self.assertEqual(refindex.source_label("reference/anthology/scripts/x.script"), "anthology")
         self.assertEqual(refindex.source_label("reference/builtin/scripts/x.script"), "builtin")
         self.assertEqual(refindex.source_label("reference/addons/mod/scripts/x.script"), "аддон")
+        self.assertEqual(refindex.source_label("reference/vendor/mod/scripts/x.script"), "вендор")
         self.assertEqual(refindex.source_label("reference/misc/x.script"), "прочее")
 
     def test_priority_order(self):
         paths = [
             "reference/addons/foo/scripts/a.script",
+            "reference/vendor/bar/scripts/a.script",
             "reference/docs/note.md",
             "reference/builtin/scripts/a.script",
             "reference/anthology/scripts/a.script",
             "reference/anomaly/scripts/a.script",
         ]
         ranked = sorted(paths, key=lambda p: (refindex.source_priority(p), p))
+        kinds = [refindex.source_kind(p) for p in ranked]
+        self.assertEqual(kinds[:3], ["anomaly", "anthology", "builtin"])
+        # addons и vendor — один ранг; порядок между ними по пути
+        self.assertEqual(set(kinds[3:5]), {"addons", "vendor"})
+        self.assertEqual(kinds[5], "other")
         self.assertEqual(
-            [refindex.source_kind(p) for p in ranked],
-            ["anomaly", "anthology", "builtin", "addons", "other"],
+            refindex.source_priority("reference/addons/x.script"),
+            refindex.source_priority("reference/vendor/x.script"),
         )
 
     def test_rank_entries_sorts_by_path_then_line_within_source(self):

@@ -166,26 +166,28 @@ class Index:
         return close
 
 
-# Порядок истины внутри reference/: anomaly → anthology → builtin → addons → прочее.
-# docs/setup.md. На выводе, не в .cache/refindex.json.
+# Порядок истины внутри reference/: anomaly → anthology → builtin → addons/vendor → прочее.
+# vendor и addons — один ранг (слепки форков vs живые моды MO2). docs/setup.md.
 _SOURCE_RANK = {
     "anomaly": 0,
     "anthology": 1,
     "builtin": 2,
     "addons": 3,
+    "vendor": 3,
 }
 _SOURCE_LABEL = {
     "anomaly": "ваниль",
     "anthology": "anthology",
     "builtin": "builtin",
     "addons": "аддон",
+    "vendor": "вендор",
     "other": "прочее",
 }
-_SOURCE_PRINT_ORDER = ("anomaly", "anthology", "builtin", "addons", "other")
+_SOURCE_PRINT_ORDER = ("anomaly", "anthology", "builtin", "addons", "vendor", "other")
 
 
 def source_kind(relpath: str) -> str:
-    """Ключ источника: anomaly / anthology / builtin / addons / other."""
+    """Ключ источника: anomaly / anthology / builtin / addons / vendor / other."""
     parts = relpath.replace("\\", "/").split("/")
     known = _SOURCE_RANK
     try:

@@ -15,14 +15,20 @@ reference/
 │  └─ materials/
 ├─ anthology/        gamedata ядра Anthology 2.1 (configs_anthology / scripts_anthology)
 ├─ builtin/          моды, влитые в инсталлятор (`db/mods/*.xdb0`: MCM, Sota UI, …)
-├─ addons/           gamedata ключевых аддонов сборки, по папке на аддон
+├─ addons/           gamedata ключевых аддонов сборки, по папке на аддон (из MO2)
+├─ vendor/           оригиналы форков (BusyHands, CMO, Campfires, Seamless, …) — вручную
 └─ docs/             README Modded Exes, заметки, распечатки вики
 ```
 
-Порядок именно такой: при конфликте одного и того же файла инструменты и агент должны понимать, что `anthology/` перекрывает `anomaly/`, `builtin/` — обоих, а `addons/` — всех трёх (реальный порядок задаётся движком/MO2, здесь это только соглашение).
+Порядок именно такой: при конфликте одного и того же файла инструменты и агент должны понимать, что `anthology/` перекрывает `anomaly/`, `builtin/` — обоих, а `addons/` / `vendor/` — всех трёх с одним рангом (реальный порядок задаётся движком/MO2, здесь это только соглашение).
 
 Текстуры, модели, звуки в `reference/` класть не нужно — они не помогают анализу и раздувают папку. Минимум: `scripts/`, `configs/`, `text/`, `materials/`.
 
+### `reference/vendor/` — оригиналы форков
+
+`fill_reference` и `fill_reference_addons` (включая `--prune`) **не пишут и не удаляют** эту папку. Сюда кладут слепки вендорских модов, на которых стоят наши форки (`vendor_source` в `meta.ini`): BusyHands Stability Fix, Context Menu Overhaul, Campfires placeable, Seamless Inventory Sort и т.п. Поиск `vendor_source`: сначала `reference/vendor/<имя>`, потом `reference/addons/<имя>`.
+
+В git содержимое `vendor/` **не хранится** (как и весь `reference/`): чужие работы, лицензии не заявлены или NC — см. корневой `NOTICE`. При переезде на другую машину **скопируй `reference/vendor/` руками** (или восстанови с бэкапа). Без неё `pack_bhs.py` и сверка `FORK-001` / LTX по CMO не соберутся / будут шуметь. В репозитории лежит только `reference/vendor/README.md` с напоминанием.
 ## Наполнение reference/
 
 Из установленной игры (папка, внутри которой есть `db/`):
@@ -45,7 +51,7 @@ python3 tools/refindex.py build
 Чего скрипт **не** делает:
 
 - Не копирует распакованную `gamedata/` с диска — это `fill_reference_addons.py` (см. ниже). В Anthology 2.1 основная масса исходников лежит модами MO2, не в `.db0`/`.xdb0`.
-- Не трогает `reference/addons/`.
+- Не трогает `reference/addons/` и `reference/vendor/`.
 - Не распаковывает форматы, кроме X-Ray с chunk 1 в TOC. Неопознанный файл печатается и пропускается.
 
 Из модов MO2 (папка самого менеджера, не профиля):
@@ -65,7 +71,7 @@ python3 tools/refindex.py build
 - Копирует из `<MO2>/mods/<имя>/gamedata/` только `scripts/`, `configs/`, `text/`, `materials/` в `reference/addons/<имя из modlist>/`. Имена со скобками и кириллицей берутся буквально, не через glob.
 - Свои сборки по умолчанию пропускаются: имя начинается с префикса из `AIO_NAME` / `SEPARATE` (`_pack_kristiano_aio.py`) или `OUT_STEM` (`pack_bhs.py`) — так ловятся и старые копии без `BUILD_INFO` и варианты с суффиксом `(NEW)`; либо есть `BUILD_INFO.txt`, `CONTENTS.txt` от Kristiano AIO, или в `meta.ini` notes/comments со `STALKER Anthology Dev` / `vendor_fork=1` / `installationFile` с путём на `Anthology/build`. `--include-own` копирует и их.
 - Повторный запуск идемпотентен (`write_if_changed`). `--dry-run` — сводка по модам и итог, без списка файлов.
-- `--prune` удаляет папки в `addons/`, которых нет среди включённых чужих модов (свои включённые тоже считаются лишними, если нет `--include-own`). По умолчанию выключено; без `--yes` печатает список к удалению и выходит, ничего не копируя и не удаляя.
+- `--prune` удаляет папки в `addons/`, которых нет среди включённых чужих модов (свои включённые тоже считаются лишними, если нет `--include-own`). По умолчанию выключено; без `--yes` печатает список к удалению и выходит, ничего не копируя и не удаляя. `reference/vendor/` prune не видит.
 
 Всё включённое идёт в `addons/`, не в `anthology/`: среди модов MO2 нет надёжного признака «ядро сборки vs аддон».
 

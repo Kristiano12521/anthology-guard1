@@ -5,7 +5,7 @@
 ModOrganizer.ini (selected_profile, включая @ByteArray с \\xNN).
 Копирует из mods/<имя>/gamedata/ только scripts/, configs/, text/,
 materials/ в reference/addons/<имя из modlist>/. reference/anthology/
-не трогает: ядро Anthology в этой сборке тоже лежит модами MO2.
+и reference/vendor/ не трогает (vendor — постоянные оригиналы форков).
 
 Свои сборки (BUILD_INFO.txt / meta notes / CONTENTS.txt от packers)
 по умолчанию не копируются — иначе lint видит addon/ как «замену себя».
@@ -35,6 +35,7 @@ from fill_reference import (  # noqa: E402
     ADDONS_DIR_NAME,
     DEFAULT_REFERENCE,
     KEEP_DIRS,
+    VENDOR_DIR_NAME,
     dest_relative,
     write_if_changed,
 )
@@ -499,6 +500,10 @@ def print_summary(
         print(summary)
     if prune:
         print_prune_preview(extra, would_delete=dry_run)
+    print(
+        f"reference/{VENDOR_DIR_NAME}/ этот скрипт не трогает "
+        "(оригиналы форков; см. docs/setup.md)."
+    )
     print("Дальше: python3 tools/refindex.py build")
 
 

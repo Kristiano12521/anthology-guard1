@@ -3,6 +3,14 @@
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 Записи старше месяца — в [`CHANGELOG-archive.md`](CHANGELOG-archive.md).
 
+## [0.1.74] — reference/vendor/: постоянные оригиналы форков
+
+`reference/vendor/` — слепки вендорских модов для форков; `fill_reference` / `fill_reference_addons` / `--prune` не пишут и не удаляют. `vendor_source` ищется сначала в `vendor/`, потом в `addons/` (`resolve_vendor_source`: pack_bhs, FORK-001). `ReferenceView` индексирует vendor → LTX-002 видит `menu.ltx` CMO после ручного копирования. `refindex`: метка «вендор», ранг как у addons.
+
+В git содержимое vendor не хранится (`NOTICE`: чужие работы / NC); в `.gitignore` разрешён только `reference/vendor/README.md`. Переезд: копировать `vendor/` руками (`docs/setup.md`).
+
+`burnshit`: `vendor_source` → `[GAM] Anthology Burn Shit Inventory Destroy Extension`. AIO 1.0.5: `fix_kupol_wrong_bone` в `SKIP` (байт в байт в ядре Anthology); `fix_ph_door_rx_reload` остаётся. Тесты `test_reference_vendor`.
+
 ## [0.1.73] — fill_reference: `.xdbN` и слой builtin
 
 `tools/xdb_unpack.is_db_archive` принимал `.db`/`.dbN`/`.xdb`, но не `.xdb0`/`.xdb1`/… — на свежей Anthology в `reference/anomaly` попадали только 147 файлов из `00_modded_exes_gamedata.db0`, а ваниль/`configs_anthology` в `.xdb0` пропускались. Теперь ищутся `.db`/`.dbN`/`.xdb`/`.xdbN`.
