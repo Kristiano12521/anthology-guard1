@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+
+	<!-- PDA tab button -->
+	<string id="pda_btn_active_missions">
+		<text>Missions</text>
+	</string>
+
+	<!-- Sidebar -->
+	<string id="ui_st_am_group_by">
+		<text>Group by</text>
+	</string>
+	<string id="ui_st_am_group_type">
+		<text>Type</text>
+	</string>
+	<string id="ui_st_am_group_region">
+		<text>Region</text>
+	</string>
+	<string id="ui_st_am_group_faction">
+		<text>Faction</text>
+	</string>
+	<string id="ui_st_am_group_all">
+		<text>All</text>
+	</string>
+	<string id="st_am_group_all">
+		<text>All missions</text>
+	</string>
+	<string id="st_am_active">
+		<text>active</text>
+	</string>
+	<string id="st_am_empty">
+		<text>No active missions.</text>
+	</string>
+
+	<!-- Tracked banner -->
+	<string id="ui_st_am_tracked_header">
+		<text>TRACKED MISSION</text>
+	</string>
+	<string id="st_am_nothing_tracked">
+		<text>Nothing tracked</text>
+	</string>
+
+	<!-- Card -->
+	<string id="ui_st_am_go_taskboard">
+		<text>Task board</text>
+	</string>
+	<string id="ui_st_am_back">
+		<text>Back</text>
+	</string>
+	<string id="ui_st_am_track">
+		<text>Track</text>
+	</string>
+	<string id="st_am_tracked">
+		<text>Tracked</text>
+	</string>
+	<string id="st_am_ready">
+		<text>Ready to hand in</text>
+	</string>
+	<string id="st_am_metres">
+		<text>m away</text>
+	</string>
+	<string id="st_am_offlevel">
+		<text>Another map</text>
+	</string>
+	<string id="st_am_no_briefing">
+		<text>No further details recorded.</text>
+	</string>
+
+	<!-- Card field labels -->
+	<string id="st_am_lbl_location">
+		<text>Location</text>
+	</string>
+	<string id="st_am_lbl_giver">
+		<text>From</text>
+	</string>
+	<string id="st_am_lbl_faction">
+		<text>Faction</text>
+	</string>
+	<string id="st_am_lbl_type">
+		<text>Type</text>
+	</string>
+
+	<!-- Item requirements, shown in an expanded briefing -->
+	<string id="st_am_needs">
+		<text>Needs</text>
+	</string>
+	<string id="st_am_carried">
+		<text>Carried</text>
+	</string>
+	<string id="st_am_stashed">
+		<text>In nearby stashes</text>
+	</string>
+	<string id="st_am_items">
+		<text>items</text>
+	</string>
+	<string id="st_am_unknown_region">
+		<text>Unknown region</text>
+	</string>
+	<string id="st_am_no_faction">
+		<text>Unaffiliated</text>
+	</string>
+
+	<!-- Mission types -->
+	<string id="st_am_type_story">
+		<text>Storyline</text>
+	</string>
+	<string id="st_am_type_fetch">
+		<text>Fetch</text>
+	</string>
+	<string id="st_am_type_delivery">
+		<text>Delivery</text>
+	</string>
+	<string id="st_am_type_bounty">
+		<text>Bounty</text>
+	</string>
+	<string id="st_am_type_hunt">
+		<text>Hunt</text>
+	</string>
+	<string id="st_am_type_assault">
+		<text>Assault</text>
+	</string>
+	<string id="st_am_type_defense">
+		<text>Defence</text>
+	</string>
+	<string id="st_am_type_rescue">
+		<text>Rescue</text>
+	</string>
+	<string id="st_am_type_survey">
+		<text>Survey</text>
+	</string>
+	<string id="st_am_type_stash">
+		<text>Stash</text>
+	</string>
+	<string id="st_am_type_payment">
+		<text>Payment</text>
+	</string>
+	<string id="st_am_type_spy">
+		<text>Espionage</text>
+	</string>
+	<string id="st_am_type_fate">
+		<text>Fate</text>
+	</string>
+	<string id="st_am_type_sabotage">
+		<text>Sabotage</text>
+	</string>
+	<string id="st_am_type_survival">
+		<text>Survival</text>
+	</string>
+	<string id="st_am_type_wait">
+		<text>Waiting</text>
+	</string>
+	<string id="st_am_type_other">
+		<text>Other</text>
+	</string>
+
+</string_table>

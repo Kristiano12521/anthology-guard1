@@ -1,0 +1,231 @@
+<w>
+	<main_wnd x="0" y="0" width="1024" height="768"/>
+
+	<!-- Content area of the PDA, matching the other script tabs. -->
+	<frame_main x="28" y="94" width="764" height="614">
+		<texture>ui_inGame2_pda_buttons_background</texture>
+	</frame_main>
+
+	<!-- ================= LEFT COLUMN =================
+	     Kept to 186 so the mission cards get the rest. The cards carry four
+	     lines of labelled text and were overflowing at the old width. -->
+
+	<frame_group x="0" y="0" width="186" height="86">
+		<texture>ui_inGame2_pda_buttons_background</texture>
+	</frame_group>
+
+	<group_caption x="8" y="3" width="170" height="18">
+		<text align="l" vert_align="c" font="letterica16" r="170" g="170" b="170">ui_st_am_group_by</text>
+	</group_caption>
+
+	<btn_group_type x="5" y="24" width="86" height="28" stretch="1">
+		<text align="c" vert_align="c" font="letterica16">ui_st_am_group_type</text>
+		<texture>ui_inGame2_pda_button</texture>
+		<text_color>
+			<t r="255" g="255" b="255"/>
+			<e r="200" g="200" b="200"/>
+			<h r="170" g="170" b="170"/>
+		</text_color>
+	</btn_group_type>
+
+	<btn_group_region x="95" y="24" width="86" height="28" stretch="1">
+		<text align="c" vert_align="c" font="letterica16">ui_st_am_group_region</text>
+		<texture>ui_inGame2_pda_button</texture>
+		<text_color>
+			<t r="255" g="255" b="255"/>
+			<e r="200" g="200" b="200"/>
+			<h r="170" g="170" b="170"/>
+		</text_color>
+	</btn_group_region>
+
+	<btn_group_faction x="5" y="55" width="86" height="28" stretch="1">
+		<text align="c" vert_align="c" font="letterica16">ui_st_am_group_faction</text>
+		<texture>ui_inGame2_pda_button</texture>
+		<text_color>
+			<t r="255" g="255" b="255"/>
+			<e r="200" g="200" b="200"/>
+			<h r="170" g="170" b="170"/>
+		</text_color>
+	</btn_group_faction>
+
+	<btn_group_all x="95" y="55" width="86" height="28" stretch="1">
+		<text align="c" vert_align="c" font="letterica16">ui_st_am_group_all</text>
+		<texture>ui_inGame2_pda_button</texture>
+		<text_color>
+			<t r="255" g="255" b="255"/>
+			<e r="200" g="200" b="200"/>
+			<h r="170" g="170" b="170"/>
+		</text_color>
+	</btn_group_all>
+
+	<!-- Hand-off to the task board. Only shown when we are sharing its tab. -->
+	<btn_taskboard x="5" y="92" width="176" height="24" stretch="1">
+		<text align="c" vert_align="c" font="letterica16">ui_st_am_go_taskboard</text>
+		<texture>ui_inGame2_pda_button</texture>
+		<text_color>
+			<t r="255" g="255" b="255"/>
+			<e r="200" g="200" b="200"/>
+			<h r="170" g="170" b="170"/>
+		</text_color>
+	</btn_taskboard>
+
+	<!-- Way out when the PDA's tab strip is hidden. Shares the slot above with
+	     btn_taskboard: the two are mutually exclusive, since sharing the board's
+	     tab means the strip is visible and this button is not needed. -->
+	<btn_back x="5" y="92" width="176" height="24" stretch="1">
+		<text align="c" vert_align="c" font="letterica16">ui_st_am_back</text>
+		<texture>ui_inGame2_pda_button</texture>
+		<text_color>
+			<t r="255" g="255" b="255"/>
+			<e r="200" g="200" b="200"/>
+			<h r="170" g="170" b="170"/>
+		</text_color>
+	</btn_back>
+
+	<summary_caption x="8" y="120" width="170" height="18">
+		<text align="l" vert_align="c" font="letterica16" r="150" g="150" b="150">summary</text>
+	</summary_caption>
+
+	<frame_categories x="0" y="142" width="186" height="470">
+		<texture>ui_inGame2_pda_buttons_background</texture>
+	</frame_categories>
+
+	<category_list x="4" y="146" width="178" height="462" item_height="44" can_select="1" always_show_scroll="0">
+		<font font="letterica16"/>
+	</category_list>
+
+	<!-- ================= CATEGORY ROW =================
+	     Two backgrounds: the rounded one from Custom iTheon's PDA Taskboard when
+	     it is installed, and a stock frame otherwise. Only one is ever built. -->
+
+	<cat_row x="0" y="0" width="176" height="44"/>
+
+	<cat_row_bg_custom x="0" y="0" width="174" height="42">
+		<texture>ui_inGame2_pda_taskboard_custom_background</texture>
+	</cat_row_bg_custom>
+
+	<cat_row_bg_stock x="0" y="0" width="174" height="42">
+		<texture>ui_inGame2_pda_buttons_background</texture>
+	</cat_row_bg_stock>
+
+	<cat_row_icon x="7" y="6" width="30" height="30" stretch="1">
+		<texture>ui_inGame2_PDA_icon_Secondary_mission</texture>
+	</cat_row_icon>
+
+	<cat_row_name x="43" y="0" width="128" height="42">
+		<text align="l" vert_align="c" font="letterica16" r="215" g="215" b="215">name</text>
+	</cat_row_name>
+
+	<!-- ================= RIGHT COLUMN: tracked banner + mission cards ====== -->
+
+	<!-- Same construction as a mission card, so the tracked mission reads as one
+	     of them rather than as a leftover strip. -->
+	<frame_tracked x="192" y="0" width="572" height="106">
+		<texture>ui_inGame2_pda_buttons_background</texture>
+	</frame_tracked>
+
+	<tracked_hit x="196" y="2" width="564" height="102" stretch="1">
+		<texture>ui_am_blank</texture>
+	</tracked_hit>
+
+	<tracked_caption x="204" y="4" width="300" height="16">
+		<text align="l" vert_align="c" font="letterica16" r="120" g="180" b="120">ui_st_am_tracked_header</text>
+	</tracked_caption>
+
+	<tracked_icon x="204" y="24" width="60" height="60" stretch="1">
+		<texture>ui_pda2_mtask_overlay</texture>
+	</tracked_icon>
+
+	<tracked_title x="274" y="22" width="476" height="22">
+		<text align="l" vert_align="c" font="letterica18" r="235" g="235" b="235">title</text>
+	</tracked_title>
+
+	<tracked_info x="274" y="44" width="476" height="58" complex_mode="1">
+		<text align="l" vert_align="t" font="letterica16" r="180" g="180" b="180">info</text>
+	</tracked_info>
+
+	<frame_tasks x="192" y="110" width="572" height="504">
+		<texture>ui_inGame2_pda_buttons_background</texture>
+	</frame_tasks>
+
+	<!-- vert_interval must stay 0: spare pooled cards shrink to zero height
+	     rather than being destroyed, and any interval would leave dead space
+	     for each one at the bottom of the list. Card spacing is built into the
+	     card height instead. -->
+	<task_list x="196" y="114" width="568" height="496"
+	           right_ident="0" left_ident="0" top_indent="2" bottom_indent="2"
+	           vert_interval="0" always_show_scroll="0"/>
+
+	<empty_caption x="206" y="134" width="548" height="24">
+		<text align="c" vert_align="c" font="letterica18" r="150" g="150" b="150">empty</text>
+	</empty_caption>
+
+	<!-- ================= MISSION CARD ================= -->
+
+	<card x="0" y="0" width="554" height="96"/>
+
+	<!-- Invisible click surface. Attached before the frame so the frame draws
+	     over it; statics and frames do not consume mouse events, so the click
+	     still lands here and the whole card stays clickable while showing only
+	     its border.
+	     Two textures were wrong before this one. ui_inGame2_pda_buttons_background
+	     is a 9-slice frame whose "_t" piece is its top edge, and a CUI3tButton
+	     reads "_t" as its touched state -- that painted every card with the
+	     frame's blue highlight. ui_inGame2_pda_button then made each card look
+	     like one enormous stretched tab. ui_am_blank is an empty cell in our own
+	     sheet: transparent in every state, so only the frame shows. -->
+	<card_hit x="0" y="0" width="550" height="92" stretch="1">
+		<texture>ui_am_blank</texture>
+	</card_hit>
+
+	<card_frame_custom x="0" y="0" width="550" height="92">
+		<texture>ui_inGame2_pda_taskboard_custom_background</texture>
+	</card_frame_custom>
+
+	<card_frame_stock x="0" y="0" width="550" height="92">
+		<texture>ui_inGame2_pda_buttons_background</texture>
+	</card_frame_stock>
+
+	<card_icon x="10" y="14" width="60" height="60" stretch="1">
+		<texture>ui_pda2_mtask_overlay</texture>
+	</card_icon>
+
+	<card_title x="80" y="6" width="392" height="22">
+		<text align="l" vert_align="c" font="letterica18" r="235" g="235" b="235">title</text>
+	</card_title>
+
+	<!-- One complex_mode block so the labels can be coloured inline, the way the
+	     task board colours NAME / Faction / Location. Four lines at letterica16
+	     need 60px; the old 344x56 was clipping both ways. -->
+	<card_info x="80" y="28" width="392" height="60" complex_mode="1">
+		<text align="l" vert_align="t" font="letterica16" r="180" g="180" b="180">info</text>
+	</card_info>
+
+	<card_btn_track x="478" y="33" width="68" height="26" stretch="1">
+		<text align="c" vert_align="c" font="letterica16">ui_st_am_track</text>
+		<texture>ui_inGame2_pda_button</texture>
+		<text_color>
+			<t r="255" g="255" b="255"/>
+			<!-- disabled: shown on the task that is already tracked -->
+			<d r="110" g="110" b="110"/>
+			<e r="200" g="200" b="200"/>
+			<h r="170" g="170" b="170"/>
+		</text_color>
+	</card_btn_track>
+
+	<!-- Box behind the expanded briefing. Height is set in script once the text
+	     has been measured, since it depends on how long the briefing is.
+	     Attached before card_descr so the text draws on top of it. -->
+	<card_descr_frame_custom x="8" y="96" width="534" height="40">
+		<texture>ui_inGame2_pda_taskboard_custom_background</texture>
+	</card_descr_frame_custom>
+
+	<card_descr_frame_stock x="8" y="96" width="534" height="40">
+		<texture>ui_inGame2_pda_buttons_background</texture>
+	</card_descr_frame_stock>
+
+	<card_descr x="20" y="103" width="512" height="18" complex_mode="1">
+		<text align="l" vert_align="t" font="letterica16" r="185" g="185" b="185">description</text>
+	</card_descr>
+
+</w>

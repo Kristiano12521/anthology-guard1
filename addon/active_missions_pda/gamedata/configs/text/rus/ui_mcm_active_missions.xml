@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+
+	<string id="ui_mcm_menu_active_missions">
+		<text>Активные задания (КПК)</text>
+	</string>
+
+	<string id="ui_mcm_active_missions_title">
+		<text>Активные задания — вкладка КПК</text>
+	</string>
+
+	<string id="ui_mcm_active_missions_default_group">
+		<text>Группировка по умолчанию</text>
+	</string>
+	<string id="ui_mcm_active_missions_default_group_desc">
+		<text>С какой группировки открывается вкладка «Задания».</text>
+	</string>
+
+	<string id="ui_mcm_active_missions_split_story">
+		<text>Сюжетные задания отдельной группой</text>
+	</string>
+	<string id="ui_mcm_active_missions_split_story_desc">
+		<text>При группировке по типу все сюжетные квесты попадают в группу «Сюжет», а не разносятся по видам заданий (поиск, доставка и т.п.).</text>
+	</string>
+
+	<string id="ui_mcm_active_missions_tabs_head">
+		<text>%c[255,205,205,205]Панель вкладок КПК:   %c[255,255,170,60]НУЖЕН ПЕРЕЗАПУСК ИГРЫ</text>
+	</string>
+	<string id="ui_mcm_active_missions_tab_second_position">
+		<text>Вкладка «Задания» рядом с картой</text>
+	</string>
+	<string id="ui_mcm_active_missions_tab_second_position_desc">
+		<text>На Anthology вкладка всегда в пейджере сразу после «Карты местности»; эта опция влияет на вставку кнопки в XML (рядом с картой или в конец ряда) на сборках без пейджера. Если вкладки чужого аддона ломаются — выключите опцию.</text>
+	</string>
+
+	<string id="ui_mcm_active_missions_save_tab_space">
+		<text>Задания внутри вкладки «Объявления»</text>
+	</string>
+	<string id="ui_mcm_active_missions_save_tab_space_desc">
+		<text>Не добавляет свою вкладку. Список активных заданий открывается во вкладке PDA Taskboard («Объявления»), а кнопка «Объявления» слева вверху ведёт на саму доску. Включайте, если полоса вкладок переполнена. Учтите: вкладка «Объявления» сначала покажет задания, а не доску. Нужен установленный PDA Taskboard. При Mod App Creator игнорируется — место уже есть в лаунчере.</text>
+	</string>
+
+	<string id="ui_mcm_active_missions_key_head">
+		<text>Необязательная горячая клавиша — открывает КПК сразу на вкладке «Задания».</text>
+	</string>
+	<string id="ui_mcm_active_missions_open_key">
+		<text>Открыть вкладку «Задания»</text>
+	</string>
+	<string id="ui_mcm_active_missions_open_key_desc">
+		<text>Оставьте неназначенной, чтобы пользоваться только кнопкой на панели вкладок.</text>
+	</string>
+	<string id="ui_mcm_active_missions_open_mod">
+		<text>Модификатор</text>
+	</string>
+
+	<string id="active_missions_default_group_lst_type">
+		<text>Тип</text>
+	</string>
+	<string id="active_missions_default_group_lst_region">
+		<text>Регион</text>
+	</string>
+	<string id="active_missions_default_group_lst_faction">
+		<text>Группировка</text>
+	</string>
+	<string id="active_missions_default_group_lst_all">
+		<text>Все</text>
+	</string>
+
+</string_table>

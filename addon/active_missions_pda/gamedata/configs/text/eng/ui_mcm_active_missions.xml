@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+
+	<string id="ui_mcm_menu_active_missions">
+		<text>Active Missions PDA Tab</text>
+	</string>
+
+	<string id="ui_mcm_active_missions_title">
+		<text>Active Missions - PDA tab</text>
+	</string>
+
+	<string id="ui_mcm_active_missions_default_group">
+		<text>Default grouping</text>
+	</string>
+	<string id="ui_mcm_active_missions_default_group_desc">
+		<text>Which grouping the Missions tab opens on.</text>
+	</string>
+
+	<string id="ui_mcm_active_missions_split_story">
+		<text>Storyline missions in their own group</text>
+	</string>
+	<string id="ui_mcm_active_missions_split_story_desc">
+		<text>When grouping by type, put every storyline quest under "Storyline" instead of sorting it by the kind of job it is.</text>
+	</string>
+
+	<string id="ui_mcm_active_missions_tabs_head">
+		<text>%c[255,205,205,205]PDA tab list alterations:   %c[255,255,170,60]REQUIRES RESTART OF GAME</text>
+	</string>
+	<string id="ui_mcm_active_missions_tab_second_position">
+		<text>Missions tab beside Area Map</text>
+	</string>
+	<string id="ui_mcm_active_missions_tab_second_position_desc">
+		<text>Puts the Missions tab in second place, right after Area Map, and shrinks the whole row by the smallest amount needed to fit it. Turn this off to append the tab at the far end of the row instead and leave every other tab exactly as it was - safer if another addon is also rearranging your tab strip, or if the tabs end up too narrow to read.</text>
+	</string>
+
+	<string id="ui_mcm_active_missions_save_tab_space">
+		<text>Put missions inside Taskboard tab</text>
+	</string>
+	<string id="ui_mcm_active_missions_save_tab_space_desc">
+		<text>Adds no tab of its own. Instead Active Missions lives inside the PDA Taskboard's tab, with a "Task board" button in the top left to reach the board itself. Use this if your tab strip is full and the tabs have gone too narrow to read. Note the Taskboard tab will open on Missions, not the board. Needs PDA Taskboard installed. Ignored when Mod App Creator is installed, since that already gives us a home without spending a tab.</text>
+	</string>
+
+	<string id="ui_mcm_active_missions_key_head">
+		<text>Optional hotkey - opens the PDA straight onto the Missions tab.</text>
+	</string>
+	<string id="ui_mcm_active_missions_open_key">
+		<text>Open Missions tab</text>
+	</string>
+	<string id="ui_mcm_active_missions_open_key_desc">
+		<text>Leave unbound to use the PDA tab button only.</text>
+	</string>
+	<string id="ui_mcm_active_missions_open_mod">
+		<text>Modifier</text>
+	</string>
+
+	<!-- List values. MCM builds these ids as <tree>_<option>_lst_<key> -- note
+	     there is NO ui_mcm_ prefix on this one, unlike every other MCM string. -->
+	<string id="active_missions_default_group_lst_type">
+		<text>Type</text>
+	</string>
+	<string id="active_missions_default_group_lst_region">
+		<text>Region</text>
+	</string>
+	<string id="active_missions_default_group_lst_faction">
+		<text>Faction</text>
+	</string>
+	<string id="active_missions_default_group_lst_all">
+		<text>All</text>
+	</string>
+
+</string_table>

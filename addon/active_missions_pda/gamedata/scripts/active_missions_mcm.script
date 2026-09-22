@@ -1,0 +1,55 @@
+-- MCM options for Active Missions.
+--
+-- Defaults here must match the fallbacks passed to
+-- active_missions_data.setting(), which is what the mod uses when MCM is absent.
+
+function on_mcm_load()
+	local gr = {
+		-- LuaFormatter off
+		{id = "title", type = "slide", link = "ui_options_slider_player", text = "ui_mcm_active_missions_title", size = {512, 50}, spacing = 20},
+
+		-- The second field of each pair is a short key, not a full string id.
+		-- MCM expands it to "ui_mcm_<tree>_<option>_lst_<key>" itself -- passing
+		-- a complete id here produced the doubled-up mess that showed on screen
+		-- instead of a readable label.
+		{id = "default_group", type = "list", val = 0, def = "type", content = {
+			{"type",    "type"},
+			{"region",  "region"},
+			{"faction", "faction"},
+			{"all",     "all"},
+		}},
+
+		{id = "split_story", type = "check", val = 1, def = true},
+
+		-- Both of these decide where the tab goes, which is settled when the PDA
+		-- layout XML is parsed -- so both need a restart, and they share one
+		-- heading that says so. No clr here on purpose: the heading colours
+		-- itself with inline codes, and clr would repaint the whole line.
+		{id = "line_tabs", type = "line"},
+		{id = "tabs_head", type = "desc", text = "ui_mcm_active_missions_tabs_head"},
+
+		-- On by default: next to Area Map is where it belongs. Turning it off
+		-- makes the injection edit nothing at all, which is the safe choice on a
+		-- PDA whose tab strip another mod is also rearranging.
+		{id = "tab_second_position", type = "check", val = 1, def = true},
+
+		-- Off by default: it moves where the Taskboard tab lands, which nobody
+		-- should get by surprise. Ignored when Mod App Creator is installed,
+		-- since the launcher already costs no tab.
+		{id = "save_tab_space", type = "check", val = 1, def = false},
+
+		{id = "line_key", type = "line"},
+		{id = "key_head", type = "desc", text = "ui_mcm_active_missions_key_head", clr = {255, 190, 190, 190}},
+		-- Unbound by default; the PDA tab button is the normal way in.
+		{id = "open_key", type = "key_bind", val = 2, def = -1},
+		{id = "open_mod", type = ui_mcm.kb_mod_radio, val = 2, def = 0, hint = "mcm_kb_modifier",
+			content = {{0, "mcm_kb_mod_none"}, {1, "mcm_kb_mod_shift"}, {2, "mcm_kb_mod_ctrl"}, {3, "mcm_kb_mod_alt"}}},
+		-- LuaFormatter on
+	}
+
+	return {
+		id = "active_missions",
+		sh = true,
+		gr = gr,
+	}
+end

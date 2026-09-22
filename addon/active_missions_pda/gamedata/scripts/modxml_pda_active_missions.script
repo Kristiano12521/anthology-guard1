@@ -1,0 +1,392 @@
+-- Adds the "Missions" button to the PDA tab strip at XML load time.
+--
+-- Anthology build note: when zzzz_pda_tabs_pager is present we inject the
+-- button only (no strip rescale). The pager override shipped with this addon
+-- lists eptActiveMissions in real_order so the tab is pageable.
+--
+--
+-- Doing it with DXML rather than shipping our own pda_16.xml means we do not
+-- fight whichever mod currently owns that file (Interactive 3D PDA Enhanced, at
+-- the time of writing) and we survive GAMMA updates that change it.
+--
+-- By default we land immediately to the right of "Area map" (eptTasks) -- the
+-- two task views belong together -- pushing everything after it one step right
+-- and scaling the row down only if that made it overflow. Turning off "Missions
+-- tab beside Area Map" appends past the last tab instead and edits nothing.
+--
+-- Earlier versions re-spaced every button evenly across the strip
+-- (spacing = width / n). That is what produced the crushed 40px tabs people
+-- reported: strips carrying tabs another mod had switched off with height="0"
+-- were divided by a tab count several higher than what was actually on screen.
+-- Hidden tabs are now excluded outright -- see patch().
+
+local TAB_ID    = "eptActiveMissions"
+local ANCHOR_ID = "eptTasks"   -- sit immediately after "Area map"
+
+-- Only used when a strip is too small to measure (a single button).
+local DEFAULT_OVERLAP = 11
+
+-- Filled in from the strip we are injecting into: x, width, height, an optional
+-- stretch flag, the caption's own attributes, the button skin, and the text
+-- colour block.
+local BUTTON_TEMPLATE = [[
+<button x="%d" y="0" width="%d" height="%s" id="eptActiveMissions" frame_mode="0"%s>
+	<text %s>pda_btn_active_missions</text>
+	<texture>%s</texture>
+	<text_color>
+%s
+	</text_color>
+</button>
+]]
+
+local FALLBACK_TEXTURE = "ui_inGame2_pda_button"
+
+-- Our own glyph, used only when the strip turns out to be icon-based -- see
+-- strip_style. Ships in this addon's atlas, so it needs nothing installed.
+local OWN_TAB_ICON = "ui_am_icon_group"
+
+-- Where the caption sits when there is no sibling to learn from.
+local DEFAULT_TEXT_ATTR = [[align="c" vert_align="c" x="0" y="0" font="letterica16"]]
+local FALLBACK_COLORS = table.concat({
+	[[		<t r="255" g="255" b="255"/>]],
+	[[		<d r="255" g="255" b="255"/>]],
+	[[		<e r="200" g="200" b="200"/>]],
+	[[		<h r="170" g="170" b="170"/>]],
+}, "\n")
+
+-- Everything about how the button looks is learned from the strip it is joining,
+-- because "what a PDA tab looks like" varies enormously between interfaces.
+--
+-- Returns: texture, colour block, caption attributes, stretch flag.
+--
+-- TEXTURE is the subtle one. The stock strip gives all nine buttons the same
+-- frame (ui_inGame2_pda_button) and copying a sibling is exactly right -- it is
+-- also what makes us match each PDA model's own skin, since pda_zero/one/two use
+-- ui_inGame0/1/3_pda_button. But icon-based interfaces, 3D PDA New Interface
+-- among them, give every tab its own picture instead. Copying a sibling there
+-- clones a neighbour: the Missions tab came out wearing Area Map's icon. So the
+-- strip is asked whether it agrees with itself first, and we only borrow a
+-- texture when it does. When it does not, we use our own glyph and stretch it
+-- into their button, whatever size that is.
+--
+-- CAPTION POSITION matters for the same reason. The stock strip centres the
+-- label on the button; icon strips put the icon in the button and push the label
+-- underneath with y="30". Hardcoding y="0" put our caption on top of the icon
+-- while every neighbour's sat below it.
+local function strip_style(xml_obj)
+	-- Texture: borrow only if the whole strip agrees on one.
+	local textures = {}
+	pcall(function()
+		for _, node in ipairs(xml_obj:query("tab button texture") or {}) do
+			local t = xml_obj:getText(node)
+			if (t and t ~= "") then
+				textures[#textures + 1] = t
+			end
+		end
+	end)
+
+	local texture, stretch = FALLBACK_TEXTURE, ""
+	if (#textures > 0) then
+		local agreed = true
+		for i = 2, #textures do
+			if (textures[i] ~= textures[1]) then
+				agreed = false
+				break
+			end
+		end
+
+		if (agreed) then
+			texture = textures[1]
+		else
+			-- Per-tab icons. Ours is 128px square and theirs is whatever it is,
+			-- so it has to scale to the button rather than draw at native size.
+			texture, stretch = OWN_TAB_ICON, [[ stretch="1"]]
+		end
+	end
+
+	-- Colours.
+	local lines = {}
+	for _, state in ipairs({ "t", "d", "e", "h" }) do
+		pcall(function()
+			local nodes = xml_obj:query("tab button text_color " .. state)
+			local attr = nodes and nodes[1] and xml_obj:getElementAttr(nodes[1])
+			if (attr and attr.r and attr.g and attr.b) then
+				lines[#lines + 1] = string.format([[		<%s r="%s" g="%s" b="%s"/>]],
+					state, tostring(attr.r), tostring(attr.g), tostring(attr.b))
+			end
+		end)
+	end
+
+	-- Caption attributes, copied wholesale off a sibling's <text> node.
+	local text_attr = DEFAULT_TEXT_ATTR
+	pcall(function()
+		local nodes = xml_obj:query("tab button text")
+		local attr = nodes and nodes[1] and xml_obj:getElementAttr(nodes[1])
+		if (attr) then
+			local parts = {}
+			for k, v in pairs(attr) do
+				-- width and height are deliberately not copied. The Area Map
+				-- button carries a stray width="157" inherited from vanilla in
+				-- several layouts, which would centre our caption over 157px
+				-- starting at our own x and shove it sideways. Left off, the
+				-- label takes the button's size -- which is what almost every
+				-- other button in every layout already does.
+				if (k ~= "width") and (k ~= "height") then
+					parts[#parts + 1] = string.format('%s="%s"', k, tostring(v))
+				end
+			end
+			if (#parts > 0) then
+				text_attr = table.concat(parts, " ")
+			end
+		end
+	end)
+
+	return texture,
+		(#lines > 0) and table.concat(lines, "\n") or FALLBACK_COLORS,
+		text_attr,
+		stretch
+end
+
+-- Candidate filenames: anything "ui\pda*.xml". Deliberately broad, because the
+-- PDA layout is not always pda.xml --
+--
+--   * pda_16.xml / pda_21.xml are the aspect-ratio variants;
+--   * Fatal Error gives each PDA model its own interface, declared as
+--     "interface = pda_zero / pda_one / pda" in mod_system_items_devices_fe.ltx,
+--     and swaps to it at runtime with SetPdaXml. Interactive 3D PDA Enhanced
+--     supplies the matching pda_zero_16 / pda_one_16 / pda_two_16 layouts, each
+--     carrying its own full copy of the tab strip.
+--
+-- Matching only pda.xml / pda_NN.xml meant the tab button was missing on every
+-- PDA model except the top one. The filename cannot tell these apart from the
+-- PDA sub-windows (pda_tasks, pda_relations, pda_taskboard...), which share the
+-- prefix -- and pda_relations.xml even has a <tab> of its own -- so the real
+-- test is done on content, in patch(): no eptTasks button, not a tab strip.
+local function is_pda_layout(name)
+	if type(name) ~= "string" then
+		return false
+	end
+	name = name:lower():gsub("/", "\\")
+	return name:match([[ui\pda[%w_]*%.xml$]]) ~= nil
+end
+
+-- This injector is the last resort, and stands down whenever there is a proper
+-- way in -- running two of them would produce two Missions tabs.
+--
+--   * Mod App Creator collects addons into a PDA launcher so they stop
+--     competing for strip space. If it is installed we register as an app
+--     instead (see zzz_active_missions_hook), and add no tab here.
+--   * Engine builds from 2026.7.31 (xray-monolith PR #608) can add tabs from
+--     script and scroll the strip when it overflows, which is strictly better
+--     than editing somebody else's layout.
+--   * "Save PDA tab space" shares PDA Taskboard's tab instead of adding one.
+--     Opt-in, so it is asked about through the hook rather than tested here.
+-- Anthology ships zzzz_pda_tabs_pager: it owns strip geometry and only shows
+-- buttons listed in its real_order. We still inject eptActiveMissions so the
+-- pager can find the button, but we never rescale siblings -- the pager
+-- repositions everything on a timer.
+local function anthology_pager_present()
+	return _G.zzzz_pda_tabs_pager ~= nil
+end
+
+local function have_better_route()
+	local mac = _G.mac_mcm ~= nil and type(mac_mcm.add_app) == "function"
+	local dyn = _G.pda_dynamic_tabs ~= nil and type(pda_dynamic_tabs.register) == "function"
+
+	local tbd = _G.zzz_active_missions_hook ~= nil
+		and type(zzz_active_missions_hook.sharing_taskboard) == "function"
+		and zzz_active_missions_hook.sharing_taskboard()
+
+	return mac or tbd or dyn
+end
+
+local function patch(xml_file_name, xml_obj)
+	if have_better_route() then
+		return
+	end
+
+	if not is_pda_layout(xml_file_name) then
+		return
+	end
+
+	local tabs = xml_obj:query("tab")
+	local tab = tabs and tabs[1]
+	if not (tab) then
+		return
+	end
+
+	local raw = xml_obj:query("tab button")
+	if not (raw) or #raw == 0 then
+		return
+	end
+
+	local strip = {}
+	local anchor_present, hidden = false, 0
+
+	for _, el in ipairs(raw) do
+		local attr = xml_obj:getElementAttr(el) or {}
+		if (attr.id == TAB_ID) then
+			return -- already injected
+		end
+		if (attr.id == ANCHOR_ID) then
+			anchor_present = true
+		end
+
+		-- height="0" is how a mod switches a tab off without deleting it: the
+		-- button stays in the XML but occupies no row. Treating those as real
+		-- tabs is wrong three times over -- they skew the step and extent we
+		-- measure, they get their x rewritten for no reason, and if the leftmost
+		-- tab by x is a hidden one our own button inherits its height and is
+		-- injected invisible. Leave them out of the geometry and out of the
+		-- rewrite, exactly as their author left them.
+		local h = tonumber(attr.height)
+		if (h and h <= 0) then
+			hidden = hidden + 1
+		else
+			strip[#strip + 1] = {
+				el     = el,
+				x      = tonumber(attr.x) or 0,
+				id     = attr.id,
+				width  = tonumber(attr.width),
+				height = attr.height,
+			}
+		end
+	end
+
+	-- eptTasks is what makes this a PDA tab strip rather than some other window
+	-- that happens to be called pda_something and happens to have a <tab>
+	-- (pda_relations.xml is exactly that). Tested against every button, hidden
+	-- ones included -- a switched-off Area Map still identifies the strip.
+	if not (anchor_present) or #strip == 0 then
+		return
+	end
+
+	-- Where a tab appears is decided by its x, not by document order, so sort by
+	-- x to get the real left-to-right order and slot ourselves in after the
+	-- anchor. That also means we can append the node itself and still land in
+	-- the right place, without depending on DXML's insert index.
+	table.sort(strip, function(a, b) return a.x < b.x end)
+
+	local anchor_at
+	for i, b in ipairs(strip) do
+		if (b.id == ANCHOR_ID) then
+			anchor_at = i
+			break
+		end
+	end
+
+	local tab_attr = xml_obj:getElementAttr(tab) or {}
+	local strip_w = tonumber(tab_attr.width) or 550
+
+	local step = strip[#strip].width or DEFAULT_OVERLAP
+	if (#strip >= 2) then
+		local measured = strip[2].x - strip[1].x
+		if (measured > 0) then
+			step = measured
+		end
+	end
+
+	local last = strip[#strip]
+	local extent = last.x + (last.width or step)
+
+	-- ---------------------------------------------------------------------
+	-- Where the tab goes
+	-- ---------------------------------------------------------------------
+	-- Two placements, chosen by "Missions tab beside Area Map" in MCM.
+	--
+	-- ON (default) -- slot in right after eptTasks and scale the whole row down
+	-- by the least amount that makes one more tab fit. Reads best, at the cost
+	-- of rewriting every button's x and width.
+	--
+	-- OFF -- append past the last tab and edit nothing at all. The row is
+	-- exactly what it was plus one button, so nothing can fight another mod's
+	-- layout; the tab just sits at the far end and the row may overflow.
+	--
+	-- Read from stored config, never ui_mcm: this runs on the XML-load path,
+	-- where ui_mcm.get() would kick off MCM's option gathering before the UI
+	-- exists and take the game down on startup.
+	local in_place = true
+	if (_G.active_missions_data and active_missions_data.stored_setting) then
+		in_place = active_missions_data.stored_setting("tab_second_position", 1, true) and true or false
+	end
+
+	-- Area Map present in the XML but switched off: there is no visible tab to
+	-- sit beside, so append rather than guess a slot from a hidden button's x.
+	if not (anchor_at) then
+		in_place = false
+	end
+
+	-- Anthology pager decides final x/width; rewriting the strip here only
+	-- fights it and can leave a crushed layout for one frame.
+	if anthology_pager_present() then
+		in_place = false
+	end
+
+	local slot, our_x, our_w, scale = #strip + 1, last.x + step, last.width or step, 1
+
+	if (in_place) then
+		slot = anchor_at + 1
+		our_x = (strip[slot] and strip[slot].x) or extent
+		our_w = (strip[slot] and strip[slot].width) or last.width or step
+
+		-- Scale to whichever is larger: the declared <tab> width, or the width
+		-- the row already occupied. The declared value is not always the truth
+		-- -- one real setup declared 550 while its twelve tabs legitimately
+		-- spanned 1000px, and trusting the 550 crushed every tab to 40px.
+		local target = strip_w
+		if (extent > target) then
+			target = extent
+		end
+
+		local needed = extent + step
+		if (needed > target and needed > 0) then
+			scale = target / needed
+		end
+
+		local function scaled(v)
+			return math.floor(v * scale + 0.5)
+		end
+
+		for i, b in ipairs(strip) do
+			local x = (i < slot) and b.x or (b.x + step)
+			local attrs = { x = tostring(scaled(x)) }
+			if (scale ~= 1 and b.width) then
+				attrs.width = tostring(scaled(b.width))
+			end
+			xml_obj:setElementAttr(b.el, attrs)
+		end
+
+		our_x, our_w = scaled(our_x), scaled(our_w)
+	end
+
+	local texture, colors, text_attr, stretch = strip_style(xml_obj)
+	local height = strip[1] and strip[1].height or "27"
+
+	xml_obj:insertFromXMLString(
+		string.format(BUTTON_TEMPLATE, our_x, our_w, tostring(height),
+			stretch, text_attr, texture, colors),
+		tab)
+
+	-- One line in the log describing exactly what we measured and what we did.
+	-- Tab strip problems are otherwise impossible to diagnose from a screenshot:
+	-- this says which layout won, how many tabs it had, and the geometry we
+	-- derived from it.
+	printf("%s", string.format(
+		"active_missions: injected into %s | tabs %s->%s (+%s hidden) | tabw %s | step %s | extent %s | placement %s | slot %s at x%s w%s | scale %.3f | skin %s (%s) | caption %s",
+		tostring(xml_file_name), #strip, #strip + 1, hidden, strip_w, step, extent,
+		in_place and "beside-areamap" or "appended",
+		slot, our_x, our_w, scale, texture,
+		(stretch ~= "") and "own-icon" or "borrowed",
+		text_attr))
+end
+
+local function on_xml_read_cb(xml_file_name, xml_obj)
+	local ok, err = pcall(patch, xml_file_name, xml_obj)
+	if not (ok) then
+		printf("!active_missions: PDA tab injection failed: %s", tostring(err))
+	end
+end
+
+function on_xml_read()
+	RegisterScriptCallback("on_xml_read", on_xml_read_cb)
+end

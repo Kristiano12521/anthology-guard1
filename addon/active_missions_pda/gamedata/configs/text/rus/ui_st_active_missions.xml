@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+
+	<!-- PDA tab button -->
+	<string id="pda_btn_active_missions">
+		<text>Задания</text>
+	</string>
+
+	<!-- Sidebar -->
+	<string id="ui_st_am_group_by">
+		<text>Группировать</text>
+	</string>
+	<string id="ui_st_am_group_type">
+		<text>Тип</text>
+	</string>
+	<string id="ui_st_am_group_region">
+		<text>Регион</text>
+	</string>
+	<string id="ui_st_am_group_faction">
+		<text>Группировка</text>
+	</string>
+	<string id="ui_st_am_group_all">
+		<text>Все</text>
+	</string>
+	<string id="st_am_group_all">
+		<text>Все задания</text>
+	</string>
+	<string id="st_am_active">
+		<text>активных</text>
+	</string>
+	<string id="st_am_empty">
+		<text>Нет активных заданий.</text>
+	</string>
+
+	<!-- Tracked banner -->
+	<string id="ui_st_am_tracked_header">
+		<text>ОТСЛЕЖИВАЕМОЕ ЗАДАНИЕ</text>
+	</string>
+	<string id="st_am_nothing_tracked">
+		<text>Ничего не отслеживается</text>
+	</string>
+
+	<!-- Card / navigation (Taskboard в Anthology зовёт вкладку «Объявления») -->
+	<string id="ui_st_am_go_taskboard">
+		<text>Объявления</text>
+	</string>
+	<string id="ui_st_am_back">
+		<text>Назад</text>
+	</string>
+	<string id="ui_st_am_track">
+		<text>Отслеживать</text>
+	</string>
+	<string id="st_am_tracked">
+		<text>Отслеживается</text>
+	</string>
+	<string id="st_am_ready">
+		<text>Готово к сдаче</text>
+	</string>
+	<string id="st_am_metres">
+		<text>м отсюда</text>
+	</string>
+	<string id="st_am_offlevel">
+		<text>Другая локация</text>
+	</string>
+	<string id="st_am_no_briefing">
+		<text>Подробных сведений нет.</text>
+	</string>
+
+	<!-- Card field labels -->
+	<string id="st_am_lbl_location">
+		<text>Локация</text>
+	</string>
+	<string id="st_am_lbl_giver">
+		<text>От кого</text>
+	</string>
+	<string id="st_am_lbl_faction">
+		<text>Группировка</text>
+	</string>
+	<string id="st_am_lbl_type">
+		<text>Тип</text>
+	</string>
+
+	<!-- Item requirements -->
+	<string id="st_am_needs">
+		<text>Требуется</text>
+	</string>
+	<string id="st_am_carried">
+		<text>При себе</text>
+	</string>
+	<string id="st_am_stashed">
+		<text>В ближайших тайниках</text>
+	</string>
+	<string id="st_am_items">
+		<text>шт.</text>
+	</string>
+	<string id="st_am_unknown_region">
+		<text>Неизвестный регион</text>
+	</string>
+	<string id="st_am_no_faction">
+		<text>Без группировки</text>
+	</string>
+
+	<!-- Mission types (короткие подписи под узкую колонку) -->
+	<string id="st_am_type_story">
+		<text>Сюжет</text>
+	</string>
+	<string id="st_am_type_fetch">
+		<text>Поиск</text>
+	</string>
+	<string id="st_am_type_delivery">
+		<text>Доставка</text>
+	</string>
+	<string id="st_am_type_bounty">
+		<text>Контракт</text>
+	</string>
+	<string id="st_am_type_hunt">
+		<text>Охота</text>
+	</string>
+	<string id="st_am_type_assault">
+		<text>Штурм</text>
+	</string>
+	<string id="st_am_type_defense">
+		<text>Оборона</text>
+	</string>
+	<string id="st_am_type_rescue">
+		<text>Спасение</text>
+	</string>
+	<string id="st_am_type_survey">
+		<text>Разведка</text>
+	</string>
+	<string id="st_am_type_stash">
+		<text>Тайник</text>
+	</string>
+	<string id="st_am_type_payment">
+		<text>Оплата</text>
+	</string>
+	<string id="st_am_type_spy">
+		<text>Шпионаж</text>
+	</string>
+	<string id="st_am_type_fate">
+		<text>Судьба</text>
+	</string>
+	<string id="st_am_type_sabotage">
+		<text>Диверсия</text>
+	</string>
+	<string id="st_am_type_survival">
+		<text>Выживание</text>
+	</string>
+	<string id="st_am_type_wait">
+		<text>Ожидание</text>
+	</string>
+	<string id="st_am_type_other">
+		<text>Прочее</text>
+	</string>
+
+</string_table>

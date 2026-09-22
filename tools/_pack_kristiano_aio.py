@@ -29,6 +29,7 @@ SEPARATE = {
     ),
     "fix_st2_footstep": "[SND] Anthology ST2 Mutant Footstep Sound",
     "campfires_anthology_compat": "[FIX] Campfires Anthology Compat",
+    "active_missions_pda": "[PDA] Active Missions PDA Tab Anthology",
 }
 
 # Raw addon/ copy is wrong for BHS — merged via pack_bhs.stage_gamedata in pack_aio.

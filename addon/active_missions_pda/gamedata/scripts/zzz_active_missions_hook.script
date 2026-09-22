@@ -1,0 +1,292 @@
+-- load-order: после z_taskboard_overrides / csfp_pda_patch; до zzzz_pda_tabs_pager
+-- Routes the eptActiveMissions PDA section to our window.
+--
+-- Anthology: zzzz_pda_tabs_pager wraps set_active_subdialog after us (zzzz >
+-- zzz). That is intentional -- the pager stays outermost for << >> tabs, then
+-- calls into this wrapper for eptActiveMissions.
+--
+local SECTION = "eptActiveMissions"
+local ANCHOR  = "eptTasks"
+local hooked = false
+
+-- Engine builds from 2026.7.31 expose a proper tab registry (xray-monolith
+-- PR #608): tabs can be added from script, anchored after an existing tab, and
+-- the strip scrolls when it overflows. That is strictly better than injecting a
+-- button into whatever pda_16.xml happened to win the VFS -- we stop touching
+-- other mods' layouts entirely, and a crowded strip scrolls instead of being
+-- squeezed. On older builds none of this exists and the DXML injector runs
+-- instead; the two are mutually exclusive.
+--
+-- pda_dynamic_tabs.register(caption_key, ui_getter, after) returns its own
+-- section id ("ept_dynamic_<n>"), and does its own set_active_subdialog routing,
+-- so nothing below needs to handle it.
+dynamic_section = nil
+
+local function dynamic_tabs_available()
+	return _G.pda_dynamic_tabs ~= nil and type(pda_dynamic_tabs.register) == "function"
+end
+
+-- ---------------------------------------------------------------------------
+-- Mod App Creator
+-- ---------------------------------------------------------------------------
+-- MAC exists precisely so addons stop competing for room on the tab strip: it
+-- collects them into a launcher instead. When it is installed that is plainly
+-- where we belong, so we register as an app and add no tab at all.
+--
+-- mac_mcm.add_app(id, {name, texture, tab}) -- name is a string-table id, so our
+-- existing pda_btn_active_missions caption works in both languages. No "func" is
+-- needed: MAC's launcher calls SetActiveSubdialog(app_data.tab), which our own
+-- wrapper below already answers.
+local MAC_APP_ID = "active_missions"
+-- Our own launcher glyph, from this addon's atlas. The stock texture used before
+-- was a map pin drawn for the area map, and came out as an empty square next to
+-- the launcher's ringed line-art icons.
+local MAC_ICON   = "ui_am_icon_app"
+local mac_registered = false
+
+function mac_available()
+	return _G.mac_mcm ~= nil and type(mac_mcm.add_app) == "function"
+end
+
+local function register_mac_app()
+	if (mac_registered) or not mac_available() then
+		return
+	end
+
+	local ok, err = pcall(function()
+		mac_mcm.add_app(MAC_APP_ID, {
+			name    = "pda_btn_active_missions",
+			texture = MAC_ICON,
+			tab     = SECTION,
+		})
+	end)
+
+	if (ok) then
+		mac_registered = true
+		printf("%s", "active_missions: registered as MAC app '" .. MAC_APP_ID .. "'")
+	else
+		printf("!active_missions: MAC registration failed (%s)", tostring(err))
+	end
+end
+
+-- ---------------------------------------------------------------------------
+-- Sharing the task board's tab
+-- ---------------------------------------------------------------------------
+-- PDA Taskboard is near-universal in GAMMA and already owns a tab about tasks,
+-- so we can live in that tab instead of putting another button on the strip.
+--
+-- Off by default. It costs something real -- pressing Taskboard lands on
+-- Missions, with a hand-off button to reach the board -- and that is a surprise
+-- nobody should get without asking for it. So it is behind the "Save PDA tab
+-- space" option, for people who are actually out of room.
+--
+-- Every fork exposes the same entry point -- ui_pda_taskboard_tab.get_ui() in
+-- 293, 463, 478 and the Gamma fork alike -- so this hooks the section rather
+-- than anything internal, and does not care which one is installed.
+--
+-- Ours has to be the default view for that tab rather than theirs: their window
+-- belongs to them, so we cannot put a button inside it, and a view reachable
+-- only by hotkey is a view nobody finds.
+local taskboard_pending = false
+
+local function taskboard_installed()
+	return _G.ui_pda_taskboard_tab ~= nil
+		and type(ui_pda_taskboard_tab.get_ui) == "function"
+end
+
+-- True when the task board's tab is where we live. MAC always wins -- if it is
+-- installed the launcher is the better home and no tab is spent either way.
+function sharing_taskboard()
+	if (mac_available()) or not (taskboard_installed()) then
+		return false
+	end
+	-- Read straight from stored config, never ui_mcm. This is called from the
+	-- XML-load path, and ui_mcm.get() there starts MCM's option gathering before
+	-- the UI is ready, which crashes the game on startup via whichever addon
+	-- touches a font first.
+	return active_missions_data.stored_setting("save_tab_space", 1, false) and true or false
+end
+
+-- Called from our window's hand-off button.
+function show_taskboard_next()
+	taskboard_pending = true
+end
+
+-- ---------------------------------------------------------------------------
+-- Where the player came from
+-- ---------------------------------------------------------------------------
+-- The last PDA section shown before ours, recorded by the wrapper below. The
+-- Back button uses it so it returns where the player actually was, rather than
+-- to whichever launcher we assume they must have used.
+previous_section = nil
+
+function last_section()
+	if (previous_section and previous_section ~= "" and previous_section ~= SECTION) then
+		return previous_section
+	end
+	return nil
+end
+
+-- Keeps our own tab button in step with the task-board option: hidden while we
+-- live in the board's tab, shown otherwise.
+--
+-- Best effort only. Both placement options are documented as needing a restart,
+-- because in practice neither takes effect mid-session -- the strip is built
+-- from XML that is parsed once. This is not a substitute for that; it just means
+-- the button is right rather than stale if the engine happens to hand us a live
+-- one. Do not promise it as a live update in the MCM text.
+local function sync_own_tab()
+	pcall(function()
+		local pda = ActorMenu.get_pda_menu()
+		local tabs = pda and pda:GetTabControl()
+		local btn = tabs and tabs:GetButtonById(SECTION)
+		if (btn) then
+			-- Shown unless we are living in the task board's tab, in which case
+			-- our own button would be a duplicate way into the same window.
+			btn:Show(not sharing_taskboard())
+		end
+	end)
+end
+
+local function register_dynamic()
+	if (dynamic_section) or not dynamic_tabs_available() then
+		return
+	end
+
+	local ok, id = pcall(function()
+		return pda_dynamic_tabs.register(
+			"pda_btn_active_missions",
+			function() return ui_pda_active_missions_tab.get_ui() end,
+			ANCHOR)
+	end)
+
+	if (ok and id) then
+		dynamic_section = id
+		printf("%s", "active_missions: registered dynamic PDA tab as " .. tostring(id))
+	else
+		printf("!active_missions: dynamic tab registration failed (%s)", tostring(id))
+	end
+end
+
+-- Whichever section id actually reaches our window on this engine build.
+local function active_section()
+	return dynamic_section or SECTION
+end
+
+-- Where the tab comes from, in order:
+--   1. MAC installed          -> a launcher app, automatic, no tab spent
+--   2. "Save PDA tab space"   -> share the task board's tab, opt-in only
+--   3. engine 2026.7.31+      -> the dynamic tab registry, which scrolls
+--   4. otherwise              -> our own DXML-injected button
+-- Exactly one applies; the injector stands down for 1, 2 and 3.
+local function install()
+	register_mac_app()
+
+	if not mac_available() and not sharing_taskboard() then
+		register_dynamic()
+	end
+
+	-- The dynamic registry does its own routing. MAC does not -- its launcher
+	-- just calls SetActiveSubdialog -- so the wrapper is still needed there,
+	-- exactly as it is for the injected button.
+	if (hooked) or (dynamic_section) then
+		return
+	end
+	hooked = true
+
+	local original = pda.set_active_subdialog
+	pda.set_active_subdialog = function(section)
+		-- Any tab switch is a fine moment to show or hide our own button, so the
+		-- task-board option takes effect without a restart.
+		sync_own_tab()
+
+		-- Remember what the player was looking at before us, so the Back button
+		-- can return them to it instead of guessing. Guessing was wrong as soon
+		-- as a second addon entered the picture: Interactive 3D PDA Enhanced
+		-- absorbs Mod App Creator's app list into its own Network screen and
+		-- launches each app from there, so a player who opened us from that grid
+		-- had never seen MAC's launcher tab we were sending them to.
+		if (section ~= SECTION) then
+			previous_section = section
+		end
+
+		if (section == SECTION) then
+			return ui_pda_active_missions_tab.get_ui()
+		end
+
+		-- Sharing the task board's tab: ours by default, theirs for one viewing
+		-- after the hand-off button. The flag is consumed as it is served, so
+		-- re-opening the tab returns here.
+		if (section == "eptTaskboard" and sharing_taskboard()) then
+			if (taskboard_pending) then
+				taskboard_pending = false
+				return original(section)
+			end
+			return ui_pda_active_missions_tab.get_ui()
+		end
+
+		return original(section)
+	end
+end
+
+-- Optional keybind: opens the PDA straight onto the Missions tab. Also acts as
+-- a way in if the tab button ever fails to inject, since SetActiveSubdialog
+-- does not require the button to exist.
+local function on_key_release(key)
+	if not (db.actor and ui_mcm) then
+		return
+	end
+
+	local bind = ui_mcm.get("active_missions/open_key")
+	if not (bind) or bind < 0 or key ~= bind then
+		return
+	end
+	local mod = tonumber(ui_mcm.get("active_missions/open_mod")) or 0
+	if not (ui_mcm.get_mod_key(mod)) then
+		return
+	end
+
+	local pda_menu = ActorMenu.get_pda_menu()
+	if (pda_menu:IsShown()) then
+		pda_menu:SetActiveSubdialog(active_section())
+		return
+	end
+
+	if not (db.actor:item_in_slot(8)) then
+		return
+	end
+
+	if (get_console_cmd(1, "g_3d_pda")) then
+		db.actor:activate_slot(8)
+	else
+		pda_menu:ShowDialog(true)
+	end
+	pda_menu:SetActiveSubdialog(active_section())
+end
+
+-- ---------------------------------------------------------------------------
+-- Why "Missions tab beside Area Map" still needs a restart
+-- ---------------------------------------------------------------------------
+-- Tempting fix: game.reload_ui_xml() re-parses every UI layout, which would
+-- re-run our DXML injection with the new setting. DART does exactly that.
+--
+-- It does not work here, and it is not close. reload_ui_xml on its own changes
+-- nothing visible, because the PDA window already exists and was built from the
+-- old XML -- which is why DART pairs it with DestroyAll_UI(). And DestroyAll_UI
+-- nils out *every* addon's registered GUI singleton, not just ours. Doing that
+-- from an option change took Dot Marks down twice with a critical Lua error
+-- (ui_hud_dotmarks.script : func_or_userdata) and put the game in a Busy Hands
+-- state: its HUD element was still live and its next update called a method on
+-- something we had just deleted underneath it.
+--
+-- DART gets away with it because it owns the refresh and fires pre/post
+-- callbacks so addons can rebuild. We have no such contract with anyone. A tab
+-- that moves on the next launch is a far better trade than an option that can
+-- corrupt a session.
+--
+-- Sharing the task board's tab is different and *is* live -- see sync_own_tab
+-- above. It only needs a button shown or hidden, which touches nothing else.
+function on_game_start()
+	RegisterScriptCallback("on_game_load", install)
+	RegisterScriptCallback("on_key_release", on_key_release)
+end

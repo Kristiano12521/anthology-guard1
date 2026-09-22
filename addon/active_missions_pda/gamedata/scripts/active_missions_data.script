@@ -1,0 +1,509 @@
+-- Active Missions - data layer
+--
+-- Collects the actor's in-progress tasks out of task_manager and decorates each
+-- one with the three things the vanilla PDA list refuses to tell you: what kind
+-- of job it is, which map it is on, and who handed it out.
+--
+-- Nothing here touches the engine task list, so the stock "Area map" tab keeps
+-- working exactly as before.
+
+local gts = game.translate_string
+
+-- ---------------------------------------------------------------------------
+-- Mission type classification
+-- ---------------------------------------------------------------------------
+-- Tasks carry no type field, so we read it off the functors declared in the
+-- tm_*.ltx section. status_functor is the more specific of the two, so it wins;
+-- target_functor is the fallback. Anything unrecognised lands in "other" rather
+-- than being dropped, so tasks from addons we've never heard of still show up.
+
+local type_by_status = {
+	actor_has_fetch_item                     = "fetch",
+	actor_has_fetch_weapon_warfare           = "fetch",
+	multifetch_status_functor                = "fetch",
+	drx_sl_quest_item_task_status            = "fetch",
+	drx_sl_retrieve_item_task_status         = "fetch",
+	intercept_artifact_task_status_functor   = "fetch",
+	skyfall_task_status_functor              = "fetch",
+	recover_item_on_corpse_status_functor    = "fetch",
+
+	delivery_task                            = "delivery",
+	urgent_orders_status_functor             = "delivery",
+
+	bounty_task                              = "bounty",
+	top_10_task_status_functor               = "bounty",
+	tracking_stalker_task_status_functor     = "bounty",
+	vengence_amplified_status_functor        = "bounty",
+
+	big_game_task_status_functor             = "hunt",
+	baba_yaga_task_status_functor            = "hunt",
+
+	assault_task_status_functor              = "assault",
+	dominance_task_status_functor            = "assault",
+
+	gd_task_status_functor                   = "defense",
+	hold_the_ground_task_status_functor      = "defense",
+	no_step_back_task_status_functor         = "defense",
+	dead_night_task_status_functor           = "defense",
+
+	hostage_task                             = "rescue",
+	duty_girl_task_status                    = "rescue",
+
+	measure_task                             = "survey",
+	anomaly_scanner_task_status              = "survey",
+	chimera_scan_status                      = "survey",
+	recover_mutant_data_status               = "survey",
+	task_type_ecolog_gathered_tissue_samples = "survey",
+
+	nta_stash_task_status_functor            = "stash",
+	drx_sl_money_task_status                 = "payment",
+	spy_task_status_functor                  = "spy",
+	fate_task                                = "fate",
+	veh_destroy_sf                           = "sabotage",
+	check_if_enough_time_passed              = "wait",
+
+	-- Addon quest lines that are storyline anyway; listed so they still land
+	-- somewhere sensible if storyline splitting is turned off in MCM.
+	special_steps_for_lostzone_tasks         = "story",
+	brain_game_status_functor                = "story",
+	gambling_with_life_status_functor        = "story",
+	house_of_horrors_task_status_functor     = "story",
+	mirage_task_status_functor               = "story",
+	mystery_of_the_swamps_task_status_functor = "story",
+	the_living_fire_task_status_functor      = "story",
+	sbf_cotb_task_status_functor             = "story",
+	sbf_intro_task_status_functor            = "story",
+	sbf_lad_task_status_functor              = "story",
+	agr_u_bandit_boss_task_1_stages          = "story",
+	hidden_threat_functor_status             = "story",
+	redemption_1_status_functor              = "story",
+	redemption_2_status_functor              = "story",
+	redemption_3_status_functor              = "story",
+	redemption_4_status_functor              = "story",
+	redemption_5_status_functor              = "story",
+	redemption_6_status_functor              = "story",
+
+}
+
+local type_by_target = {
+	general_fetch_task                    = "fetch",
+	drx_sl_quest_item_task_target         = "fetch",
+	multifetch_target_functor             = "fetch",
+	recover_item_on_corpse_target_functor = "fetch",
+
+	general_delivery                      = "delivery",
+	general_bounty_task                   = "bounty",
+	top_10_task_target_functor            = "bounty",
+	mutants_in_map_target                 = "hunt",
+
+	assault_task_target_functor           = "assault",
+	dominance_task_target_functor         = "assault",
+	faction_base_defense_target           = "defense",
+	barrier_defense_target_functor        = "defense",
+	gd_task_target_functor                = "defense",
+
+	simulation_task_target                = "rescue",
+
+	general_measure                       = "survey",
+	anomaly_scanner_task_target           = "survey",
+	chimera_scan_target                   = "survey",
+	recover_mutant_data_target            = "survey",
+
+	drx_sl_money_task_target              = "payment",
+	spy_task_target_functor               = "spy",
+	general_fate                          = "fate",
+	veh_destroy_tf                        = "sabotage",
+	surge_task_target                     = "survival",
+	psi_storm_task_target                 = "survival",
+	task_targets_lostzone_all             = "story",
+}
+
+-- Order the type groups appear in the sidebar. Types not listed here get
+-- appended alphabetically after these.
+local type_order = {
+	"story", "fetch", "delivery", "bounty", "hunt", "assault", "defense",
+	"rescue", "survey", "stash", "payment", "spy", "fate", "sabotage",
+	"survival", "wait", "other",
+}
+
+function get_type_order()
+	return type_order
+end
+
+-- ---------------------------------------------------------------------------
+-- Helpers
+-- ---------------------------------------------------------------------------
+
+local function ini_str(task_id, key)
+	return task_manager.task_ini and task_manager.task_ini:r_string_ex(task_id, key)
+end
+
+-- Server object for an id, whether or not it is currently online.
+local function se_obj(id)
+	if not (id) or id == 65535 then
+		return nil
+	end
+	return alife_object(id)
+end
+
+-- Level name ("l01_escape") that a server object currently sits on.
+local function level_of(id)
+	local obj = se_obj(id)
+	local gvid = obj and obj.m_game_vertex_id
+	if not (gvid) or gvid == 65535 then
+		return nil
+	end
+	local ok, name = pcall(function()
+		return alife():level_name(game_graph():vertex(gvid):level_id())
+	end)
+	return ok and name or nil
+end
+
+-- MCM lookups kept in one place so the module still works with MCM absent.
+-- Reads a stored MCM value WITHOUT going through ui_mcm.
+--
+-- ui_mcm.get() builds MCM's entire option table on its first call, walking every
+-- installed addon's on_mcm_load. Called from the XML-load path that happens
+-- before fonts exist, and any addon that touches the UI while gathering takes
+-- the game down with it -- Dot Marks asking for GetFontSmall did exactly that,
+-- and the game would not start. Guarding on ui_mcm.is_gathering() does not help,
+-- because the call is what *starts* the gathering.
+--
+-- MCM persists into axr_options.ltx under the "mcm" section, keyed by the full
+-- option path, so reading that directly is safe from anywhere. It only returns a
+-- value once MCM has written one, which is why the fallback has to be the same
+-- default the option declares.
+--
+-- vtype follows axr_main.config: 1 = boolean, 2 = number, 0 = string.
+function stored_setting(key, vtype, fallback)
+	if not (_G.axr_main and axr_main.config) then
+		return fallback
+	end
+
+	local ok, v = pcall(function()
+		return axr_main.config:r_value("mcm", "active_missions/" .. key, vtype or 1, fallback)
+	end)
+
+	if (ok and v ~= nil) then
+		return v
+	end
+	return fallback
+end
+
+function setting(key, fallback)
+	if (ui_mcm) then
+		-- ui_mcm.get() asserts while MCM is still collecting options, and this
+		-- is read from the XML-load path which can run during that window.
+		if (ui_mcm.is_gathering and ui_mcm.is_gathering()) then
+			return fallback
+		end
+		local v = ui_mcm.get("active_missions/" .. key)
+		if (v ~= nil) then
+			return v
+		end
+	end
+	return fallback
+end
+
+local function split_story_enabled()
+	return setting("split_story", true) and true or false
+end
+
+local function classify(tsk)
+	if (tsk.storyline and split_story_enabled()) then
+		return "story"
+	end
+
+	local by_status = tsk.status_functor and type_by_status[tsk.status_functor]
+	if (by_status) then
+		return by_status
+	end
+
+	local by_target = tsk.target_functor and type_by_target[tsk.target_functor]
+	if (by_target) then
+		return by_target
+	end
+
+	-- A handful of quest lines only declare condlists. Storyline is the best
+	-- remaining signal.
+	if (tsk.storyline) then
+		return "story"
+	end
+
+	return "other"
+end
+
+-- ---------------------------------------------------------------------------
+-- Collection
+-- ---------------------------------------------------------------------------
+
+-- One walk of the inventory per refresh, keyed by section. Asking
+-- utils_item.get_amount per task would re-walk the whole inventory once for
+-- every fetch mission, and a dozen of those on a 2 second timer adds up.
+-- Counting matches get_amount's mode 1: multi-use items count their remaining
+-- uses, ammo counts as one box.
+function inventory_histogram()
+	local counts = {}
+	if not (db.actor) then
+		return counts
+	end
+
+	pcall(function()
+		db.actor:iterate_inventory(function(_, item)
+			local section = item:section()
+			local amount = 1
+			if (IsItem("multiuse", section)) then
+				local uses = item.get_remaining_uses and item:get_remaining_uses()
+				amount = (uses and uses > 1) and uses or 1
+			end
+			counts[section] = (counts[section] or 0) + amount
+		end, nil)
+	end)
+
+	return counts
+end
+
+-- Returns an array of decorated entries for every task that the engine still
+-- considers in progress.
+function collect()
+	local out = {}
+	if not (db.actor) then
+		return out
+	end
+
+	local tm = task_manager.get_task_manager()
+	if not (tm and tm.task_info) then
+		return out
+	end
+
+	local actor_lvl = level.name()
+	local actor_pos = db.actor:position()
+	local carried = inventory_histogram()
+
+	for task_id, tsk in pairs(tm.task_info) do
+		-- Engine is the authority on whether a task is live; task_info also
+		-- holds finished tasks that are sitting in their repeat timeout.
+		local ok, state = pcall(function() return db.actor:get_task_state(task_id) end)
+		if (ok and state == 1 and tsk.t) then
+			local target_id = tonumber(tsk.current_target)
+			local giver_id  = tonumber(tsk.task_giver_id)
+
+			local lvl = (target_id and level_of(target_id)) or (giver_id and level_of(giver_id))
+
+			-- A task giver is normally a stalker, but nothing enforces it and a
+			-- server object of another class has no community()/character_name().
+			local giver = giver_id and se_obj(giver_id)
+			local giver_name, faction
+			if (giver) then
+				pcall(function()
+					giver_name = giver:character_name()
+					faction = giver:community()
+				end)
+			end
+			if not (faction) or faction == "" then
+				local sim = ini_str(task_id, "sim_communities")
+				faction = sim and str_explode(sim, ",")[1]
+			end
+			if (faction) then
+				faction = faction:gsub("^%s+", ""):gsub("%s+$", "")
+			end
+
+			local dist
+			if (target_id and lvl == actor_lvl) then
+				local obj = level.object_by_id(target_id)
+				if (obj) then
+					dist = obj:position():distance_to(actor_pos)
+				end
+			end
+
+			local tracked = false
+			local ok2, res = pcall(function() return db.actor:is_active_task(tsk.t) end)
+			if (ok2) then
+				tracked = res and true or false
+			end
+
+			local ttype = classify(tsk)
+
+			-- Cheap half of the fetch requirement: what it wants and how much of
+			-- it is on you. Stash counts are far more expensive and are left to
+			-- item_requirement(), which only runs for an expanded card.
+			--
+			-- Money tasks (drx_sl_money_task_status) reuse the very same
+			-- "<task_id>_fetch" key but store a cash amount in it instead of an
+			-- item section, which read as a nonsense 0/0 item count. Require the
+			-- value to actually name an item before treating it as one.
+			local items
+			local fetch_sec = load_var(db.actor, task_id .. "_fetch")
+			if (type(fetch_sec) == "string" and fetch_sec ~= ""
+			    and not tonumber(fetch_sec) and ini_sys:section_exist(fetch_sec)) then
+				items = {
+					section = fetch_sec,
+					need    = tonumber(load_var(db.actor, task_id .. "_fetch_count")) or 1,
+					carried = carried[fetch_sec] or 0,
+				}
+			end
+
+			out[#out + 1] = {
+				id           = task_id,
+				task         = tsk,
+				gametask     = tsk.t,
+				title        = tsk.current_title and gts(tsk.current_title) or task_id,
+				descr        = tsk.current_descr and gts(tsk.current_descr) or "",
+				icon         = tsk.icon or "ui_pda2_mtask_overlay",
+				storyline    = tsk.storyline and true or false,
+				ttype        = ttype,
+				ttype_label  = gts("st_am_type_" .. ttype),
+				level        = lvl or "am_unknown",
+				level_label  = lvl and gts(lvl) or gts("st_am_unknown_region"),
+				faction      = faction or "am_none",
+				faction_label = faction and gts(faction) or gts("st_am_no_faction"),
+				giver_name   = (giver_name ~= "" and giver_name) or nil,
+				target_id    = target_id,
+				tracked      = tracked,
+				ready        = tsk.last_check_task == "complete",
+				items        = items,
+				dist         = dist,
+			}
+		end
+	end
+
+	return out
+end
+
+-- ---------------------------------------------------------------------------
+-- Item requirements
+-- ---------------------------------------------------------------------------
+
+-- Counts a section across the player's stashes and workshop boxes on the
+-- current level. iterate_inventory_box only reaches online objects, so this is
+-- genuinely "nearby stashes" -- the same limit the vanilla fetch counter has.
+local function count_in_stashes(section)
+	local total = 0
+	local m_data = alife_storage_manager.get_state()
+	if not (m_data) then
+		return 0
+	end
+
+	local function itr(_, item)
+		if (item:section() == section) then
+			local uses = item.get_remaining_uses and item:get_remaining_uses()
+			total = total + ((uses and uses > 1) and uses or 1)
+		end
+	end
+
+	-- player_created_stashes is keyed by object id; workshop_stashes stores the
+	-- id as the value. Try both so one loop covers them.
+	for _, tbl in ipairs({ m_data.player_created_stashes or {}, m_data.workshop_stashes or {} }) do
+		for k, v in pairs(tbl) do
+			local box = tonumber(k) and level.object_by_id(tonumber(k))
+			if not (box) and tonumber(v) then
+				box = level.object_by_id(tonumber(v))
+			end
+			if (box) then
+				pcall(function() box:iterate_inventory_box(itr, box) end)
+			end
+		end
+	end
+
+	return total
+end
+
+-- What a fetch task is asking for, and how close you are to it.
+-- Returns nil for tasks that want no item.
+--
+-- Fetch tasks stash their requirement in the actor's pstor under
+-- "<task_id>_fetch" / "<task_id>_fetch_count" -- see task_status_functor
+-- .actor_has_fetch_item in tasks_fetch.script. Multifetch keeps its own table
+-- in a file-local, so those tasks are not covered.
+function item_requirement(entry)
+	if not (db.actor and entry) then
+		return nil
+	end
+
+	-- collect() already worked out the section, the amount and what you are
+	-- carrying; the only thing left that costs anything is the stash sweep.
+	if not (entry.items) then
+		return nil
+	end
+
+	local ok, req = pcall(function()
+		return {
+			section = entry.items.section,
+			name    = ui_item.get_sec_name(entry.items.section),
+			need    = entry.items.need,
+			carried = entry.items.carried,
+			stashed = count_in_stashes(entry.items.section),
+		}
+	end)
+
+	return ok and req or nil
+end
+
+-- ---------------------------------------------------------------------------
+-- Grouping
+-- ---------------------------------------------------------------------------
+
+local group_key = {
+	type    = function(e) return e.ttype,   e.ttype_label   end,
+	region  = function(e) return e.level,   e.level_label   end,
+	faction = function(e) return e.faction, e.faction_label end,
+	all     = function(e) return "all",     gts("st_am_group_all") end,
+}
+
+function valid_modes()
+	return { "type", "region", "faction", "all" }
+end
+
+-- Sorts entries inside a group: anything ready to hand in first, then storyline,
+-- then nearest, then title.
+--
+-- Deliberately does NOT sort the tracked mission to the front -- it gets its own
+-- fixed strip above the list instead, so tracking something doesn't shuffle the
+-- list out from under you.
+local function entry_less(a, b)
+	if (a.ready ~= b.ready) then return a.ready end
+	if (a.storyline ~= b.storyline) then return a.storyline end
+	if (a.dist and b.dist and a.dist ~= b.dist) then return a.dist < b.dist end
+	if (a.dist and not b.dist) then return true end
+	if (b.dist and not a.dist) then return false end
+	return a.title < b.title
+end
+
+-- Returns groups = {key = {key, label, items}}, order = sorted array of keys.
+function group(entries, mode)
+	local keyfn = group_key[mode] or group_key.type
+	local groups, order = {}, {}
+
+	for _, e in ipairs(entries) do
+		local key, label = keyfn(e)
+		if not (groups[key]) then
+			groups[key] = { key = key, label = label, items = {} }
+			order[#order + 1] = key
+		end
+		local g = groups[key]
+		g.items[#g.items + 1] = e
+	end
+
+	for _, g in pairs(groups) do
+		table.sort(g.items, entry_less)
+	end
+
+	if (mode == "type") then
+		local rank = {}
+		for i, t in ipairs(type_order) do
+			rank[t] = i
+		end
+		table.sort(order, function(a, b)
+			local ra, rb = rank[a] or 999, rank[b] or 999
+			if (ra ~= rb) then return ra < rb end
+			return a < b
+		end)
+	else
+		-- Region and faction read best alphabetically by their display name.
+		table.sort(order, function(a, b)
+			return groups[a].label < groups[b].label
+		end)
+	end
+
+	return groups, order
+end
