@@ -19,6 +19,15 @@
 
 ---
 
+## [issue] `stash_capacities.script:92: attempt to index local 'obj' (a nil value)` / `lua_pcall_failed`
+
+- дата: 2026-09-25
+- мод: Hideout Furniture `stash_capacities` + FastTransfer `ish_fast_transfer`; триггер — Shift-лут трупа (Move_All стека)
+- итог: **фикс написан, в игре не проверен** — `fix_stash_capacities_nil` 1.0.0. Класс `Lua / pcall`, тот же паттерн что `fix_arti_frames_nil`. Цепочка: FastTransfer → HF `Action_Move_All` (`weight_add=0`) → `Action_Move(child_id)` → `CheckItem` nil → `ActorMenu_on_item_after_move` всё равно уходит → строка 92 `obj:weight()`. Обработчик локальный: guard через подмену `on_game_start` + поздний steal из `intercepts`. Сейв `fatal_ctd_save_1` — autosave перед FATAL, не причина.
+- карточка: [2026-09-25_xray_mg9000.md](../logs/cards/2026-09-25_xray_mg9000.md) (источник Downloads `xray_mg9000.log`)
+- pitfalls: `Action_Move` после `CheckItem` nil всё равно вызывает after_move; HF after_move полагается на `weight_add`, не на stash/obj
+- подробности: нет
+
 ## [issue] nikit 2026-09-22: сессия Rostok Factory → Topi (динамика)
 
 - дата: 2026-09-22
