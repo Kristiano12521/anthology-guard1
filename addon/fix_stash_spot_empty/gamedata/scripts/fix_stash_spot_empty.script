@@ -1,0 +1,314 @@
+-- Stash Spot Empty Fix
+-- Anomaly 1.5.3 / Anthology 2.1
+--
+-- treasure_manager removes treasure / treasure_searched / treasure_unique
+-- only when caches[id] == true on actor_on_item_take_from_box. If loot
+-- finished with caches already false/nil/string-mismatch, or take never
+-- fired that branch, the box stays empty and the map spot hangs forever.
+--
+-- Clear those spots when the live box is empty and caches[id] is NOT a
+-- pending loot string (unopened stashes look empty until open). One
+-- delayed repair sweep for sticky spots already in the save.
+
+local LOG_TAG = "[fix_stash_spot_empty]"
+local VERSION = "1.0.0"
+local EVENT_ID = "fix_stash_spot_empty"
+local REPAIR_ACTION = "repair"
+local REPAIR_DELAY = 1.0
+local CHUNK_DELAY = 0
+local ID_CHUNK = 4096
+local ID_MAX = 65534
+local SPOTS = { "treasure", "treasure_searched", "treasure_unique" }
+
+printf("%s loaded v%s", LOG_TAG, VERSION)
+
+local callbacks_registered = false
+local pending_clear = {}
+local scan_id = 1
+local cleared_spots = 0
+
+local function log(fmt, ...)
+	printf(LOG_TAG .. " " .. fmt, ...)
+end
+
+local function caches_table()
+	local caches = treasure_manager and treasure_manager.caches
+	if type(caches) == "table" then
+		return caches
+	end
+	return nil
+end
+
+local function cache_value(id)
+	local caches = caches_table()
+	if not caches then
+		return nil
+	end
+	return caches[id]
+end
+
+-- Pending loot lives as a comma-separated string; the box is empty until open.
+local function is_pending_loot(id)
+	return type(cache_value(id)) == "string"
+end
+
+local function has_spot(id, spot)
+	if not (id and level and type(level.map_has_object_spot) == "function") then
+		return false
+	end
+	local ok, result = pcall(level.map_has_object_spot, id, spot)
+	return ok and result ~= 0
+end
+
+local function spot_count(id)
+	local count = 0
+	for i = 1, #SPOTS do
+		if has_spot(id, SPOTS[i]) then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+local function remove_treasure_spots(id)
+	if not id then
+		return 0
+	end
+	if not (level and type(level.map_remove_object_spot) == "function") then
+		return 0
+	end
+	local removed = 0
+	for i = 1, #SPOTS do
+		local spot = SPOTS[i]
+		if has_spot(id, spot) then
+			pcall(level.map_remove_object_spot, id, spot)
+			removed = removed + 1
+		end
+	end
+	return removed
+end
+
+local function is_invbox_go(box)
+	if not box then
+		return false
+	end
+	if type(IsInvbox) == "function" then
+		local ok, result = pcall(IsInvbox, box)
+		return ok and result and true or false
+	end
+	return false
+end
+
+local function is_invbox_se(se_obj)
+	if not se_obj then
+		return false
+	end
+	local ok, cls = pcall(function()
+		return se_obj:clsid()
+	end)
+	if not ok or cls == nil then
+		return false
+	end
+	if type(IsInvbox) == "function" then
+		local ok_box, result = pcall(IsInvbox, nil, cls)
+		return ok_box and result and true or false
+	end
+	return cls == clsid.inventory_box_s or cls == clsid.inventory_box
+end
+
+local function box_empty(box)
+	if not box then
+		return false
+	end
+	local ok, empty = pcall(function()
+		return box:is_inv_box_empty()
+	end)
+	return ok and empty and true or false
+end
+
+local function object_label(id)
+	local box = id and level and level.object_by_id and level.object_by_id(id)
+	if box then
+		local ok, name = pcall(function()
+			return box:name()
+		end)
+		return tostring(ok and name or id)
+	end
+	local se_obj = alife_object(id)
+	if se_obj then
+		local ok, name = pcall(function()
+			return se_obj:name()
+		end)
+		return tostring(ok and name or id)
+	end
+	return tostring(id)
+end
+
+-- Returns true when spots were removed.
+local function try_clear(id, reason)
+	if not id then
+		return false
+	end
+	if spot_count(id) == 0 then
+		return false
+	end
+	if is_pending_loot(id) then
+		return false
+	end
+
+	local box = level and level.object_by_id and level.object_by_id(id)
+	if box then
+		if not is_invbox_go(box) then
+			return false
+		end
+		if not box_empty(box) then
+			return false
+		end
+	else
+		-- Offline: only clear when treasure_manager already marked the stash looted.
+		if cache_value(id) ~= false then
+			return false
+		end
+		local se_obj = alife_object(id)
+		if not is_invbox_se(se_obj) then
+			return false
+		end
+	end
+
+	local removed = remove_treasure_spots(id)
+	if removed > 0 then
+		cleared_spots = cleared_spots + removed
+		log(
+			"cleared id=%s reason=%s spots=%s cache=%s name=%s",
+			tostring(id),
+			tostring(reason),
+			tostring(removed),
+			tostring(cache_value(id)),
+			object_label(id)
+		)
+		return true
+	end
+	return false
+end
+
+function clear_tick(id)
+	pending_clear[id] = nil
+	try_clear(id, "deferred")
+	return true
+end
+
+local function schedule_clear(id, reason)
+	if not id then
+		return
+	end
+	if pending_clear[id] then
+		return
+	end
+	-- Next tick: try_spawn_treasure / transfer may still run this frame.
+	pending_clear[id] = true
+	CreateTimeEvent(EVENT_ID, "clear_" .. tostring(id), 0, clear_tick, id)
+end
+
+function actor_on_item_take_from_box(box, item)
+	if not is_invbox_go(box) then
+		return
+	end
+	local ok, id = pcall(function()
+		return box:id()
+	end)
+	if not ok or not id then
+		return
+	end
+	schedule_clear(id, "take")
+end
+
+function physic_object_on_use_callback(box, who)
+	if not db.actor or who ~= db.actor then
+		return
+	end
+	if not is_invbox_go(box) then
+		return
+	end
+	local ok, id = pcall(function()
+		return box:id()
+	end)
+	if not ok or not id then
+		return
+	end
+	schedule_clear(id, "use")
+end
+
+local function sweep_id_range(from_id, to_id)
+	for id = from_id, to_id do
+		if spot_count(id) > 0 then
+			try_clear(id, "repair")
+		end
+	end
+end
+
+local function reset_repair()
+	scan_id = 1
+	cleared_spots = 0
+end
+
+local function cancel_repair()
+	RemoveTimeEvent(EVENT_ID, REPAIR_ACTION)
+	reset_repair()
+end
+
+function repair_tick()
+	local last = scan_id + ID_CHUNK - 1
+	if last > ID_MAX then
+		last = ID_MAX
+	end
+	sweep_id_range(scan_id, last)
+	scan_id = last + 1
+
+	if scan_id > ID_MAX then
+		log("repair done spots=%s", tostring(cleared_spots))
+		return true
+	end
+
+	ResetTimeEvent(EVENT_ID, REPAIR_ACTION, CHUNK_DELAY)
+	return false
+end
+
+local function schedule_repair()
+	RemoveTimeEvent(EVENT_ID, REPAIR_ACTION)
+	reset_repair()
+	CreateTimeEvent(EVENT_ID, REPAIR_ACTION, REPAIR_DELAY, repair_tick)
+end
+
+function actor_on_first_update()
+	schedule_repair()
+end
+
+function on_game_load()
+	RemoveTimeEvent(EVENT_ID, REPAIR_ACTION)
+	reset_repair()
+	pending_clear = {}
+end
+
+function on_game_start()
+	if callbacks_registered then
+		return
+	end
+	RegisterScriptCallback("actor_on_item_take_from_box", actor_on_item_take_from_box)
+	RegisterScriptCallback("physic_object_on_use_callback", physic_object_on_use_callback)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("on_game_load", on_game_load)
+	callbacks_registered = true
+	log("callbacks registered v%s", VERSION)
+end
+
+function on_game_end()
+	cancel_repair()
+	pending_clear = {}
+	if callbacks_registered then
+		UnregisterScriptCallback("actor_on_item_take_from_box", actor_on_item_take_from_box)
+		UnregisterScriptCallback("physic_object_on_use_callback", physic_object_on_use_callback)
+		UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+		UnregisterScriptCallback("on_game_load", on_game_load)
+		callbacks_registered = false
+	end
+end
