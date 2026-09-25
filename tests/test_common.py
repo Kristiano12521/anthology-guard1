@@ -8,12 +8,25 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
-from _common import detect_version  # noqa: E402
+from _common import detect_version, is_ignorable_filename  # noqa: E402
 
 
 def write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+class IgnorableFilenameTests(unittest.TestCase):
+    def test_basename_and_posix_path(self):
+        self.assertTrue(is_ignorable_filename("desktop.ini"))
+        self.assertTrue(is_ignorable_filename("Thumbs.db"))
+        self.assertTrue(is_ignorable_filename("scripts/desktop.ini"))
+        self.assertFalse(is_ignorable_filename("scripts/hello.script"))
+
+    def test_windows_separators_as_in_xdb_toc(self):
+        # Регрессия CI (Linux): Path(r"a\\b").name не отрезает basename.
+        self.assertTrue(is_ignorable_filename("scripts\\desktop.ini"))
+        self.assertTrue(is_ignorable_filename("foo\\bar\\Thumbs.db"))
 
 
 class DetectVersionTests(unittest.TestCase):

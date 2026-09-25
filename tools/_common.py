@@ -36,7 +36,13 @@ IGNORABLE_FILE_NAMES = frozenset({"desktop.ini", "thumbs.db"})
 
 
 def is_ignorable_filename(name: str) -> bool:
-    return Path(name).name.lower() in IGNORABLE_FILE_NAMES
+    """True for desktop.ini / Thumbs.db, including TOC paths with ``\\``.
+
+    Архивы XDB часто хранят Windows-пути. ``Path(name).name`` на Linux не
+    режет ``\\``, и игнор молча не срабатывал в CI.
+    """
+    base = name.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
+    return base.lower() in IGNORABLE_FILE_NAMES
 
 
 def detect_version(addon_dir: Path) -> str:

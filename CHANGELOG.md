@@ -3,6 +3,10 @@
 Изменения самого рабочего места. Изменения модов ведутся в `addon/<mod_id>/CHANGELOG.md`.
 Записи старше месяца — в [`CHANGELOG-archive.md`](CHANGELOG-archive.md).
 
+## [0.1.76] — is_ignorable_filename: `\\` в TOC на Linux
+
+`tools/_common.is_ignorable_filename` режет basename через `replace("\\","/")`, а не `Path.name` — иначе на Linux CI имена вроде `scripts\desktop.ini` из XDB TOC не игнорировались и валили `test_fill_reference_skips_desktop_ini`. Тест на Windows-разделители.
+
 ## [0.1.75] — vendor_omit, CORE-001/002, игнор desktop.ini
 
 FORK-001: `vendor_omit=` в meta.ini — осознанные пропуски относительно вендора; BusyHands full-file (`mon_sleep`, `guaranteed_loot`, `aes_crow_spawner`) берутся из `pack_bhs.VENDOR_FULL_FILES`, не дублируются в omit. Campfires / CMO — omit + строки в CHANGELOG модов. `desktop.ini` / `Thumbs.db` не входят в FORK и не копируются fill-инструментами.
