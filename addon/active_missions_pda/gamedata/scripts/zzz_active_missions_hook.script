@@ -104,7 +104,7 @@ function sharing_taskboard()
 	-- XML-load path, and ui_mcm.get() there starts MCM's option gathering before
 	-- the UI is ready, which crashes the game on startup via whichever addon
 	-- touches a font first.
-	return active_missions_data.stored_setting("save_tab_space", 1, false) and true or false
+	return active_missions_data.stored_setting("save_tab_space", 1, true) and true or false
 end
 
 -- Called from our window's hand-off button.

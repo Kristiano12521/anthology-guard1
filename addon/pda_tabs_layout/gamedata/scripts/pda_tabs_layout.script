@@ -1,0 +1,100 @@
+-- PDA Tabs Layout - settings + dump helpers.
+-- Used by zzzz_pda_tabs_pager.script (VFS override of Anthology pager).
+
+function get(key, fallback)
+	if (ui_mcm) then
+		if (ui_mcm.is_gathering and ui_mcm.is_gathering()) then
+			return fallback
+		end
+		local v = ui_mcm.get("pda_tabs_layout/" .. key)
+		if (v ~= nil) then
+			return v
+		end
+	end
+	return fallback
+end
+
+-- Safe from early paths: read axr_options directly.
+-- vtype: 1 bool, 2 number, 0 string (axr_main.config)
+function stored(key, vtype, fallback)
+	if not (_G.axr_main and axr_main.config) then
+		return fallback
+	end
+	local ok, v = pcall(function()
+		return axr_main.config:r_value("mcm", "pda_tabs_layout/" .. key, vtype or 2, fallback)
+	end)
+	if (ok and v ~= nil) then
+		return v
+	end
+	return fallback
+end
+
+function enabled()
+	return get("enable", true) and true or false
+end
+
+local function btn_caption(btn)
+	local text = nil
+	pcall(function()
+		local tc = btn and btn:TextControl()
+		text = tc and tc:GetText() or nil
+	end)
+	return text
+end
+
+function dump_strip()
+	local menu = ActorMenu and ActorMenu.get_pda_menu and ActorMenu.get_pda_menu()
+	if not (menu) then
+		printf("!pda_tabs_layout: dump - no PDA menu")
+		return
+	end
+	local ok, tab = pcall(function()
+		return menu:GetTabControl()
+	end)
+	if not (ok and tab) then
+		printf("!pda_tabs_layout: dump - no tab control")
+		return
+	end
+
+	local strip_x, strip_y, strip_w = 0, 0, 0
+	pcall(function()
+		local p = tab:GetWndPos()
+		strip_x, strip_y = p.x, p.y
+		strip_w = tab:GetWidth()
+	end)
+
+	printf("========== pda_tabs_layout DUMP ==========")
+	printf("strip pos=(%.0f,%.0f) w=%.0f active=%s",
+		strip_x, strip_y, strip_w, tostring(menu.GetActiveSection and menu:GetActiveSection() or "?"))
+	printf("mcm enable=%s gap=%s page_size=%s tab_w_max=%s arrow_w=%s",
+		tostring(get("enable", true)),
+		tostring(get("gap", 4)),
+		tostring(get("page_size", 7)),
+		tostring(get("tab_w_max", 84)),
+		tostring(get("arrow_w", 36)))
+
+	local known = {
+		"eptPdaTabsPrev", "eptTasks", "eptActiveMissions", "eptRanking", "eptRelations",
+		"eptContacts", "eptEncyclopedia", "eptRadio", "eptLogs", "eptExtraAchievements",
+		"eptHarukaSkills", "eptUtjanTraits", "eptTalents", "eptInteractivePDA",
+		"eptFactions", "eptTaskboard", "eptPdaTabsNext",
+	}
+	for _, id in ipairs(known) do
+		local btn = nil
+		pcall(function()
+			btn = tab:GetButtonById(id)
+		end)
+		if (btn) then
+			local x, y, w, h, shown = 0, 0, 0, 0, false
+			pcall(function()
+				local p = btn:GetWndPos()
+				x, y = p.x, p.y
+				w, h = btn:GetWidth(), btn:GetHeight()
+				shown = btn:IsShown() and true or false
+			end)
+			printf("  %s show=%s x=%.0f y=%.0f w=%.0f h=%.0f caption=[%s]",
+				id, tostring(shown), x, y, w, h, tostring(btn_caption(btn) or ""))
+		end
+	end
+	printf("========== end dump ==========")
+end

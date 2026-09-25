@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="ui_mcm_menu_pda_tabs_layout">
+		<text>PDA Tabs Layout</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_title">
+		<text>PDA tab strip calibrator</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_enable">
+		<text>Apply clear gap between tabs</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_enable_desc">
+		<text>On: equal-width tabs with a clear gap (no border stacking). Off: stock Anthology packing (tabs edge-to-edge, gap only around arrows).</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_geom_head">
+		<text>%c[255,190,190,190]Geometry — open the PDA to see changes live</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_gap">
+		<text>Gap between buttons</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_page_size">
+		<text>Tabs per page</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_arrow_w">
+		<text>Arrow button width</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_tab_w_min">
+		<text>Min tab width</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_tab_w_max">
+		<text>Max tab width</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_strip_head">
+		<text>%c[255,190,190,190]Strip position / size</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_strip_x">
+		<text>Strip X</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_strip_y">
+		<text>Strip Y</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_strip_w">
+		<text>Strip width</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_dump_head">
+		<text>%c[255,190,190,190]Diagnostic — dumps id/x/width/caption of every tab button to the log</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_dump_key">
+		<text>Dump layout to log</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_dump_mod">
+		<text>Modifier</text>
+	</string>
+</string_table>

@@ -33,10 +33,9 @@ function on_mcm_load()
 		-- PDA whose tab strip another mod is also rearranging.
 		{id = "tab_second_position", type = "check", val = 1, def = true},
 
-		-- Off by default: it moves where the Taskboard tab lands, which nobody
-		-- should get by surprise. Ignored when Mod App Creator is installed,
-		-- since the launcher already costs no tab.
-		{id = "save_tab_space", type = "check", val = 1, def = false},
+		-- On by default (Anthology crowded strip): Missions share Taskboard.
+		-- Ignored when Mod App Creator is installed (launcher costs no tab).
+		{id = "save_tab_space", type = "check", val = 1, def = true},
 
 		{id = "line_key", type = "line"},
 		{id = "key_head", type = "desc", text = "ui_mcm_active_missions_key_head", clr = {255, 190, 190, 190}},

@@ -1,11 +1,9 @@
--- load-order: после anthology zzzz_pda_tabs_pager (same filename override)
--- Active Missions Anthology: adds eptActiveMissions next to Area Map.
--- Keep in sync with reference/anthology/scripts/zzzz_pda_tabs_pager.script
--- when the core pager changes.
+-- load-order: после anthology zzzz_pda_tabs_pager (same filename VFS override)
+-- PDA Tabs Layout: MCM-driven strip geometry + pagination.
+-- Keep eptActiveMissions in real_order for Active Missions PDA Tab.
 
 local prev_id = "eptPdaTabsPrev"
 local next_id = "eptPdaTabsNext"
-local page_size = 7
 local page = 1
 local prev_text = "<<"
 local next_text = ">>"
@@ -28,8 +26,24 @@ local real_order = {
 	"eptTalents",
 	"eptInteractivePDA",
 	"eptFactions",
-	"eptTaskboard"
+	"eptTaskboard",
 }
+
+local function cfg_num(key, fallback)
+	local v = pda_tabs_layout.get(key, fallback)
+	v = tonumber(v)
+	if not (v) then
+		return fallback
+	end
+	return v
+end
+
+local function page_size()
+	local n = math.floor(cfg_num("page_size", 7) + 0.5)
+	if n < 3 then n = 3 end
+	if n > 12 then n = 12 end
+	return n
+end
 
 local function safe_call(obj, method, ...)
 	if not obj then return false end
@@ -82,7 +96,7 @@ local function find_index(list, section)
 end
 
 local function get_page_count(list)
-	return math.max(1, math.ceil(#list / page_size))
+	return math.max(1, math.ceil(#list / page_size()))
 end
 
 local function clamp_page(value, list)
@@ -94,7 +108,7 @@ end
 
 local function page_for_section(list, section)
 	local idx = find_index(list, section)
-	return idx and clamp_page(math.ceil(idx / page_size), list) or page
+	return idx and clamp_page(math.ceil(idx / page_size()), list) or page
 end
 
 local function get_text_control(btn)
@@ -126,15 +140,15 @@ local function show_button(btn, show, x, width, label)
 end
 
 local function first_section_on_page(list, target_page)
-	local first_idx = ((target_page - 1) * page_size) + 1
+	local first_idx = ((target_page - 1) * page_size()) + 1
 	return list[first_idx] or list[1] or "eptTasks"
 end
 
 local function section_on_current_page(list, section)
 	local idx = find_index(list, section)
 	if not idx then return false end
-	local first_idx = ((page - 1) * page_size) + 1
-	return idx >= first_idx and idx < first_idx + page_size
+	local first_idx = ((page - 1) * page_size()) + 1
+	return idx >= first_idx and idx < first_idx + page_size()
 end
 
 local function apply_layout(preferred_section)
@@ -149,38 +163,92 @@ local function apply_layout(preferred_section)
 	end
 	page = clamp_page(page, order)
 
-	local tab_x = 132
-	local tab_y = 23
-	local available = 570
-	local arrow_w = 40
-	local gap = 4
+	local tab_x = cfg_num("strip_x", 132)
+	local tab_y = cfg_num("strip_y", 23)
+	local available = cfg_num("strip_w", 570)
+	local arrow_w = cfg_num("arrow_w", 36)
+	local gap = cfg_num("gap", 4)
+	local max_w = cfg_num("tab_w_max", 84)
+	local min_w = cfg_num("tab_w_min", 56)
+	local use_gap = pda_tabs_layout.enabled()
+
+	-- When layout MCM is off: Anthology stock behaviour (gap only around arrows).
+	local stock_gap = 4
+
 	local show_prev = page > 1
 	local show_next = page < get_page_count(order)
-	local first_idx = ((page - 1) * page_size) + 1
-	local last_idx = math.min(first_idx + page_size - 1, #order)
+	local ps = page_size()
+	local first_idx = ((page - 1) * ps) + 1
+	local last_idx = math.min(first_idx + ps - 1, #order)
 	local visible_count = last_idx - first_idx + 1
-	local arrow_space = (show_prev and (arrow_w + gap) or 0) + (show_next and (arrow_w + gap) or 0)
-	local real_w = visible_count > 0 and math.floor((available - arrow_space) / visible_count) or 80
-	if real_w > 89 then real_w = 89 end
-	if real_w < 55 then real_w = 55 end
+	if visible_count < 1 then
+		visible_count = 1
+	end
+
+	local arrow_count = (show_prev and 1 or 0) + (show_next and 1 or 0)
+	local real_w
+
+	if use_gap then
+		local ctrl_count = visible_count + arrow_count
+		real_w = math.floor(
+			(available - arrow_count * arrow_w - math.max(0, ctrl_count - 1) * gap)
+				/ visible_count
+		)
+	else
+		local arrow_space = (show_prev and (arrow_w + stock_gap) or 0)
+			+ (show_next and (arrow_w + stock_gap) or 0)
+		real_w = math.floor((available - arrow_space) / visible_count)
+	end
+
+	if real_w > max_w then real_w = max_w end
+	if real_w < min_w then real_w = min_w end
 
 	safe_call(tab, "SetWndPos", vector2():set(tab_x, tab_y))
 	safe_call(tab, "SetWndSize", vector2():set(available, 27))
 
-	local x = 0
-	show_button(get_button(tab, prev_id), show_prev, x, arrow_w, prev_text)
+	local strip = {}
 	if show_prev then
-		x = x + arrow_w + gap
+		strip[#strip + 1] = { btn = get_button(tab, prev_id), w = arrow_w, label = prev_text }
 	end
-
 	for idx, id in ipairs(order) do
 		local btn = get_button(tab, id)
-		local show = idx >= first_idx and idx <= last_idx
-		if show then
-			show_button(btn, true, x, real_w)
-			x = x + real_w
+		if idx >= first_idx and idx <= last_idx then
+			strip[#strip + 1] = { btn = btn, w = real_w, label = nil }
 		else
 			show_button(btn, false, -2000, 1)
+		end
+	end
+	if show_next then
+		strip[#strip + 1] = { btn = get_button(tab, next_id), w = arrow_w, label = next_text }
+	else
+		show_button(get_button(tab, next_id), false, -2000, 1)
+	end
+	if not show_prev then
+		show_button(get_button(tab, prev_id), false, -2000, 1)
+	end
+
+	local x = 0
+	if use_gap then
+		for i, item in ipairs(strip) do
+			show_button(item.btn, true, x, item.w, item.label)
+			if i < #strip then
+				x = x + item.w + gap
+			end
+		end
+	else
+		-- Stock Anthology: gap only after/before arrows.
+		for i, item in ipairs(strip) do
+			show_button(item.btn, true, x, item.w, item.label)
+			if i < #strip then
+				local next_item = strip[i + 1]
+				local after_arrow = item.label ~= nil
+				local before_arrow = next_item and next_item.label ~= nil
+				if after_arrow or before_arrow then
+					x = x + item.w + stock_gap
+				else
+					x = x + item.w
+				end
+			end
 		end
 	end
 
@@ -189,11 +257,6 @@ local function apply_layout(preferred_section)
 			show_button(get_button(tab, id), false, -2000, 1)
 		end
 	end
-
-	if show_next then
-		x = x + gap
-	end
-	show_button(get_button(tab, next_id), show_next, x, arrow_w, next_text)
 end
 
 local function delayed_activate(section)
@@ -269,8 +332,24 @@ local function actor_on_update()
 	end
 end
 
+local function on_key_release(dik)
+	if not (db.actor and ui_mcm) then
+		return
+	end
+	local bind = ui_mcm.get("pda_tabs_layout/dump_key")
+	if not (bind) or bind < 0 or dik ~= bind then
+		return
+	end
+	local mod = tonumber(ui_mcm.get("pda_tabs_layout/dump_mod")) or 0
+	if not (ui_mcm.get_mod_key(mod)) then
+		return
+	end
+	pda_tabs_layout.dump_strip()
+end
+
 function on_game_start()
 	patch_pda_subdialog()
 	RegisterScriptCallback("on_game_load", patch_pda_subdialog)
 	RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("on_key_release", on_key_release)
 end

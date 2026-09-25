@@ -24,3 +24,7 @@ Active Missions PDA Tab — Anthology 2.1
 ------
 Оригинал: Active Missions PDA Tab 1.2 (ModDB).
 Адаптация под Anthology: Kristiano / STALKER Anthology Dev.
+
+Полоса вкладок
+--------------
+Раскладку полосы настраивайте аддоном pda_tabs_layout (ставить после этого мода).

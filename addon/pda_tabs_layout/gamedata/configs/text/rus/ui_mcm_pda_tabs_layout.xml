@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="ui_mcm_menu_pda_tabs_layout">
+		<text>Раскладка вкладок КПК</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_title">
+		<text>Калибровка полосы вкладок КПК</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_enable">
+		<text>Зазор между вкладками</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_enable_desc">
+		<text>Вкл.: одинаковая ширина и явный зазор (края не наезжают). Выкл.: как в Anthology (вкладки встык, зазор только у стрелок).</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_geom_head">
+		<text>%c[255,190,190,190]Геометрия — откройте КПК, правки видны сразу</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_gap">
+		<text>Зазор между кнопками</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_page_size">
+		<text>Вкладок на страницу</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_arrow_w">
+		<text>Ширина стрелок</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_tab_w_min">
+		<text>Мин. ширина вкладки</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_tab_w_max">
+		<text>Макс. ширина вкладки</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_strip_head">
+		<text>%c[255,190,190,190]Позиция / размер полосы</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_strip_x">
+		<text>Полоса X</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_strip_y">
+		<text>Полоса Y</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_strip_w">
+		<text>Ширина полосы</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_dump_head">
+		<text>%c[255,190,190,190]Диагностика — пишет id/x/width/подпись каждой кнопки в лог</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_dump_key">
+		<text>Дамп раскладки в лог</text>
+	</string>
+	<string id="ui_mcm_pda_tabs_layout_dump_mod">
+		<text>Модификатор</text>
+	</string>
+</string_table>
