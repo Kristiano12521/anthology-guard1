@@ -85,6 +85,7 @@ class PackKristianoTests(unittest.TestCase):
             ("quickqk_task_complete", "quickqk_only"),
             ("fix_st2_footstep", "st2_only"),
             ("campfires_anthology_compat", "campfires_only"),
+            ("active_missions_pda", "active_missions_only"),
         ):
             write(
                 self.addon_root / mod_id / "gamedata" / "scripts" / f"{marker}.script",
@@ -169,6 +170,7 @@ class PackKristianoTests(unittest.TestCase):
         self.assertNotIn("gamedata/scripts/quickqk_only.script", names)
         self.assertNotIn("gamedata/scripts/st2_only.script", names)
         self.assertNotIn("gamedata/scripts/campfires_only.script", names)
+        self.assertNotIn("gamedata/scripts/active_missions_only.script", names)
         self.assertNotIn("gamedata/scripts/skip_loot.script", names)
         self.assertNotIn("gamedata/scripts/skip_bhs.script", names)
         self.assertNotIn("gamedata/scripts/zzzz_diag_fetch_marker.script", names)
