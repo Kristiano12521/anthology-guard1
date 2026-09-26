@@ -1,5 +1,5 @@
 -- Anthology Busy Hands Stability Fix v0.5.3 - repair OnItemSelect chain fix
--- load-order: ����� zzzzz_arti_outfit_repair
+-- load-order: after zzzzz_arti_outfit_repair
 --
 -- ПРАВИЛО 2/3: zzzz_arti_jamming_repairs.script и zzzzz_arti_outfit_repair.
 -- script остаются оригинальными - НЕ подменяются. Патчим только конечную

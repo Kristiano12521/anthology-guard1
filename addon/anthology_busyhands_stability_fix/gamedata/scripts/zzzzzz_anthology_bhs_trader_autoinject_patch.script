@@ -1,4 +1,4 @@
--- load-order: ����� trader_autoinject (����������, [FIX] Campfires Anthology Compat)
+-- load-order: after trader_autoinject (vendor, [FIX] Campfires Anthology Compat)
 -- Anthology Busy Hands Stability Fix v0.6.0 - trader_autoinject patch
 --
 -- ÐÐ¡ÐÐ ÐÐÐÐ¯ÐÐ¢ ÐÐ¨ÐÐÐÐ£ v0.5.0: ÑÐ¾Ð³Ð´Ð° trader_autoinject.script Ð±ÑÐ» Ð¿Ð¾Ð»Ð½Ð¾ÑÑÑÑ

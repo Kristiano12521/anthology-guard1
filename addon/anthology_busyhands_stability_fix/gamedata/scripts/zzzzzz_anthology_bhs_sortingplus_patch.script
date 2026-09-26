@@ -1,5 +1,5 @@
 -- Anthology Busy Hands Stability Fix v0.5.0 - SortingPlus LMode_Init patch
--- load-order: ����� zzz_rax_sortingplus_mcm
+-- load-order: after zzz_rax_sortingplus_mcm
 --
 -- ПРАВИЛО 2/3: zzz_rax_sortingplus_mcm.script (674 строки, вендорский
 -- SortingPlus addon) остаётся оригинальным - НЕ подменяется. Патчим ТОЛЬКО

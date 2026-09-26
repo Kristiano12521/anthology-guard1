@@ -1,5 +1,5 @@
 -- Anthology Busy Hands Stability Fix v0.6.14 - main_menu.Show / SetVisibleMagnifier
--- load-order: после ui_main_menu / ui_options
+-- load-order: after ui_main_menu / ui_options
 --
 -- BusyHands on destroyed CUIMMShniaga is NOT catchable by pcall (Modded Exes).
 -- xray_mg9000(3) stack: SetVisibleMagnifier -> our pcall wrapper -> still BusyHands.

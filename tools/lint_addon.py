@@ -49,7 +49,9 @@ ADDON_ROOT = REPO_ROOT / "addon"
 ALLOWED_TOP_LEVEL = {"meta.ini", "changelog.md", "readme.md", ".gitignore"}
 
 LOAD_ORDER_HACK_RE = re.compile(r"^(z{3,}|a{3,})", re.I)
-LOAD_ORDER_JUSTIFICATION_RE = re.compile(r"--\s*load-order:\s*после\s+\S+", re.I)
+LOAD_ORDER_JUSTIFICATION_RE = re.compile(
+    r"--\s*load-order:\s*(?:после|after)\s+\S+", re.I
+)
 VENDOR_FORK_RE = re.compile(r"^vendor_fork\s*=\s*1$", re.I)
 VENDOR_SOURCE_RE = re.compile(r"^vendor_source\s*=\s*(.+)$", re.I)
 VENDOR_OMIT_RE = re.compile(r"^vendor_omit\s*=\s*(.+)$", re.I)
@@ -387,7 +389,7 @@ def mtime_untrusted_reason() -> str | None:
 
 
 def has_load_order_justification(text: str) -> bool:
-    """Комментарий `-- load-order: после <что>` в первых 10 строках снимает ORDER-002."""
+    """Комментарий `-- load-order: after <what>` (или устар. «после») снимает ORDER-002."""
     for line in text.splitlines()[:10]:
         if LOAD_ORDER_JUSTIFICATION_RE.search(line):
             return True
@@ -882,9 +884,8 @@ class AddonLinter:
             self.add(
                 "ENC-005",
                 "error",
-                "В комментарии -- load-order: подряд идут '?': кириллица «после» "
-                "испорчена редактором без cp1251. Восстанови слово в Windows-1251 "
-                "(tools/to_cp1251.ps1).",
+                "В комментарии -- load-order: подряд идут '?': маркер испорчен. "
+                "Пиши ASCII: -- load-order: after <what> (не кириллическое «после»).",
                 path,
             )
         elif looks_like_utf8_cyrillic(data):
@@ -970,7 +971,7 @@ class AddonLinter:
                 "ORDER-002",
                 "warn",
                 "Префикс задаёт порядок выполнения скриптов. Если гонка загрузки намеренная, "
-                "добавь в первые 10 строк комментарий `-- load-order: после <что>`.",
+                "добавь в первые 10 строк комментарий `-- load-order: after <what>` (ASCII).",
                 path,
             )
 

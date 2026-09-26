@@ -1,5 +1,5 @@
 -- Anthology Busy Hands Stability Fix v0.6.14 - DotMarks QuickHelp
--- load-order: после ui_hud_dotmarks / dotmarks_main
+-- load-order: after ui_hud_dotmarks / dotmarks_main
 --
 -- BusyHands on destroyed UIStaticQuickHelp is NOT catchable by pcall.
 -- xray_mg9000(3): GetText -> ui_hud_dotmarks:1776 -> pcall -> our wrapper -> BusyHands.

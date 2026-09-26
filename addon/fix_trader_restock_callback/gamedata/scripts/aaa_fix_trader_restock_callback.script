@@ -1,4 +1,4 @@
--- load-order: после axr_main.script; префикс aaa_ - trader_on_restock до on_game_start barter_core и exo_loot
+-- load-order: after axr_main.script; prefix aaa_ - trader_on_restock before on_game_start barter_core and exo_loot
 -- Trader Restock Callback Fix
 -- Anomaly 1.5.3 / Anthology 2.1
 --
@@ -9,7 +9,7 @@
 -- axr_main.callback_add wrap.
 
 local LOG_TAG = "[fix_trader_restock_callback]"
-local VERSION = "1.0.5"
+local VERSION = "1.0.6"
 local CALLBACK = "trader_on_restock"
 
 local declare_result = "pending"

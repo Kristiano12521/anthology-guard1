@@ -1,4 +1,4 @@
--- load-order: после faction_trade_ui / action_trade_ui (Faction Based HUD)
+-- load-order: after faction_trade_ui / action_trade_ui (Faction Based HUD)
 -- Faction Trade UI supply_level crash fix
 -- Anomaly 1.5.3 / Anthology 2.1
 --
@@ -8,7 +8,7 @@
 -- Tikhonych / Pathogenych on Cordon hit this path on StartTrade.
 
 local LOG_TAG = "[fix_faction_trade_supply]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 

@@ -1,5 +1,9 @@
 # Changelog — Active Missions PDA Tab (Anthology)
 
+## 1.3.3 — 2026-09-27
+
+- `-- load-order:` в `zzz_active_missions_hook` — ASCII `after` / `before` (кириллица в маркере портила CI).
+
 ## 1.3.2 — 2026-09-27
 
 - `zzz_active_missions_hook`: `on_game_end` снимает `on_game_load` и `on_key_release` (LUA-003).

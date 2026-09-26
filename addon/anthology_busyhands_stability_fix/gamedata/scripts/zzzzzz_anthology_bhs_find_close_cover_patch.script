@@ -1,5 +1,5 @@
 -- Anthology Busy Hands Stability Fix v0.6.7 - find_close_cover runtime patch
--- load-order: ����� utils_obj
+-- load-order: after utils_obj
 --
 -- ПРАВИЛО 2/3: настоящий monkey-patch ОДНОЙ глобальной функции.
 -- utils_obj.script (965 строк) остаётся оригинальным вендорским файлом -

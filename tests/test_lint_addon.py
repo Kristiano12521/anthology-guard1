@@ -250,6 +250,20 @@ class LoadOrderScriptTests(unittest.TestCase):
             self.assertNotIn("ORDER-002", {f.code for f in findings})
             self.assertNotIn("ORDER-001", {f.code for f in findings})
 
+    def test_justification_after_ascii_suppresses_warning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = _minimal_addon(Path(tmp), "order_after")
+            script = addon / "gamedata" / "scripts" / "zzzz_after_ascii.script"
+            script.write_text(
+                "-- load-order: after sequential_load_magazine.script\n"
+                "function on_game_start() end\n",
+                encoding="ascii",
+            )
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView())
+            self.assertNotIn("ORDER-002", {f.code for f in findings})
+            self.assertNotIn("ENC-004", {f.code for f in findings})
+            self.assertNotIn("ENC-005", {f.code for f in findings})
+
     def test_justification_after_line_ten_does_not_suppress(self):
         with tempfile.TemporaryDirectory() as tmp:
             addon = _minimal_addon(Path(tmp), "order_late")

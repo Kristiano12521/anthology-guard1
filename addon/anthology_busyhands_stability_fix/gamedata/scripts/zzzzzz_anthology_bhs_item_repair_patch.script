@@ -1,5 +1,5 @@
 -- Anthology Busy Hands Stability Fix v0.5.0 - item_repair.UIRepair patch
--- load-order: ����� zz_item_repair_keep_crafting_window_open
+-- load-order: after zz_item_repair_keep_crafting_window_open
 --
 -- ПРАВИЛО 2/3: zz_item_repair_keep_crafting_window_open.script (вендорский
 -- monkey-patch addon поверх item_repair.script) остаётся оригинальным - НЕ

@@ -1,4 +1,4 @@
--- load-order: после z_taskboard_overrides / csfp_pda_patch; до zzzz_pda_tabs_pager
+-- load-order: after z_taskboard_overrides / csfp_pda_patch; before zzzz_pda_tabs_pager
 -- Routes the eptActiveMissions PDA section to our window.
 --
 -- Anthology: zzzz_pda_tabs_pager wraps set_active_subdialog after us (zzzz >

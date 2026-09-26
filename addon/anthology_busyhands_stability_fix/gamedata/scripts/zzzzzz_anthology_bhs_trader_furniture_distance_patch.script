@@ -1,5 +1,5 @@
 -- Anthology Busy Hands Stability Fix - trader furniture distance check
--- load-order: ����� zzzzzz_anthology_bhs_trader_autoinject_patch
+-- load-order: after zzzzzz_anthology_bhs_trader_autoinject_patch
 -- (ОПЦИОНАЛЬНО, НЕ фикс краша)
 --
 -- Это НЕ часть стабилизации - это изменение игрового поведения, которое

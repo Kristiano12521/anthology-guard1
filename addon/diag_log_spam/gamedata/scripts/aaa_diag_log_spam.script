@@ -1,9 +1,9 @@
--- load-order: после _g.script; префикс aaa_ — обёртки printe и get_object_by_id до item_combination (до init мода)
+-- load-order: after _g.script; prefix aaa_ - wraps printe and get_object_by_id before item_combination (before init mod)
 -- Log Spam Diagnostic
 -- Trace first miss per id for get_object_by_id / alife_release; printe via _diag_log_spam_printe.script.
 -- Anomaly 1.5.3 / Anthology 2.1
 
-local VERSION = "1.2.3"
+local VERSION = "1.2.4"
 local LOG_TAG = "[diag_log_spam]"
 
 _G.__diag_log_spam = _G.__diag_log_spam or {}

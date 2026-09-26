@@ -1,5 +1,5 @@
 -- Anthology Busy Hands Stability Fix v0.5.3 - repair chain vendor-base capture
--- load-order: ����� zzzz_arti_jamming_repairs
+-- load-order: after zzzz_arti_jamming_repairs
 --
 -- ЭТОТ ФАЙЛ ДОЛЖЕН ЗАГРУЗИТЬСЯ РОВНО МЕЖДУ zzzz_arti_jamming_repairs.script
 -- И zzzzz_arti_outfit_repair.script. Имя файла подобрано так, чтобы попасть

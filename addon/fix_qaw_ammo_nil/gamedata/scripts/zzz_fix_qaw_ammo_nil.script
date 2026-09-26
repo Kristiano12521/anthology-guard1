@@ -1,4 +1,4 @@
--- load-order: после haru_quick_action_wheel_mcm
+-- load-order: after haru_quick_action_wheel_mcm
 -- QAW Ammo Active Item Nil Guard
 -- Anomaly 1.5.3 / Anthology 2.1
 --
@@ -13,7 +13,7 @@
 -- v1.0.2: re-wrap on actor_on_first_update if MT reload replaced QAW classes.
 
 local LOG_TAG = "[fix_qaw_ammo_nil]"
-local VERSION = "1.0.4"
+local VERSION = "1.0.5"
 local LOG_INTERVAL_MS = 1000
 
 printf("%s loaded v%s", LOG_TAG, VERSION)

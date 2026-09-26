@@ -114,8 +114,9 @@ _LOAD_ORDER_QUESTION_MARKS_RE = re.compile(rb"--\s*load-order:[^\n]*\?{2,}", re.
 def has_load_order_question_marks(data: bytes) -> bool:
     """True, если в комментарии -- load-order: подряд идут '?' (≥2).
 
-    Типичная порча: редактор без кириллицы заменил «после» на «?????».
+    Типичная порча: редактор без кириллицы заменил слово в маркере на «?????».
     ENC-004 (EF BF BD) этот случай не ловит — там уже ASCII «?».
+    Пиши маркер ASCII: `-- load-order: after <what>`.
     """
     return _LOAD_ORDER_QUESTION_MARKS_RE.search(data) is not None
 

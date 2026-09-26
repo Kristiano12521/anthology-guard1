@@ -1,5 +1,5 @@
 -- Anthology Busy Hands Stability Fix v0.6.12 - UIInventory weight / IsInvOwner guard
--- load-order: после stash_capacities (Anthology База.Данные) и ui_inventory
+-- load-order: after stash_capacities (Anthology Base.Data) and ui_inventory
 --
 -- Classes & Talents calls ui_inventory.GUI:UpdateWeight() every second from
 -- actor_on_update even after the loot UI is closed. GUI still holds the last
