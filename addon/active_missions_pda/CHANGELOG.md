@@ -1,5 +1,10 @@
 # Changelog — Active Missions PDA Tab (Anthology)
 
+## 1.3.2 — 2026-09-27
+
+- `zzz_active_missions_hook`: `on_game_end` снимает `on_game_load` и `on_key_release` (LUA-003).
+- README_RU / README_EN перенесены в `docs/mods/active_missions_pda/` (вне пакета MO2).
+
 ## 1.3.1 — 2026-09-23
 
 - `save_tab_space` (Задания внутри вкладки Объявления) включено по умолчанию — отдельная кнопка Заданий не занимает место на полоске вкладок PDA.

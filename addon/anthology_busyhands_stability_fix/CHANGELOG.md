@@ -10,6 +10,25 @@
 - Отключить слот в MO2; новая игра не нужна.
 - Сейв не портится (своего `save_state` нет). Вернётся ванильное/вендорское поведение BusyHands и соседних модов — прежние CTD и лог-спам возможны, битого сейва нет.
 
+## [0.6.16] — 2026-09-26
+
+**Изменено**
+
+- `zzzzzz_anthology_bhs_crow_spawner_patch.script` 0.6.6: перед `patrol` / `level_vertex_id` проверка `level.patrol_path_exists`. Чужой путь — idle 5 минут и выход, без вызова вершины. `pcall` вокруг вершины оставлен на случай, когда путь есть, а вершина всё же кидает.
+
+**Причина**
+
+Лог jacob 2026-09-26, `l12_stancia`: `[BusyHandsDebug] Runtime Error`, стек `level_vertex_id` → строка 40 → `pcall`. Окно «UNSTABLE GAME STATE» рисует Busy Hands на ошибку внутри `pcall`. Путь не с загруженного уровня надо отсечь до вызова.
+
+**Не затронуто**
+
+- Остальные гарды BHS, вендорский `sr_crow_spawner.script`, сейвы
+
+**Проверено**
+
+- `tools/lint_addon.py anthology_busyhands_stability_fix`
+- В игре ещё нет
+
 ## [0.6.15] — 2026-09-22
 
 **Изменено**

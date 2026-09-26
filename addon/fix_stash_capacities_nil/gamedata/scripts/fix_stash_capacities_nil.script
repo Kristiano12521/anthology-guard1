@@ -14,7 +14,7 @@
 -- (debug.getupvalue on callback_set; same path as fix_misc_script_errors).
 
 local LOG_TAG = "[fix_stash_capacities_nil]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.4"
 local MODULE_NAME = "stash_capacities"
 local AFTER_MOVE = "ActorMenu_on_item_after_move"
 local SOURCE_MARK = "stash_capacities"
@@ -29,6 +29,7 @@ local after_move_wrapped = false
 local callbacks_registered = false
 local skip_count = 0
 local last_log_tg = 0
+local saved_register = nil
 
 local function log_skip(npc_id)
 	skip_count = skip_count + 1
@@ -72,11 +73,11 @@ local function is_stash_callback(fn)
 	return string.find(src, SOURCE_MARK, 1, true) ~= nil
 end
 
+-- Do not read _G[name]. The engine binder (C __index) aborts with
+-- invalid_parameter_handler in xrDebugNew.cpp for "stash_capacities"
+-- both at file load (1.0.1) and from on_game_start (1.0.2). rawget only.
 local function module_of(name)
 	local mod = rawget(_G, name)
-	if type(mod) ~= "table" then
-		mod = _G[name]
-	end
 	if type(mod) ~= "table" then
 		return nil
 	end
@@ -152,13 +153,25 @@ local function steal_after_move(raw_fn)
 	return guarded_after_move
 end
 
+local function hooked_register(name, fn)
+	if name == AFTER_MOVE and type(fn) == "function" then
+		fn = steal_after_move(fn)
+	end
+	if type(saved_register) ~= "function" then
+		return
+	end
+	return saved_register(name, fn)
+end
+
 function patched_on_game_start()
 	local prev_register = _G.RegisterScriptCallback
 	_G.RegisterScriptCallback = function(name, fn)
 		if name == AFTER_MOVE then
 			fn = steal_after_move(fn)
 		end
-		return prev_register(name, fn)
+		if type(prev_register) == "function" then
+			return prev_register(name, fn)
+		end
 	end
 
 	local ok, err = true, nil
@@ -176,38 +189,35 @@ function patched_on_game_start()
 	end
 end
 
-local saved_register = nil
-
-local function hooked_register(name, fn)
-	if name == AFTER_MOVE and type(fn) == "function" then
-		fn = steal_after_move(fn)
-	end
-	return saved_register(name, fn)
-end
-
 local function arm_register_hook()
-	if saved_register then
+	if type(saved_register) == "function" then
 		return
 	end
-	if type(RegisterScriptCallback) ~= "function" then
+	local current = rawget(_G, "RegisterScriptCallback")
+	if type(current) ~= "function" then
+		current = RegisterScriptCallback
+	end
+	if type(current) ~= "function" or current == hooked_register then
 		return
 	end
-	saved_register = RegisterScriptCallback
+	saved_register = current
 	_G.RegisterScriptCallback = hooked_register
 end
 
+-- Restore _G only when we are still the top hook. Never clear saved_register:
+-- fix_travel_invalid_id (and similar) capture the current RegisterScriptCallback
+-- as their orig_register; after our actor_on_first_update they still call us.
 local function disarm_register_hook()
-	if saved_register and _G.RegisterScriptCallback == hooked_register then
+	if type(saved_register) == "function" and _G.RegisterScriptCallback == hooked_register then
 		_G.RegisterScriptCallback = saved_register
 	end
-	saved_register = nil
 end
 
 local function install(silent)
 	local mod = module_of(MODULE_NAME)
 	if not (mod and type(mod.on_game_start) == "function") then
 		if not silent then
-			printf("%s %s.on_game_start not found - guard NOT installed", LOG_TAG, MODULE_NAME)
+			printf("%s %s not on raw _G, register hook stays armed v%s", LOG_TAG, MODULE_NAME, VERSION)
 		end
 		return false
 	end
@@ -226,10 +236,14 @@ local function install(silent)
 end
 
 local function uninstall()
+	disarm_register_hook()
+
 	if after_move_wrapped and type(UnregisterScriptCallback) == "function" then
 		UnregisterScriptCallback(AFTER_MOVE, guarded_after_move)
 	end
-	if orig_after_move and type(RegisterScriptCallback) == "function" then
+	if orig_after_move and type(saved_register) == "function" then
+		saved_register(AFTER_MOVE, orig_after_move)
+	elseif orig_after_move and type(RegisterScriptCallback) == "function" then
 		RegisterScriptCallback(AFTER_MOVE, orig_after_move)
 	end
 	orig_after_move = nil
@@ -256,10 +270,9 @@ function actor_on_first_update()
 	end
 end
 
--- File load is before any on_game_start. HF registers the local callback
--- from stash_capacities.on_game_start via the global RegisterScriptCallback.
+-- File load is before stash_capacities.script. Arm the register hook only.
+-- module_of / install run from on_game_start, after that file exists.
 arm_register_hook()
-install(true)
 
 function on_game_start()
 	install(false)

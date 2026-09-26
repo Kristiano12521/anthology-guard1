@@ -19,6 +19,24 @@
 
 ---
 
+## [issue] `[BusyHandsDebug] Runtime Error` / `zzzzzz_anthology_bhs_crow_spawner_patch.script:40` `level_vertex_id`
+
+- дата: 2026-09-26
+- мод: наш `anthology_busyhands_stability_fix` 0.6.5 (`zzzzzz_anthology_bhs_crow_spawner_patch.script`); окно рисует вендорский Busy Hands. Сессия jacob, `l12_stancia`, xrCore 10057 / MT-TEST 2026.08.21 (не пакет 1.0.11)
+- итог: **0.6.16 на ЧАЭС окно не вернуло** — класс `Lua, поймано pcall`. Стек jacob: `[C] level_vertex_id` → строка 40 → `[C] pcall` → `check_for_spawn_new_crow`. Busy Hands рисует UNSTABLE на ошибку внутри pcall. 0.6.6 патча ворон: `level.patrol_path_exists` (как `bind_monster.script:165`); false — idle 5 минут, без `level_vertex_id`. Проверка nikit 26.09 17:19–17:27, xrCore 10092: патч `v0.6.6` встал, два захода на `l12_stancia` при `w_clear7`, несколько сейвов, `InternalCloseLog`. `BusyHandsDebug` / `level_vertex_id` / FATAL нет. Пропуск пути в лог не пишется.
+- карточка: нет (класс «вылета нет»; лог jacob `logs/xray_jacob.log`, проверка `logs/xray_nikit_2026-09-26_1727.log`)
+- pitfalls: нет
+- подробности: нет
+
+## [issue] `invalid_parameter_handler` / `xrDebugNew.cpp:1120` / `fix_stash_capacities_nil.script:78 module_of`
+
+- дата: 2026-09-26
+- мод: `fix_stash_capacities_nil` 1.0.1 внутри AIO 1.0.8; сессия mg9000, загрузка `l09_deadcity`, xrCore 10092
+- итог: **1.0.4 встал, вылет снят; Shift-лут не проверяли** — 1.0.1 падал на загрузке файла (`_G["stash_capacities"]`). 1.0.2 (AIO 1.0.9) — тем же `invalid parameter` из `on_game_start`. 1.0.3 убрал `_G[name]`, гарда встала, затем `fix_travel_invalid_id.try_wrap_existing` вызвал хук с обнулённым `saved_register`. 1.0.4 оставляет upvalue. Лог nikit 26.09 16:44, `l09_deadcity`: `guard installed v1.0.4`, travel `late-wrapped 4`, выход `InternalCloseLog`. FATAL / `crt-invalid` / `saved_register` нет.
+- карточка: [2026-09-26_xray_mg9000-3.md](../logs/cards/2026-09-26_xray_mg9000-3.md); 1.0.2: [2026-09-26_xray_mg9000-4.md](../logs/cards/2026-09-26_xray_mg9000-4.md); 1.0.3: [2026-09-26_xray_nikit_2026-09-26_1639.md](../logs/cards/2026-09-26_xray_nikit_2026-09-26_1639.md); проверка 1.0.4: `logs/xray_nikit_2026-09-26_1648.log`
+- pitfalls: нет
+- подробности: нет
+
 ## [issue] native `stack trace` / `at address 0x0000000140077CE0` (кадров нет, SymType exported)
 
 - дата: 2026-09-26
@@ -41,7 +59,7 @@
 
 - дата: 2026-09-25
 - мод: Hideout Furniture `stash_capacities` + FastTransfer `ish_fast_transfer`; триггер — Shift-лут трупа (Move_All стека)
-- итог: **1.0.1 перехватывает регистрацию, в игре ещё не проверен** — класс `Lua / pcall`, тот же паттерн что `fix_arti_frames_nil`. Цепочка: FastTransfer → HF `Action_Move_All` → `Action_Move` при мёртвом child id всё равно шлёт `ActorMenu_on_item_after_move` → строка 92 `obj:weight()`. Обработчик локальный. 1.0.0 в сессии 26.09 не встал (`on_game_start not found`, поздний steal тоже). 1.0.1 забирает callback через `RegisterScriptCallback` с загрузки файла. Сейв `fatal_ctd_save_1` — autosave перед FATAL, не причина. Путь Shift-лута в логе 26.09 не повторяли.
+- итог: **1.0.4 встал, сессия 16:44 закрылась штатно; Shift-лут не проверяли** — класс исходного бага `Lua / pcall` (HF строка 92 `obj:weight()`). 1.0.0 не встал. 1.0.1–1.0.2 сами роняли `invalid parameter`. 1.0.3 встал и упал на `saved_register` nil. Лог nikit 26.09 16:44–16:48, `l09_deadcity`, `InternalCloseLog`: `loaded v1.0.4`, `wrapped stash_capacities.on_game_start`, `wrapped after_move nil-guard`, `guard installed`; `saved_register` / `crt-invalid` / FATAL нет. Строк `skip nil obj` и `stash_capacities.script:92` нет.
 - карточка: [2026-09-25_xray_mg9000.md](../logs/cards/2026-09-25_xray_mg9000.md) (источник Downloads `xray_mg9000.log`)
 - pitfalls: `Action_Move` после `CheckItem` nil всё равно вызывает after_move; HF after_move полагается на `weight_add`, не на stash/obj
 - подробности: нет

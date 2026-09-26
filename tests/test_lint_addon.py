@@ -1084,6 +1084,68 @@ class Lua003LintTests(unittest.TestCase):
         self.assertIn("game_object_on_net_destroy", hit[0].message)
 
 
+class Mcm002LintTests(unittest.TestCase):
+    def _script(self, root: Path, name: str, source: str) -> Path:
+        addon = _minimal_addon(root, name)
+        (addon / "gamedata" / "scripts" / f"{name}.script").write_text(source, encoding="utf-8")
+        return addon
+
+    def test_paren_guard_is_silent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "mcm_paren",
+                "function setting(key, fallback)\n"
+                "    if (ui_mcm) then\n"
+                '        return ui_mcm.get("mcm_paren/" .. key) or fallback\n'
+                "    end\n"
+                "    return fallback\n"
+                "end\n",
+            )
+            codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
+            self.assertNotIn("MCM-002", codes)
+
+    def test_and_ui_mcm_guard_is_silent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "mcm_and",
+                "function on_key(key)\n"
+                "    if not (db.actor and ui_mcm) then\n"
+                "        return\n"
+                "    end\n"
+                '    local bind = ui_mcm.get("mcm_and/open_key")\n'
+                "end\n",
+            )
+            codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
+            self.assertNotIn("MCM-002", codes)
+
+    def test_comment_only_ui_mcm_get_is_silent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "mcm_comment",
+                "-- Read from stored config, never ui_mcm.get(): XML path.\n"
+                "function read_opt()\n"
+                "    return true\n"
+                "end\n",
+            )
+            codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
+            self.assertNotIn("MCM-002", codes)
+
+    def test_unguarded_ui_mcm_get_still_warns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "mcm_bare",
+                "function read_opt()\n"
+                '    return ui_mcm.get("mcm_bare/enable")\n'
+                "end\n",
+            )
+            codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
+            self.assertIn("MCM-002", codes)
+
+
 class LogPresenceTests(unittest.TestCase):
     def test_top_level_printf_detected(self):
         source = (

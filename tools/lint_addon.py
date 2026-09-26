@@ -1064,7 +1064,13 @@ class AddonLinter:
                 path,
             )
 
-        if "ui_mcm.get" in text and not re.search(r"ui_mcm\s+(?:and|~=)|if\s+ui_mcm", text):
+        # Комментарии/строки с упоминанием ui_mcm.get не считаем вызовом.
+        # Гарды: `ui_mcm and …`, `if ui_mcm`, `if (ui_mcm)`, `… and ui_mcm`.
+        mcm_masked = mask_lua_literals(text)
+        if "ui_mcm.get" in mcm_masked and not re.search(
+            r"(?:if|and|or)\s*\(?\s*ui_mcm\b|ui_mcm\s*(?:and|~=|or)",
+            mcm_masked,
+        ):
             self.add(
                 "MCM-002",
                 "warn",

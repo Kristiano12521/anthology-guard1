@@ -7,6 +7,63 @@
 - Отключить слот в MO2; новая игра не нужна.
 - Сейв не затрагивается. Без guard'а снова возможен CTD при Shift-луте стека — исходный баг, не след отключения.
 
+## [1.0.4] — 2026-09-26
+
+**Изменено**
+
+- `disarm_register_hook` больше не обнуляет `saved_register`. С `_G` хук снимается, только если мы всё ещё верхний слой. `hooked_register` не зовёт nil.
+
+**Причина**
+
+Сессия nikit 2026-09-26 16:39, скрипт 1.0.3: после `guard installed` FATAL `attempt to call upvalue 'saved_register' (a nil value)` на строке 186. `fix_travel_invalid_id` на своём `on_game_start` сохранил наш `hooked_register` как `orig_register`, а наш `actor_on_first_update` раньше обнулил `saved_register`. Дальше travel → `orig_register` → наш хук → nil.
+
+**Не затронуто**
+
+- Nil-check `obj:weight()`, логика steal, сейвы
+
+**Проверено**
+
+- `tools/lint_addon.py fix_stash_capacities_nil`
+- В игре ещё нет
+
+## [1.0.3] — 2026-09-26
+
+**Изменено**
+
+- `module_of` больше не читает `_G[name]`. Только `rawget`. Если таблицы модуля нет, хук `RegisterScriptCallback` остаётся включённым до `actor_on_first_update`.
+
+**Причина**
+
+Сессия mg9000 2026-09-26 16:18, AIO 1.0.9 / скрипт 1.0.2: загрузка файла прошла (`loaded v1.0.2`), вылет тот же `invalid parameter` уже из `on_game_start`. Стек: `module_of:82` `_G["stash_capacities"]` ← `install:211` ← `on_game_start:268` ← `axr_main`. Перенос вызова с загрузки файла на `on_game_start` не убрал C `__index`.
+
+**Не затронуто**
+
+- Nil-check `obj:weight()`, хук регистрации, сейвы
+
+**Проверено**
+
+- `tools/lint_addon.py fix_stash_capacities_nil`
+- В игре ещё нет
+
+## [1.0.2] — 2026-09-26
+
+**Изменено**
+
+- `install()` больше не вызывается при загрузке файла. На загрузке остаётся только подмена `RegisterScriptCallback`. Поиск модуля `stash_capacities` — из `on_game_start`, когда этот файл уже выполнен.
+
+**Причина**
+
+Сессия mg9000 2026-09-26 15:43, AIO 1.0.8: сразу после `loaded v1.0.1` вылет `invalid_parameter_handler` (`xrDebugNew.cpp:1120`). Стек: `module_of` строка 78 `_G["stash_capacities"]` ← `install` ← тело файла строка 262. Скрипт грузится раньше `stash_capacities.script`; C `__index` у `_G` догружает ещё не открытый файл и рвёт CRT.
+
+**Не затронуто**
+
+- Сам nil-check `obj:weight()`, перехват регистрации callback, сейвы
+
+**Проверено**
+
+- `tools/lint_addon.py fix_stash_capacities_nil`
+- В игре ещё нет
+
 ## [1.0.1] — 2026-09-26
 
 **Изменено**

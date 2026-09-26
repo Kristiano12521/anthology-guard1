@@ -290,3 +290,8 @@ function on_game_start()
 	RegisterScriptCallback("on_game_load", install)
 	RegisterScriptCallback("on_key_release", on_key_release)
 end
+
+function on_game_end()
+	UnregisterScriptCallback("on_game_load", install)
+	UnregisterScriptCallback("on_key_release", on_key_release)
+end
