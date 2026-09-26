@@ -29,7 +29,7 @@ local GUARD_SPAWN_FAST = true
 local GUARD_VID_MODE = true
 
 local LOG_TAG = "[fix_nil_crash_guards]"
-local VERSION = "1.1.1"
+local VERSION = "1.1.2"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -215,23 +215,45 @@ local function patched_stalker_on_unregister(self, ...)
 	cse_alife_human_stalker.on_unregister(self)
 end
 
-local function install_unregister(class_mod, name, patched, base_label)
+-- Engine binds the server class as "script.class" (class_registrator:
+-- se_monster.se_monster, se_stalker.se_stalker). The script table itself
+-- has no on_unregister; the method lives on the nested class.
+local function resolve_unreg_class(script_name, class_name)
+	local ns = module_of(script_name)
+	if type(ns) ~= "table" then
+		ns = _G[script_name]
+	end
+	if type(ns) ~= "table" then
+		return nil
+	end
+	local nested = ns[class_name]
+	if type(nested) == "table" and type(nested.on_unregister) == "function" then
+		return nested
+	end
+	if type(ns.on_unregister) == "function" then
+		return ns
+	end
+	return nil
+end
+
+local function install_unregister(script_name, class_name, name, patched, base_label)
 	if installed[name] then
 		return true
 	end
-	local mod = module_of(class_mod)
-	if not (mod and type(mod.on_unregister) == "function") then
-		log("%s.on_unregister not found - guard NOT installed", class_mod)
+	local cls = resolve_unreg_class(script_name, class_name)
+	if not cls then
+		log("%s.%s.on_unregister not found - guard NOT installed", script_name, class_name)
 		return false
 	end
-	if mod.on_unregister == patched then
+	if cls.on_unregister == patched then
 		installed[name] = true
 		return true
 	end
-	orig[name] = mod.on_unregister
-	mod.on_unregister = patched
+	orig[name] = cls.on_unregister
+	orig[name .. "_cls"] = cls
+	cls.on_unregister = patched
 	installed[name] = true
-	log("wrapped %s.on_unregister (%s)", class_mod, base_label)
+	log("wrapped %s.%s.on_unregister (%s)", script_name, class_name, base_label)
 	return true
 end
 
@@ -500,8 +522,8 @@ local function install_all()
 	end
 
 	if GUARD_UNREGISTER_NPC then
-		install_unregister("se_monster", "monster_unreg", patched_monster_on_unregister, "monster")
-		install_unregister("se_stalker", "stalker_unreg", patched_stalker_on_unregister, "stalker")
+		install_unregister("se_monster", "se_monster", "monster_unreg", patched_monster_on_unregister, "monster")
+		install_unregister("se_stalker", "se_stalker", "stalker_unreg", patched_stalker_on_unregister, "stalker")
 	else
 		skip_disabled("GUARD_UNREGISTER_NPC")
 	end
@@ -548,13 +570,11 @@ local function uninstall_all()
 		end
 	end
 
-	local mon = module_of("se_monster")
-	if mon and orig.monster_unreg then
-		mon.on_unregister = orig.monster_unreg
+	if orig.monster_unreg_cls and orig.monster_unreg then
+		orig.monster_unreg_cls.on_unregister = orig.monster_unreg
 	end
-	local stk = module_of("se_stalker")
-	if stk and orig.stalker_unreg then
-		stk.on_unregister = orig.stalker_unreg
+	if orig.stalker_unreg_cls and orig.stalker_unreg then
+		orig.stalker_unreg_cls.on_unregister = orig.stalker_unreg
 	end
 
 	local st = module_of("smart_terrain")

@@ -14,10 +14,10 @@
 -- (debug.getupvalue on callback_set; same path as fix_misc_script_errors).
 
 local LOG_TAG = "[fix_stash_capacities_nil]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local MODULE_NAME = "stash_capacities"
 local AFTER_MOVE = "ActorMenu_on_item_after_move"
-local SOURCE_MARK = "stash_capacities.script"
+local SOURCE_MARK = "stash_capacities"
 local LOG_INTERVAL_MS = 1000
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -64,15 +64,30 @@ local function is_stash_callback(fn)
 		return false
 	end
 	local info = debug.getinfo(fn, "S")
-	local src = info and (info.short_src or info.source) or ""
+	if not info then
+		return false
+	end
+	-- short_src is capped (~60 bytes) and is always set, so it hides source.
+	local src = tostring(info.source or "") .. " " .. tostring(info.short_src or "")
 	return string.find(src, SOURCE_MARK, 1, true) ~= nil
+end
+
+local function module_of(name)
+	local mod = rawget(_G, name)
+	if type(mod) ~= "table" then
+		mod = _G[name]
+	end
+	if type(mod) ~= "table" then
+		return nil
+	end
+	return mod
 end
 
 local function intercepts_bucket()
 	if not (debug and type(debug.getupvalue) == "function") then
 		return nil
 	end
-	local axr = rawget(_G, "axr_main")
+	local axr = module_of("axr_main")
 	if not (axr and type(axr.callback_set) == "function") then
 		return nil
 	end
@@ -161,8 +176,35 @@ function patched_on_game_start()
 	end
 end
 
+local saved_register = nil
+
+local function hooked_register(name, fn)
+	if name == AFTER_MOVE and type(fn) == "function" then
+		fn = steal_after_move(fn)
+	end
+	return saved_register(name, fn)
+end
+
+local function arm_register_hook()
+	if saved_register then
+		return
+	end
+	if type(RegisterScriptCallback) ~= "function" then
+		return
+	end
+	saved_register = RegisterScriptCallback
+	_G.RegisterScriptCallback = hooked_register
+end
+
+local function disarm_register_hook()
+	if saved_register and _G.RegisterScriptCallback == hooked_register then
+		_G.RegisterScriptCallback = saved_register
+	end
+	saved_register = nil
+end
+
 local function install(silent)
-	local mod = rawget(_G, MODULE_NAME)
+	local mod = module_of(MODULE_NAME)
 	if not (mod and type(mod.on_game_start) == "function") then
 		if not silent then
 			printf("%s %s.on_game_start not found - guard NOT installed", LOG_TAG, MODULE_NAME)
@@ -193,7 +235,7 @@ local function uninstall()
 	orig_after_move = nil
 	after_move_wrapped = false
 
-	local mod = rawget(_G, MODULE_NAME)
+	local mod = module_of(MODULE_NAME)
 	if mod and orig_on_game_start and mod.on_game_start == patched_on_game_start then
 		mod.on_game_start = orig_on_game_start
 	end
@@ -203,13 +245,20 @@ end
 
 function actor_on_first_update()
 	if not installed then
-		install(false)
+		install(true)
 	end
-	if not try_wrap_registered_after_move() then
+	try_wrap_registered_after_move()
+	disarm_register_hook()
+	if after_move_wrapped then
+		printf("%s guard installed v%s", LOG_TAG, VERSION)
+	else
 		printf("%s after_move nil-guard NOT installed (callback not found)", LOG_TAG)
 	end
 end
 
+-- File load is before any on_game_start. HF registers the local callback
+-- from stash_capacities.on_game_start via the global RegisterScriptCallback.
+arm_register_hook()
 install(true)
 
 function on_game_start()

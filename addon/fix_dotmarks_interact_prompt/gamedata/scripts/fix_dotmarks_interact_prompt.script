@@ -12,7 +12,7 @@
 -- the prompt instead of CTD. Vanilla tutorial text path stays intact.
 
 local LOG_TAG = "[fix_dotmarks_interact_prompt]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -23,6 +23,7 @@ local orig_get_xml_cache = nil
 local orig_setup_pri = nil
 local orig_setup_sec = nil
 local orig_on_option_change = nil
+local patched_prompt_cls = nil
 
 local xml_cache = {}
 
@@ -99,6 +100,30 @@ local function patched_on_option_change(self, ...)
 	self.destroyed = true
 end
 
+local function method_table(candidate)
+	if type(candidate) ~= "table" then
+		return nil
+	end
+	local fn = candidate.on_option_change
+	if fn == patched_on_option_change or type(fn) == "function" then
+		return candidate
+	end
+	return nil
+end
+
+-- class "InteractPrompt" may land on the script env or on _G.
+local function prompt_class()
+	if method_table(patched_prompt_cls) then
+		return patched_prompt_cls
+	end
+	local ns = ui_hud_dotmarks
+	local cls = method_table(type(ns) == "table" and ns.InteractPrompt or nil)
+	if cls then
+		return cls
+	end
+	return method_table(InteractPrompt)
+end
+
 local function wraps_ok()
 	if type(ui_hud_dotmarks) ~= "table" then
 		return false
@@ -109,7 +134,7 @@ local function wraps_ok()
 	if ui_hud_dotmarks.setup_sec_interact_prompt ~= patched_setup_sec then
 		return false
 	end
-	local cls = ui_hud_dotmarks.InteractPrompt
+	local cls = prompt_class()
 	if type(cls) ~= "table" or cls.on_option_change ~= patched_on_option_change then
 		return false
 	end
@@ -133,13 +158,14 @@ local function uninstall()
 		if orig_setup_sec and ui_hud_dotmarks.setup_sec_interact_prompt == patched_setup_sec then
 			ui_hud_dotmarks.setup_sec_interact_prompt = orig_setup_sec
 		end
-		local cls = ui_hud_dotmarks.InteractPrompt
+		local cls = prompt_class()
 		if type(cls) == "table"
 			and orig_on_option_change
 			and cls.on_option_change == patched_on_option_change then
 			cls.on_option_change = orig_on_option_change
 		end
 	end
+	patched_prompt_cls = nil
 	orig_get_xml_cache = nil
 	orig_setup_pri = nil
 	orig_setup_sec = nil
@@ -167,7 +193,7 @@ local function install()
 		log("setup_pri/sec_interact_prompt not found - guard NOT installed")
 		return false
 	end
-	local cls = ui_hud_dotmarks.InteractPrompt
+	local cls = prompt_class()
 	if type(cls) ~= "table" or type(cls.on_option_change) ~= "function" then
 		log("InteractPrompt.on_option_change not found - guard NOT installed")
 		return false
@@ -190,6 +216,7 @@ local function install()
 		orig_on_option_change = cls.on_option_change
 		cls.on_option_change = patched_on_option_change
 	end
+	patched_prompt_cls = cls
 
 	installed = true
 	log("guards installed v%s", VERSION)

@@ -19,11 +19,29 @@
 
 ---
 
+## [issue] native `stack trace` / `at address 0x0000000140077CE0` (кадров нет, SymType exported)
+
+- дата: 2026-09-26
+- мод: нативный вылет в `AnomalyDX11AVX.exe` +0x77CE0; сессия mg9000, Мёртвый город `l09_deadcity`, сейв `fatal_ctd_save_2`, затем quickload (`static level already active`, доиграл). Modded Exes MT-TEST 2026.09.25, xrCore 10092. FATAL / `UnhandledFilter` / Lua error нет
+- итог: **не чинится по этому логу** — класс **`нативный вылет (не Lua)`**. `stack trace:` есть, кадров нет: `SymType: '-exported-'`, PDB не подхватился, в хвосте только `at address 0x0000000140077CE0`. Последний скриптовый printf — `[RAK Rank Knife Drops] spawned [wpn_bat] on [sim_default_bandit_trader6129]` сразу после закрытия UIInventory и пачки `adding … af_* to se_obj state`. Такой же RAK-спавн на `sim_default_bandit_trader7892` раньше в сессии прошёл без CTD — строка не доказывает причину. mdmp в `logs/` нет. Фризы этой сессии — отдельный класс (рендер/Present, не этот адрес): медиана кадра ~18 мс (~55 FPS) при 3200×1800; 9 окон Present с max ≥1 с (до 5.9 с), 8 из 9 при `pressure=1` и free RAM ~1.1–1.6 ГБ; Lua GC ~13 мс, не источник многосекундных стопов. Холодный `[STARTUP/RENDER TARGET] total=55010 ms` один раз на старте процесса.
+- карточка: [2026-09-26_xray_mg9000-2.md](../logs/cards/2026-09-26_xray_mg9000-2.md)
+- pitfalls: нет
+- подробности: нет
+
+## [issue] `No such operator [__eq] defined in class [game_object]` / `fix_stash_spot_empty.script:226`
+
+- дата: 2026-09-26
+- мод: `fix_stash_spot_empty` 1.0.0
+- итог: **починено в 1.0.1** — `who ~= db.actor` в `physic_object_on_use_callback` (открытие аномального тайника). У `game_object` нет `__eq`; сравнивать `who:id() == db.actor:id()`. Ваниль `treasure_manager` `who` не сравнивает. Сессия 26.09 13:30 (`fatal_ctd_save_2`, Мёртвый город): `loaded v1.0.1`, callbacks registered, `repair done spots=0`, сигнатуры `__eq` нет. Открытие аномального тайника в логе не видно (`hidden_anom_stash` режет DotMarks `block_loot_window`) — подтверждена загрузка фикса, не повтор use.
+- карточка: [2026-09-26_xray_mg9000.md](../logs/cards/2026-09-26_xray_mg9000.md); проверка: [2026-09-26_xray_mg9000-2.md](../logs/cards/2026-09-26_xray_mg9000-2.md)
+- pitfalls: §19 — не сравнивать `game_object` через `==` / `~=`
+- подробности: нет
+
 ## [issue] `stash_capacities.script:92: attempt to index local 'obj' (a nil value)` / `lua_pcall_failed`
 
 - дата: 2026-09-25
 - мод: Hideout Furniture `stash_capacities` + FastTransfer `ish_fast_transfer`; триггер — Shift-лут трупа (Move_All стека)
-- итог: **фикс написан, в игре не проверен** — `fix_stash_capacities_nil` 1.0.0. Класс `Lua / pcall`, тот же паттерн что `fix_arti_frames_nil`. Цепочка: FastTransfer → HF `Action_Move_All` (`weight_add=0`) → `Action_Move(child_id)` → `CheckItem` nil → `ActorMenu_on_item_after_move` всё равно уходит → строка 92 `obj:weight()`. Обработчик локальный: guard через подмену `on_game_start` + поздний steal из `intercepts`. Сейв `fatal_ctd_save_1` — autosave перед FATAL, не причина.
+- итог: **1.0.1 перехватывает регистрацию, в игре ещё не проверен** — класс `Lua / pcall`, тот же паттерн что `fix_arti_frames_nil`. Цепочка: FastTransfer → HF `Action_Move_All` → `Action_Move` при мёртвом child id всё равно шлёт `ActorMenu_on_item_after_move` → строка 92 `obj:weight()`. Обработчик локальный. 1.0.0 в сессии 26.09 не встал (`on_game_start not found`, поздний steal тоже). 1.0.1 забирает callback через `RegisterScriptCallback` с загрузки файла. Сейв `fatal_ctd_save_1` — autosave перед FATAL, не причина. Путь Shift-лута в логе 26.09 не повторяли.
 - карточка: [2026-09-25_xray_mg9000.md](../logs/cards/2026-09-25_xray_mg9000.md) (источник Downloads `xray_mg9000.log`)
 - pitfalls: `Action_Move` после `CheckItem` nil всё равно вызывает after_move; HF after_move полагается на `weight_add`, не на stash/obj
 - подробности: нет
@@ -173,7 +191,7 @@
 
 - дата: 2026-09-19; повтор 2026-09-20 (nikit)
 - мод: `fix_nil_crash_guards` 1.1.1, `fix_qaw_ammo_nil` 1.0.3, `fix_dotmarks_interact_prompt` 1.0.0, `fix_aim_fatigue_visibility` 1.0.2; рядом `fix_utjan_mag_skill` — `magazines module missing` (MAG Redux нет → wrappers NOT installed)
-- итог: **цель API не найдена** — гарды пишут `… not found - guard NOT installed` (остальные wrap'ы nil-guards встают). Не «install() упал молча»: цель отсутствует или имя/путь другое в пакете. На 20.09 у nikit тот же набор + `aim_stamina.on_option_change`/`load_state`. Следующий шаг — сверить символы через `refindex` / наличие QAW, DotMarks InteractPrompt, Aim Stamina.
+- итог: **часть целей смотрела не туда; правка 2026-09-26, в игре ещё нет** — лог mg9000 26.09 снова: `se_monster`/`se_stalker` `on_unregister not found`, `QAmmoWheelOption.LoadInActiveWeapon not found`, `InteractPrompt.on_option_change not found`. `class_registrator` зовёт `se_monster.se_monster` и `se_stalker.se_stalker` — `fix_nil_crash_guards` 1.1.2 вешает метод туда. QAW 1.0.4 дополнительно берёт `TAB_MANAGER.classes`. DotMarks 1.0.1 смотрит ещё глобальный `InteractPrompt`. `melee_trade_inject.vks_spawn_stock` в распакованной сборке нет, bang `no supplies` в этом логе нет — хук некуда переносить. `aim_stamina` в сессии 26.09 встал (`fix_aim_fatigue_visibility` wrapped).
 - карточка: [2026-09-19_xray_mg9000-3.md](../logs/cards/2026-09-19_xray_mg9000-3.md), [2026-09-19_xray_mg9000-4.md](../logs/cards/2026-09-19_xray_mg9000-4.md), [2026-09-20_xray_nikit.md](../logs/cards/2026-09-20_xray_nikit.md)
 - pitfalls: [§9](pitfalls.md) (порядок `.script`); см. также issue про fallback `actor_on_first_update`
 - подробности: нет

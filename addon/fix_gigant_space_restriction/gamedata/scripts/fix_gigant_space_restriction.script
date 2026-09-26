@@ -18,7 +18,7 @@
 -- or a missing smart terrain: alife_release (squad-safe) while offline.
 
 local LOG_TAG = "[fix_gigant_space_restriction]"
-local VERSION = "1.1.2"
+local VERSION = "1.1.3"
 local EVENT_ID = "fix_gigant_space_restriction"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -31,6 +31,7 @@ local RESTRICTOR_TYPE_OUT = 5
 
 local callbacks_registered = false
 local orig_can_switch_online = nil
+local patched_can_switch_cls = nil
 local level_ready = false
 local process_scheduled = false
 
@@ -594,23 +595,44 @@ function patched_can_switch_online(self, ...)
 	return true
 end
 
-local function install_can_switch_online()
+-- class_registrator binds "se_monster.se_monster". The method the engine
+-- calls is on that nested class, not on the script table.
+local function monster_method_table()
 	if type(se_monster) ~= "table" then
-		printf("%s se_monster not found - guard NOT installed", LOG_TAG)
+		return nil
+	end
+	local cls = se_monster.se_monster
+	if type(cls) == "table" and (type(cls.can_switch_online) == "function" or cls.can_switch_online == patched_can_switch_online) then
+		return cls
+	end
+	if type(se_monster.can_switch_online) == "function" or se_monster.can_switch_online == patched_can_switch_online then
+		return se_monster
+	end
+	return nil
+end
+
+local function install_can_switch_online()
+	local cls = monster_method_table()
+	if not cls then
+		printf("%s se_monster.se_monster.can_switch_online not found - guard NOT installed", LOG_TAG)
 		return
 	end
-	if se_monster.can_switch_online == patched_can_switch_online then
+	if cls.can_switch_online == patched_can_switch_online then
+		patched_can_switch_cls = cls
 		return
 	end
-	orig_can_switch_online = orig_can_switch_online or se_monster.can_switch_online
-	se_monster.can_switch_online = patched_can_switch_online
-	log("wrapped se_monster.can_switch_online")
+	orig_can_switch_online = orig_can_switch_online or cls.can_switch_online
+	cls.can_switch_online = patched_can_switch_online
+	patched_can_switch_cls = cls
+	log("wrapped se_monster.se_monster.can_switch_online")
 end
 
 local function uninstall_can_switch_online()
-	if type(se_monster) == "table" and se_monster.can_switch_online == patched_can_switch_online then
-		se_monster.can_switch_online = orig_can_switch_online
+	local cls = patched_can_switch_cls
+	if type(cls) == "table" and cls.can_switch_online == patched_can_switch_online then
+		cls.can_switch_online = orig_can_switch_online
 	end
+	patched_can_switch_cls = nil
 end
 
 -- Session gates only. Unsafe reasons stay flagged for release/process.

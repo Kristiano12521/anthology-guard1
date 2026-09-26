@@ -176,6 +176,16 @@ JSON квеста лежит в `configs/igi_tasks/tasks/…`, задание п
 
 Проверять не только JSON, но и секции в LTX плюс что они реально грузятся (`ini_sys:section_exist`). CTD от такой ошибки обычно нет: WTF глотает сбой квеста сам; `fix_wtf_taskboard_guard` лишь делает причину читаемой. Обход для tracking_shot: MCM `igi_tasks/community/tracking_shot/disabled`.
 
+## 19. Не сравнивать `game_object` через `==` / `~=`
+
+У userdata `game_object` нет оператора `__eq`. Выражение `who ~= db.actor` в callback даёт FATAL:
+
+```
+LUA error: ! No such operator [__eq] defined in class [game_object]
+```
+
+Сравнивать идентификаторы: `who:id() == db.actor:id()` (числа). Образец: `kristiano_kx1_exo`, `burnshit_inventory_destroy`. Источник: `fix_stash_spot_empty` 1.0.0 → 1.0.1 (открытие тайника → `physic_object_on_use_callback`).
+
 ## Открытые вопросы
 
 Сюда пишем то, что пока не проверено на этой сборке, чтобы не выдавать за факт:

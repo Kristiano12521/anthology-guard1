@@ -13,7 +13,7 @@
 -- v1.0.2: re-wrap on actor_on_first_update if MT reload replaced QAW classes.
 
 local LOG_TAG = "[fix_qaw_ammo_nil]"
-local VERSION = "1.0.3"
+local VERSION = "1.0.4"
 local LOG_INTERVAL_MS = 1000
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -87,16 +87,30 @@ local function add_class_target(list, seen, obj, via)
 	list[#list + 1] = { obj = obj, via = via }
 end
 
+local function script_env(name)
+	local mod = rawget(_G, name)
+	if type(mod) ~= "table" then
+		mod = _G[name]
+	end
+	if type(mod) ~= "table" then
+		return nil
+	end
+	return mod
+end
+
 local function class_targets(bare_name)
 	local list = {}
 	local seen = {}
-	add_class_target(list, seen, rawget(_G, bare_name), "_G." .. bare_name)
-	local mod = rawget(_G, "haru_quick_action_wheel_mcm")
-	if type(mod) == "table" then
+	add_class_target(list, seen, _G[bare_name], "_G." .. bare_name)
+	local mod = script_env("haru_quick_action_wheel_mcm")
+	if mod then
 		add_class_target(list, seen, mod[bare_name], "haru_quick_action_wheel_mcm." .. bare_name)
+		local mgr = mod.TAB_MANAGER
+		local classes = type(mgr) == "table" and mgr.classes or nil
+		if type(classes) == "table" then
+			add_class_target(list, seen, classes[bare_name], "TAB_MANAGER.classes." .. bare_name)
+		end
 	end
-	-- Bare name via __index=_G of this script env (same as BusyHands UIInventory).
-	add_class_target(list, seen, _G[bare_name], "env " .. bare_name)
 	return list
 end
 

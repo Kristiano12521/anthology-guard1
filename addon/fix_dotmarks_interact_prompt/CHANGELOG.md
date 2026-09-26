@@ -7,6 +7,25 @@
 - Отключить слот в MO2; новая игра не нужна.
 - Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
 
+## [1.0.1] — 2026-09-26
+
+**Изменено**
+
+- `InteractPrompt` берётся с `ui_hud_dotmarks.InteractPrompt`, если там есть `on_option_change`, иначе с глобального `InteractPrompt`.
+
+**Причина**
+
+Лог mg9000 2026-09-26: `setup_pri/sec` находились, а `InteractPrompt.on_option_change not found`. Метод объявлен как `class "InteractPrompt"` в `ui_hud_dotmarks.script:2854` и может лежать на `_G`, а не полем таблицы скрипта.
+
+**Не затронуто**
+
+- Обёртки `get_xml_cache` и `setup_pri/sec_interact_prompt`, сейвы
+
+**Проверено**
+
+- `tools/lint_addon.py fix_dotmarks_interact_prompt`
+- В игре ещё нет
+
 ## [1.0.0] — 2026-09-18
 
 **Изменено**

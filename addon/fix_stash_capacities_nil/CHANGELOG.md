@@ -7,6 +7,26 @@
 - Отключить слот в MO2; новая игра не нужна.
 - Сейв не затрагивается. Без guard'а снова возможен CTD при Shift-луте стека — исходный баг, не след отключения.
 
+## [1.0.1] — 2026-09-26
+
+**Изменено**
+
+- `gamedata/scripts/fix_stash_capacities_nil.script` — перехват `RegisterScriptCallback` с загрузки файла, до `on_game_start` Hideout Furniture. В обёртку попадает только функция, у которой `debug.getinfo` source/short_src содержит `stash_capacities`. Поиск модуля через `_G[name]`, не только `rawget`. Поздний steal из `intercepts` смотрит полный `source`, не только урезанный `short_src`.
+
+**Причина**
+
+Сессия mg9000 2026-09-26: `loaded v1.0.0`, затем `stash_capacities.on_game_start not found` и `after_move nil-guard NOT installed`. Обработчик `actor_on_item_after_move` локальный (`stash_capacities.script:90`); одного `rawget` по `on_game_start` не хватило, callback к `actor_on_first_update` уже был зарегистрирован мимо гарда.
+
+**Не затронуто**
+
+- Сам `stash_capacities.script`, `ui_inventory`, остальные подписчики `ActorMenu_on_item_after_move`
+- Сейвы
+
+**Проверено**
+
+- `tools/lint_addon.py fix_stash_capacities_nil`
+- В игре ещё нет
+
 ## [1.0.0] — 2026-09-25
 
 **Изменено**

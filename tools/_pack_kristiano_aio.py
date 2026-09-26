@@ -48,7 +48,7 @@ BHS_MOD_ID = "anthology_busyhands_stability_fix"
 AIO_NAME = "[DBG] Kristiano Fixes ALL IN ONE"
 # Package semver (not per-addon). Bump when the AIO zip contents change for testers.
 # Dates stay in BUILD_INFO `built:`; do not use date-as-version (rebuild ≠ new release).
-AIO_VERSION = "1.0.5"
+AIO_VERSION = "1.0.7"
 
 
 def copy_gamedata(source: Path, destination: Path) -> int:

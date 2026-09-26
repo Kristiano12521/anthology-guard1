@@ -11,7 +11,7 @@
 -- delayed repair sweep for sticky spots already in the save.
 
 local LOG_TAG = "[fix_stash_spot_empty]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local EVENT_ID = "fix_stash_spot_empty"
 local REPAIR_ACTION = "repair"
 local REPAIR_DELAY = 1.0
@@ -223,7 +223,14 @@ function actor_on_item_take_from_box(box, item)
 end
 
 function physic_object_on_use_callback(box, who)
-	if not db.actor or who ~= db.actor then
+	-- game_object has no __eq; compare ids (who ~= db.actor is FATAL).
+	if not (who and db.actor) then
+		return
+	end
+	local ok_ids, same = pcall(function()
+		return who:id() == db.actor:id()
+	end)
+	if not ok_ids or not same then
 		return
 	end
 	if not is_invbox_go(box) then

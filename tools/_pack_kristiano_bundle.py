@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import REPO_ROOT  # noqa: E402
 
 BUILD = REPO_ROOT / "build"
-BUNDLE_NAME = "Kristiano_Fixes_Bundle_2026-09-20.zip"
+BUNDLE_NAME = "Kristiano_Fixes_Bundle_2026-09-26.zip"
 VANILLA_BUNDLE_NAME = "Kristiano_Vanilla_Anomaly_Fixes_2026-09-02.zip"
 
 ZIP_VER = re.compile(r"^(.+)-(\d+(?:\.\d+)+)\.zip$")
@@ -68,6 +68,7 @@ TOP_PREFIXES = (
     "[GFX] QuickQK",
     "[SND] Anthology ST2",
     "[FIX] Campfires",
+    "[PDA] Active Missions",
 )
 
 
@@ -130,8 +131,13 @@ def write_index(individual: list[Path]) -> str:
 
 def write_changelog(count: int) -> str:
     return (
-        "# Kristiano Fixes Bundle - 2026-09-20\n\n"
+        "# Kristiano Fixes Bundle - 2026-09-26\n\n"
         "## Что нового\n\n"
+        "### 2026-09-26\n\n"
+        "- AIO 1.0.7: fix_stash_spot_empty 1.0.1 — CTD `__eq` game_object "
+        "при открытии тайника (who ~= db.actor → сравнение id).\n"
+        "- AIO 1.0.6: fix_stash_capacities_nil, fix_stash_spot_empty; "
+        "пересборка с актуальными addon/.\n\n"
         "### 2026-09-20\n\n"
         "- AIO 1.0.4: softlock Объявления — цикл wrap give_task "
         "fix_drx_enemy_task_gate↔fix_hostage_task_collision (orig только при первом захвате); "
@@ -172,7 +178,7 @@ def write_changelog(count: int) -> str:
         "- fix_radio 1.0.3: arm sound_set после use / опции Радио Зоны.\n"
         "- MT re-wrap по crash-guard партиям; campfires trader wrap.\n\n"
         "### Структура bundle\n\n"
-        "- Корень: AIO + CMO + QuickQK + ST2 + Campfires\n"
+        "- Корень: AIO + CMO + QuickQK + ST2 + Campfires + Active Missions PDA\n"
         f"- individual/: {count} отдельных zip\n"
         "- README_RU.txt, CHANGELOG.txt, individual/INDEX.txt\n"
     )
@@ -195,6 +201,7 @@ def write_readme() -> str:
             "  [GFX] QuickQK Task Status Tool Anthology.zip",
             "  [SND] Anthology ST2 Mutant Footstep Sound.zip",
             "  [FIX] Campfires Anthology Compat.zip",
+            "  [PDA] Active Missions PDA Tab Anthology.zip",
             "",
             "Для чистой Anomaly без Anthology:",
             "  — не ставить AIO;",

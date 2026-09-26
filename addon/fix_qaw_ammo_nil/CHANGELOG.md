@@ -7,6 +7,25 @@
 - Отключить слот в MO2; новая игра не нужна.
 - Сейв не затрагивается. Без фикса исходный баг или CTD может вернуться.
 
+## [1.0.4] — 2026-09-26
+
+**Изменено**
+
+- Класс ищется через `_G[name]` и таблицу скрипта `haru_quick_action_wheel_mcm`, плюс живой `TAB_MANAGER.classes` после `on_game_start` QAW (`QAmmoWheelOption` / `QMagazineWheelOption`).
+
+**Причина**
+
+Лог mg9000 2026-09-26: шесть раз `QAmmoWheelOption.LoadInActiveWeapon not found`, хотя метод есть в `haru_quick_action_wheel_mcm.script:1424`, а колесо собирает опции из `TAB_MANAGER.classes`. `rawget` по голому имени класса эту таблицу не видел.
+
+**Не затронуто**
+
+- Сам nil-check `active_item`, `CanLoadInActiveWeapon`, сейвы
+
+**Проверено**
+
+- `tools/lint_addon.py fix_qaw_ammo_nil`
+- В игре ещё нет
+
 ## [1.0.3] — 2026-09-19
 
 **Изменено**
