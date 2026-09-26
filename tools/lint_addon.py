@@ -898,6 +898,15 @@ class AddonLinter:
                 path,
             )
 
+        if suffix == ".script" and any(byte > 127 for byte in data):
+            self.add(
+                "ENC-006",
+                "warn",
+                "Не-ASCII в .script (байт > 127). Комментарии и логи — ASCII; "
+                "строки, которые видит игрок, — configs/text/.",
+                path,
+            )
+
         text = decode_bytes(data)
         suffix = path.suffix.lower()
         if suffix == ".ltx":
@@ -968,14 +977,6 @@ class AddonLinter:
                 )
 
     def check_script(self, path: Path, text: str) -> None:
-        if re.search(r"[\u0400-\u04FF]", text):
-            self.add(
-                "ENC-006",
-                "warn",
-                "Кириллица в .script. Комментарии и логи — ASCII; строки, которые видит игрок, — configs/text/.",
-                path,
-            )
-
         if LOAD_ORDER_HACK_RE.match(path.name.lower()) and not has_load_order_justification(text):
             self.add(
                 "ORDER-002",

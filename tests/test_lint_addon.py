@@ -199,6 +199,19 @@ class EncodingTests(unittest.TestCase):
             hit = next(f for f in findings if f.code == "ENC-006")
             self.assertEqual(hit.severity, "warn")
 
+    def test_non_ascii_byte_without_cyrillic_warns_enc006(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = Path(tmp) / "dash_mod"
+            scripts = addon / "gamedata" / "scripts"
+            scripts.mkdir(parents=True)
+            (scripts / "dash_mod.script").write_bytes(
+                "-- note \xe2\x80\x94 dash\nfunction on_game_start() end\n".encode("latin-1")
+            )
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView())
+            codes = {f.code for f in findings}
+            self.assertIn("ENC-006", codes)
+            self.assertNotIn("ENC-003", codes)
+
     def test_load_order_question_marks_is_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             addon = Path(tmp) / "qmark_mod"

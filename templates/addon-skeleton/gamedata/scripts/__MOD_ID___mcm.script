@@ -1,4 +1,4 @@
--- __TITLE__ — MCM options
+-- __TITLE__ - MCM options
 -- Option tree only. Keep game logic in __MOD_ID__.script
 -- Text keys live in gamedata/configs/text/<lang>/ui_st_mcm___MOD_ID__.xml
 

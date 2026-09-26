@@ -12,7 +12,7 @@
 -- not by a save-specific object id.
 
 local LOG_TAG = "[fix_sim_mechanic_trade]"
-local VERSION = "1.0.3"
+local VERSION = "1.0.4"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -179,7 +179,7 @@ end
 function actor_on_first_update()
 	-- MT reload can replace trade_manager / stalker_generic after on_game_start.
 	-- Do not wipe orig_* first: install() re-captures only slots that are no
-	-- longer ours. Wiping broke still-wrapped slots (orig nil → CTD).
+	-- longer ours. Wiping broke still-wrapped slots (orig nil -> CTD).
 	if not wraps_ok() then
 		install()
 	end

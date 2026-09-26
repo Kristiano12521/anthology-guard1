@@ -1,4 +1,4 @@
--- Context Menu Overhaul 1.4.2 — Anthology 2.1 compatibility bootstrap
+-- Context Menu Overhaul 1.4.2 - Anthology 2.1 compatibility bootstrap
 --
 -- FIX: this replaces zzzzzzzzzz_context_menu_overhaul_anthology.script.
 -- The old file depended on its "zzzzzzzzzz_" filename prefix to be loaded
@@ -10,12 +10,12 @@
 --
 -- Instead, this file registers a single actor_on_first_update callback.
 -- The engine fires actor_on_first_update only after every loaded script's
--- own on_game_start/on_game_load has already run — the same guarantee the
+-- own on_game_start/on_game_load has already run - the same guarantee the
 -- zzz-prefix was trying to buy, but based on an actual engine callback
 -- instead of file sort order.
 --
 -- DELETE the old zzzzzzzzzz_context_menu_overhaul_anthology.script when
--- installing this file — both define the same global function names
+-- installing this file - both define the same global function names
 -- (install_cmo_anthology_hooks, schedule_cmo_qaw, on_game_start, on_game_load)
 -- and having both loaded would let one silently overwrite the other.
 

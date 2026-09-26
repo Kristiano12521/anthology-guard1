@@ -15,11 +15,11 @@
 --    (Zone FM). Most base devices use ph_idle + play_sound and ignore it.
 --    ph_sound defaults no_hit=true. ph_idle hit_on_bone requires exact bone 2.
 --    No on_use in LTX for many devices. Toggle via physic_object_on_use_callback.
---    ph_idle: mute with stop_sounds (do not switch to @broken — kills scheme).
+--    ph_idle: mute with stop_sounds (do not switch to @broken - kills scheme).
 --    ph_sound: mute with volume 0 on Zone FM *_out.
 
 local LOG_TAG = "[fix_radio]"
-local VERSION = "1.0.7"
+local VERSION = "1.0.8"
 local TIP_ID = "st_fix_radio_use"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -489,7 +489,7 @@ function patched_idle_update(self, delta)
 end
 
 -- ph_sound fetches a track only when st.sound_set is true. Zone-off used to
--- stop the out-sound and leave sound_set false — re-arm when allowed again.
+-- stop the out-sound and leave sound_set false - re-arm when allowed again.
 local function arm_ph_sound(self)
 	if not self.st then
 		return
@@ -545,7 +545,7 @@ local function toggle_ph_sound_radio(obj)
 		return
 	end
 
-	-- Old 1.0.x stored mute as destr — clear so the radio can play again.
+	-- Old 1.0.x stored mute as destr - clear so the radio can play again.
 	if action.destructed then
 		action.destructed = false
 		action._fix_radio_muted = false
@@ -687,7 +687,7 @@ local function install_world()
 	ok = patch_method("ph_sound", "snd_source", "hit_callback", patched_snd_hit, "snd_hit") and ok
 	ok = patch_method("ph_sound", "snd_source", "update", patched_snd_update, "snd_update") and ok
 
-	-- Clear leftover use_callback from fix_radio 1.0.3–1.0.5 if still hanging on class.
+	-- Clear leftover use_callback from fix_radio 1.0.3-1.0.5 if still hanging on class.
 	local snd_cls = class_of("ph_sound", "snd_source")
 	if snd_cls and snd_cls.use_callback ~= nil then
 		snd_cls.use_callback = nil
@@ -695,7 +695,7 @@ local function install_world()
 
 	-- Do not add snd_source.use_callback: vanilla has none, and class lookup for a
 	-- newly added method is unreliable. Binder always SendScriptCallbacks
-	-- physic_object_on_use_callback — that is the toggle path for Zone FM.
+	-- physic_object_on_use_callback - that is the toggle path for Zone FM.
 
 	local fx = module_of("xr_effects")
 	if fx and type(fx.play_sound) == "function" and fx.play_sound ~= patched_play_sound then

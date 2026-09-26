@@ -1,4 +1,4 @@
--- Tooltip Control 1.1.2 — Anthology UI Performance Core integration.
+-- Tooltip Control 1.1.2 - Anthology UI Performance Core integration.
 function on_mcm_load()
 	op = {
 		id = "tooltip_control", sh = true,

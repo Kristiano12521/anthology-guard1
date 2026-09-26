@@ -1,5 +1,5 @@
 -- DIAGNOSTIC ONLY: logs state, changes nothing.
--- __TITLE__ — diagnostics
+-- __TITLE__ - diagnostics
 -- Ship separately from the fix, disable in MO2 once the cause is confirmed.
 
 local LOG_TAG = "[__MOD_ID__:diag]"

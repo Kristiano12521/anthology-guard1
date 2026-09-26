@@ -36,7 +36,7 @@ class FixQuestStashGuardTests(unittest.TestCase):
         self.assertIn("cache_opened", self.text_cp)
         self.assertIn("story_item_exists", self.text_cp)
         self.assertIn("get_story_se_item", self.text_cp)
-        self.assertIn("пропуск recover", self.text_cp)
+        self.assertIn("skip recover", self.text_cp)
 
 
 if __name__ == "__main__":

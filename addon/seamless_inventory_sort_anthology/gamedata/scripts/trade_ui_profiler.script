@@ -482,16 +482,14 @@ end
 function on_game_start()
     refresh_opts()
 
-    -- Ïàò÷ îòêëàäûâàåòñÿ íà ñëåäóþùèé òèê ÷åðåç òàéìåð âìåñòî ñèíõðîííîãî
-    -- âûçîâà install() çäåñü. Ðàíüøå "ïàò÷èì ïîñëåäíèì, ñíàðóæè Seamless/
-    -- Antifreeze" îáåñïå÷èâàëîñü òîëüêî ïðåôèêñîì "zzzzzzz_" â èìåíè ôàéëà
-    -- (áîëüøå z => ïîçæå ãðóçèòñÿ => íà ìîìåíò ïàò÷à ïðîôàéëåðà ÷óæèå
-    -- îá¸ðòêè CC.Update/TMode_Init óæå íà ìåñòå, è íàøà îá¸ðòêà èõ
-    -- îêðóæàåò). Ýòî ëîìàåòñÿ, åñëè ó êîãî-òî åù¸ îêàæåòñÿ èìÿ ôàéëà
-    -- ñ íå ìåíüøèì ÷èñëîì z. Òàéìåð ñ çàäåðæêîé 0 ãàðàíòèðóåò òî æå ñàìîå
-    -- ñâîéñòâî (ïðîôàéëåð ïàò÷èò ñòðîãî ÏÎÑËÅ òîãî, êàê îòðàáîòàþò âñå
-    -- on_game_start îñòàëüíûõ ñêðèïòîâ â ýòîò æå òèê), íî íå çàâèñèò îò
-    -- èìåíè ôàéëà âîîáùå.
+    -- Defer the patch to the next tick via a timer instead of calling
+    -- install() here. The old "patch last, outside Seamless/Antifreeze"
+    -- relied only on a zzzzzzz_ filename prefix (more z => later load =>
+    -- foreign CC.Update/TMode_Init wraps are already in place and ours
+    -- wraps them). That breaks if another file has as many z characters.
+    -- A delay-0 timer does the same thing (this profiler patches strictly
+    -- AFTER every other on_game_start on this tick) without depending on
+    -- the filename.
     if CreateTimeEvent and not RETRY_ARMED then
         RETRY_ARMED = true
         CreateTimeEvent("trade_ui_profiler", "deferred_install", 0, function()
@@ -500,8 +498,8 @@ function on_game_start()
                 if diag_on() then install_diag() end
                 return true
             end
-            -- Öåëåâûå êëàññû UI åù¸ íå ãîòîâû (íàïðèìåð, íå òîò ìîìåíò
-            -- çàãðóçêè) - ïîâòîðèì ïîïûòêó åù¸ ÷åðåç ñåêóíäó.
+            -- Target UI classes are not ready yet (wrong load moment).
+            -- Retry in one second.
             RETRY_ARMED = true
             CreateTimeEvent("trade_ui_profiler", "late_install", 1, retry_install)
             return true

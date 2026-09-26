@@ -218,9 +218,9 @@ FIELD_STRIP_ACTION = "remove_part"
 --- WPO's two maintenance actions; a menu whose rows all carry one is the "replace parts" menu.
 REPLACE_PART_ACTION = "replace_part"
 CLEAN_PART_ACTION = "clean_part"
---- Label id whose icon every field-strip row inherits — the same `[label_icons]` entry the "field strip" menu entry uses.
+--- Label id whose icon every field-strip row inherits - the same `[label_icons]` entry the "field strip" menu entry uses.
 FIELD_STRIP_LABEL = "st_field_strip"
---- Label id whose icon the maintenance rows inherit — the "replace parts" entry's oil can.
+--- Label id whose icon the maintenance rows inherit - the "replace parts" entry's oil can.
 MAINTENANCE_LABEL = "st_wpo_replace_parts"
 STRIP_CELL = 40
 STRIP_GAP = 4
@@ -265,11 +265,11 @@ function is_maintenance(action_list)
   return true
 end
 --- Item UI Improvements, when installed, draws a condition dot per part on the weapon's own
--- inventory icon and orders them by its `parts_sort` — a fixed part-name order (barrel, trigger,
--- bolt, bolt carrier, …). The menu WPO hands over is ordered by whatever comparator the installed
+-- inventory icon and orders them by its `parts_sort` - a fixed part-name order (barrel, trigger,
+-- bolt, bolt carrier, ...). The menu WPO hands over is ordered by whatever comparator the installed
 -- field-strip builder happens to use (in GAMMA, `utils_ui.sort_by_sizekind`, i.e. by inventory grid
 -- size), so the rows do not line up with the dots the player just read off the icon. Returns the
--- dot comparator when that mod is present, and nothing when it is not — without it there are no
+-- dot comparator when that mod is present, and nothing when it is not - without it there are no
 -- dots to match and the order WPO gave is kept.
 function dot_order()
   if type(z_item_icon_info) ~= "table" then

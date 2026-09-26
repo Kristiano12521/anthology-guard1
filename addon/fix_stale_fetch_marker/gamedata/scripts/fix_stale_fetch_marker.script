@@ -5,13 +5,13 @@
 -- marker while task_info exists and last_check_task is not complete/fail.
 -- After turn-in, repeat_timeout can leave *_fetch in pstor with no PDA task.
 --
--- v1.0.0/1.0.1 used load_var(db.actor, …) while sweeping task_info only —
+-- v1.0.0/1.0.1 used load_var(db.actor, ...) while sweeping task_info only -
 -- log showed probed=0 while diag still saw eloquent_task_8_fetch. v1.0.2
 -- scans pstor tables at AC_ID / 0 / actor:id() for keys ending in _fetch
 -- and clears ghosts when the engine CGameTask is gone (or status completed/fail).
 
 local LOG_TAG = "[fix_stale_fetch_marker]"
-local VERSION = "1.0.3"
+local VERSION = "1.0.4"
 local DELAY_EVENT = "fix_stale_fetch_marker_delay"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
@@ -79,7 +79,7 @@ end
 
 local function is_stale(actor, task_id, info)
 	if type(info) ~= "table" then
-		-- Orphan pstor key, no task_info entry — safe to drop for marker purposes.
+		-- Orphan pstor key, no task_info entry - safe to drop for marker purposes.
 		if not has_engine_task(actor, task_id) then
 			return true, "orphan_no_engine"
 		end

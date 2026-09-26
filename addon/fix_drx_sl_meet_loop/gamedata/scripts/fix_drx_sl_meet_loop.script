@@ -8,7 +8,7 @@
 -- "meet X" while dialog flashes "get next task" new+complete.
 --
 -- Also: drx_sl_honchos_table lists Vector as cit_killers_merc_mechanic_stalker
--- (Hog duplicate). Meet tasks exist for zat_stancia_trader_merc — without that
+-- (Hog duplicate). Meet tasks exist for zat_stancia_trader_merc - without that
 -- id mercs often have zero next targets after Griffith.
 --
 -- Monkey-patch: fix Vector id; prefer same-faction next; never self-meet on
@@ -17,7 +17,7 @@
 -- load-order: after xr_effects / axr_task_manager (wraps at on_game_start)
 
 local LOG_TAG = "[fix_drx_sl_meet_loop]"
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 

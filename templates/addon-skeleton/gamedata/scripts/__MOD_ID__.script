@@ -5,7 +5,7 @@
 local LOG_TAG = "[__MOD_ID__]"
 local VERSION = "1.0.0"
 
--- Presence line for xraylog «Мои моды» — unconditional, before any guards.
+-- Presence line for xraylog "My mods" - unconditional, before any guards.
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local function opt(path, default)
@@ -33,13 +33,13 @@ end
 -- Pattern from addon code (not a project rule):
 --   full:   fix_rogue_hostility, fix_soc_nimble_flash, fix_noosphere_voice_x18
 --   partial: fix_quest_story_id (DLTX + CreateTimeEvent + also register wrap)
---   partial: fix_wtf_assault_instacomplete (runtime merge only — no DLTX,
+--   partial: fix_wtf_assault_instacomplete (runtime merge only - no DLTX,
 --            no CreateTimeEvent)
 --
--- Layer 1 — DLTX (see mod_items_food___MOD_ID__.ltx):
+-- Layer 1 - DLTX (see mod_items_food___MOD_ID__.ltx):
 --   Fixes FUTURE spawns / scheme / jobs. New objects pick it up from config.
 --
--- Layer 2 — one-shot CreateTimeEvent (this stub):
+-- Layer 2 - one-shot CreateTimeEvent (this stub):
 --   Fixes ALREADY broken saves after load. Schedule from actor_on_first_update.
 --   Retry: ResetTimeEvent + return false. Done / give up: return true
 --   (Create with the same ids while the slot lives is a no-op).

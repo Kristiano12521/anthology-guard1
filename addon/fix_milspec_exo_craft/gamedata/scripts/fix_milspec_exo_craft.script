@@ -4,7 +4,7 @@
 -- tables; this wrap injects after that, same as the old archive script.
 
 local LOG_TAG = "[fix_milspec_exo_craft]"
-local VERSION = "1.0.4"
+local VERSION = "1.0.5"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -232,7 +232,7 @@ local function install()
 	end
 
 	-- Capture current top (real CSI or another wrap below us). Never run if we are
-	-- already mid-chain under an outer wrap on the same CSI table — that is
+	-- already mid-chain under an outer wrap on the same CSI table - that is
 	-- actor_on_first_update's job to leave alone.
 	orig_load = aa_load_recipes_Banjaji_CSI.LoadRecipesLTX
 	aa_load_recipes_Banjaji_CSI.LoadRecipesLTX = wrapped_LoadRecipesLTX
