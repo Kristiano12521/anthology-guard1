@@ -26,17 +26,17 @@ function parse_hex(hex)
     channel(5)
   )
 end
---- Lower-case `à`-`ÿ` in windows-1251, the encoding Anomaly's localization files use; their upper-case forms sit 32 bytes below.
+--- Lower-case a-ya in windows-1251, the encoding Anomaly localization files use; their upper-case forms sit 32 bytes below.
 CP1251_A = 224
 CP1251_YA = 255
 CP1251_CASE_GAP = 32
---- Lower-case `¸`, which sits outside the contiguous range and pairs with `¨`.
+--- Lower-case yo, which sits outside the contiguous range and pairs with YO.
 CP1251_YO = 184
 CP1251_YO_UPPER = 168
 --- A UTF-8 multibyte sequence: a lead byte `0xC2`-`0xF4` followed by a continuation byte
 -- `0x80`-`0xBF`. The CP1251 case logic below reads a byte as a whole letter, so a CJK
--- localization (Chinese, Korean, Japanese) — whose glyphs are UTF-8, and whose 3-byte lead
--- bytes `0xE0`-`0xEF` land inside the Cyrillic range — would have its first byte rewritten
+-- localization (Chinese, Korean, Japanese) - whose glyphs are UTF-8, and whose 3-byte lead
+-- bytes `0xE0`-`0xEF` land inside the Cyrillic range - would have its first byte rewritten
 -- and the sequence corrupted, dropping the label entirely. CP1251 Cyrillic is unaffected:
 -- its second letter byte is `>= 0xC0`, never a `0x80`-`0xBF` continuation byte.
 UTF8_LEAD_MIN = 194

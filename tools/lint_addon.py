@@ -77,7 +77,9 @@ CREATE_NAMED_RE = re.compile(
     re.S,
 )
 ALIFE_SCAN_RE = re.compile(r"for\s+\w+\s*=\s*1\s*,\s*(MAX_ALIFE_ID|65534|65535)\b")
-ALIFE_SCAN_JUSTIFICATION_RE = re.compile(r"--\s*alife-scan:\s*запасной путь,\s*\S+", re.I)
+ALIFE_SCAN_JUSTIFICATION_RE = re.compile(
+    r"--\s*alife-scan:\s*(?:запасной путь|fallback),\s*\S+", re.I
+)
 LUA_STRING_OR_COMMENT_RE = re.compile(
     r"--\[\[[\s\S]*?\]\]|--[^\n]*|\[\[.*?\]\]|"
     r"\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'",
@@ -397,7 +399,7 @@ def has_load_order_justification(text: str) -> bool:
 
 
 def has_alife_scan_justification(text: str, match_start: int) -> bool:
-    """Комментарий `-- alife-scan: запасной путь, <причина>` в трёх строках перед циклом снимает LUA-008."""
+    """`-- alife-scan: fallback, <reason>` (или устар. «запасной путь,») снимает LUA-008."""
     line_no = text[:match_start].count("\n")
     lines = text.splitlines()
     window = lines[max(0, line_no - 3) : line_no]
@@ -891,7 +893,7 @@ class AddonLinter:
         elif looks_like_utf8_cyrillic(data):
             self.add(
                 "ENC-003",
-                "warn",
+                "error",
                 "Похоже на UTF-8 с кириллицей. Игровые файлы — Windows-1251, иначе в игре будет мусор.",
                 path,
             )
@@ -966,6 +968,14 @@ class AddonLinter:
                 )
 
     def check_script(self, path: Path, text: str) -> None:
+        if re.search(r"[\u0400-\u04FF]", text):
+            self.add(
+                "ENC-006",
+                "warn",
+                "Кириллица в .script. Комментарии и логи — ASCII; строки, которые видит игрок, — configs/text/.",
+                path,
+            )
+
         if LOAD_ORDER_HACK_RE.match(path.name.lower()) and not has_load_order_justification(text):
             self.add(
                 "ORDER-002",
@@ -1147,7 +1157,7 @@ class AddonLinter:
                 "warn",
                 "Полный проход id 1..65534: каждый шаг — alife():object. "
                 "На загрузке/смене уровня это хитч. Нужен iterate_objects или чанк. "
-                "Запасной путь: `-- alife-scan: запасной путь, <причина>` в трёх строках перед циклом.",
+                "Запасной путь: `-- alife-scan: fallback, <reason>` в трёх строках перед циклом (ASCII).",
                 path,
                 text[: match.start()].count("\n") + 1,
             )

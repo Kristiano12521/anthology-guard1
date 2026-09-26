@@ -1,6 +1,6 @@
--- Field Replace Ч вшит в Context Menu Overhaul Anthology.
+-- Field Replace, sewn into Context Menu Overhaul Anthology.
 -- Upstream: Field_Replace_v1.6 (https://www.moddb.com/mods/stalker-anomaly/addons/field-replace)
--- Depends: custom_functor_autoinject (в сборке). »конки: mod_menu_field_replace.ltx.
+-- Depends: custom_functor_autoinject (in the pack). Icons: mod_menu_field_replace.ltx.
 
 local LOG_TAG = "[field_replace]"
 local VERSION = "1.6.0"

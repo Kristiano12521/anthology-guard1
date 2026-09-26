@@ -1,34 +1,34 @@
 -- Anthology Busy Hands Stability Fix v0.5.3 - repair OnItemSelect chain fix
 -- load-order: after zzzzz_arti_outfit_repair
 --
--- ПРАВИЛО 2/3: zzzz_arti_jamming_repairs.script и zzzzz_arti_outfit_repair.
--- script остаются оригинальными - НЕ подменяются. Патчим только конечную
--- точку - item_repair.UIRepair.OnItemSelect - но делаем это, полностью
--- реконструируя её логику здесь, а не вызывая исходные функции: см. ниже,
--- почему вызвать их напрямую нельзя.
+-- RULE 2/3: zzzz_arti_jamming_repairs.script and zzzzz_arti_outfit_repair.
+-- script stay original and are NOT replaced. We patch only the final
+-- point, item_repair.UIRepair.OnItemSelect, but we do it by fully
+-- reconstructing the logic here instead of calling the originals. See below
+-- why calling them directly is impossible.
 --
--- ДВА НЕЗАВИСИМЫХ БАГА В ЭТИХ ДВУХ ФАЙЛАХ, ИСПРАВЛЕННЫЕ ЗДЕСЬ:
+-- TWO INDEPENDENT BUGS IN THESE TWO FILES, FIXED HERE:
 --
--- 1) БЕСКОНЕЧНАЯ РЕКУРСИЯ (подробное объяснение - в
---    zzzz_zzz_anthology_bhs_repair_capture_vendor_base.script, который
---    должен грузиться перед этим файлом). Оба вендорских файла патчат
---    OnItemSelect цепочкой через ОДНУ и ту же глобальную переменную
---    RepairOnItemSelect без local - второй патч стирает ссылку, которую
---    первый патч использует для вызова "следующего звена". Итог: обычный
---    ремонт брони/одежды (has_parts(obj_1) == false) уходит в бесконечную
---    рекурсию и роняет игру. Фикс: реконструируем обе функции здесь как
---    явные Lua-замыкания, полностью игнорируя сломанный общий global.
+-- 1) INFINITE RECURSION (full explanation is in
+--    zzzz_zzz_anthology_bhs_repair_capture_vendor_base.script, which
+--    must load before this file). Both vendor files patch
+--    OnItemSelect by chaining through ONE shared global
+--    RepairOnItemSelect with no local. The second patch wipes the reference
+--    the first patch uses to call the next link. Result: a normal
+--    armor/outfit repair (has_parts(obj_1) == false) goes into infinite
+--    recursion and crashes the game. Fix: reconstruct both functions here as
+--    explicit Lua closures and ignore the broken shared global.
 --
--- 2) self.obj:section() на потенциально невалидном self.obj (тот же класс
---    бага, что и в zzzzzz_anthology_bhs_item_repair_patch.script) - заменено
---    на self.section, которая всегда синхронно поддерживается актуальной
---    нашим патчем CollectValidItems/Reset.
+-- 2) self.obj:section() on a possibly invalid self.obj (same class
+--    of bug as zzzzzz_anthology_bhs_item_repair_patch.script), replaced
+--    with self.section, which our CollectValidItems/Reset patch keeps
+--    in sync.
 --
--- ЗАВИСИМОСТИ: обе функции используют только self.*/публичные глобалы, за
--- одним исключением - jamming_repairs.script читает приватный
--- local ini_custom_repair = ini_file("repair\\importer.ltx"). Это загрузка
--- ресурса по фиксированному пути, не логика - воспроизведена как есть.
--- outfit_repair.script вообще не имеет ни одного top-level local (проверено).
+-- DEPENDENCIES: both functions use only self.*/public globals, with
+-- one exception. jamming_repairs.script reads a private
+-- local ini_custom_repair = ini_file("repair\\importer.ltx"). That is a
+-- resource load from a fixed path, not logic, reproduced as-is.
+-- outfit_repair.script has no top-level local at all (checked).
 
 local VERSION = "0.6.10"
 ANTHOLOGY_BHS_REPAIR_CHAIN_PATCH_VERSION = VERSION
@@ -80,8 +80,8 @@ local function resolve_outfit_helpers()
 	return nil
 end
 
--- Реконструкция jamming_repairs.script:OnItemSelect (J'), с явным
--- параметром next_fn вместо чтения сломанного глобала.
+-- Reconstruction of jamming_repairs.script:OnItemSelect (J'), with an explicit
+-- next_fn parameter instead of reading the broken global.
 local function jamming_on_item_select(self, n, next_fn)
 	local obj_1 = self.CC[1]:GetCell_Selected(true)
 	local obj_n = self.CC[n]:GetCell_Selected(true)
@@ -102,8 +102,8 @@ local function jamming_on_item_select(self, n, next_fn)
 	end
 end
 
--- Реконструкция outfit_repair.script:OnItemSelect (O'), с явным
--- параметром next_fn вместо чтения сломанного глобала.
+-- Reconstruction of outfit_repair.script:OnItemSelect (O'), with an explicit
+-- next_fn parameter instead of reading the broken global.
 local function outfit_on_item_select(self, n, next_fn)
 	local obj_1 = self.CC[1]:GetCell_Selected(true)
 	local obj_n = self.CC[n]:GetCell_Selected(true)

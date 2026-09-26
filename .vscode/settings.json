@@ -1,0 +1,15 @@
+{
+  "files.associations": {
+    "*.script": "lua",
+    "*.ltx": "properties"
+  },
+  "[lua]": {
+    "files.encoding": "windows1251"
+  },
+  "[properties]": {
+    "files.encoding": "windows1251"
+  },
+  "[xml]": {
+    "files.encoding": "windows1251"
+  }
+}

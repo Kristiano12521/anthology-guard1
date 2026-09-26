@@ -1,15 +1,15 @@
--- Фикс: зелёные тайники не садятся на закрытые сюжетные ящики
+-- Fix: green stash markers must not land on locked story boxes
 -- Anomaly 1.5.3 / Anthology 2.1
 --
--- treasure_manager кладёт случайный лут в любой inventory_box из caches.
--- Сюжетные ящики с nonscript_usable=false (ключ/код/инфопорция) остаются
--- в пуле: метка есть, открыть нельзя. DLTX дополняет blacklist_stashes_names
--- в treasure_manager.ltx и grok_treasure_manager.ltx (новые игры).
--- caches_blacklist локальный и при get_random_stash проверяется только
--- при inv_box=true — поэтому оборачиваем get_random_stash и чиним сейвы.
+-- treasure_manager drops random loot into any inventory_box from caches.
+-- Story boxes with nonscript_usable=false (key/code/info portion) stay
+-- in the pool: the spot exists, the box cannot be opened. DLTX extends blacklist_stashes_names
+-- in treasure_manager.ltx and grok_treasure_manager.ltx (new games).
+-- caches_blacklist is local and get_random_stash checks it only
+-- when inv_box=true, so we wrap get_random_stash and repair saves.
 
 local LOG_TAG = "[fix_locked_stash_boxes]"
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 local EVENT_ID = "fix_locked_stash_boxes"
 local REPAIR_ACTION = "repair"
 local REPAIR_DELAY = 1.0
@@ -17,7 +17,7 @@ local SPOTS = { "treasure", "treasure_searched", "treasure_unique" }
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
--- Имена se_obj:name() закрытых/квестовых ящиков (см. CHANGELOG).
+-- se_obj:name() of locked/quest boxes (see CHANGELOG).
 local LOCKED_NAMES = {
 	esc_kkp_sidr_habar = true,
 	esc_inv_out_quest_fee = true,
@@ -106,7 +106,7 @@ local function remove_treasure_spots(id)
 	return removed
 end
 
--- release_stash_by_id игнорирует caches[id]==false (falsy). Поднимаем до true.
+-- release_stash_by_id ignores caches[id]==false (falsy). Raise it to true.
 local function drop_cache_entry(id)
 	local caches = caches_table()
 	if not (caches and id ~= nil and caches[id] ~= nil) then
@@ -199,12 +199,12 @@ local function repair_locked_caches()
 			if relocate_pending(row.id, row.value, row.name) then
 				relocated = relocated + 1
 			else
-				-- Нет свободного ящика: снимаем метку/слот и просим новый marked stash.
+				-- No free box: clear the spot/slot and ask for a new marked stash.
 				remove_treasure_spots(row.id)
 				drop_cache_entry(row.id)
 				failed_pending = failed_pending + 1
 				log(
-					"dropped pending (no free box) name=%s id=%s — spawn replacement",
+					"dropped pending (no free box) name=%s id=%s - spawn replacement",
 					tostring(row.name),
 					tostring(row.id)
 				)
@@ -235,8 +235,8 @@ function patched_get_random_stash(no_spot, hint, spawn_local, inv_box)
 		return
 	end
 
-	-- Blacklist в оригинале смотрит имя только при inv_box=true.
-	-- Закрытый ящик убираем из пула и пробуем снова.
+	-- The original blacklist reads the name only when inv_box=true.
+	-- Drop the locked box from the pool and try again.
 	for _ = 1, 16 do
 		local id, a, b, c = orig_get_random_stash(no_spot, hint, spawn_local, inv_box)
 		if not id then

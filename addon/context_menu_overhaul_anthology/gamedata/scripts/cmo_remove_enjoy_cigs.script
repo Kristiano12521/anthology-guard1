@@ -1,14 +1,14 @@
--- Removes the "ѕокурить" ("Enjoy Cigarette") context-menu row added by the
+-- Removes the "Enjoy Cigarette" context-menu row added by the
 -- [MODDED EXES] Enjoy Cigarettes addon (Tosox, moddb.com/mods/stalker-anomaly/
--- addons/dltx-enjoy-cigarettes) Ч per user request, it duplicates the
--- existing "»спользовать" action.
+-- addons/dltx-enjoy-cigarettes) - per user request, it duplicates the
+-- existing "Use" action.
 --
 -- Enjoy Cigarettes registers its row through demonized's
 -- custom_functor_autoinject.script (the same shared helper Mags Redux/OPO/
 -- PBA transmute all use in this modlist) via add_functor(name, ...). That
--- library also exposes an official remove_functor(name) Ч this uses that
+-- library also exposes an official remove_functor(name) - this uses that
 -- API directly instead of monkey-patching dynamic.enjoy_cigs itself, so the
--- actual smoking action bound to "»спользовать" (a separate, vanilla `use`
+-- actual smoking action bound to "Use" (a separate, vanilla `use`
 -- functor per the diagnostic log) is never touched.
 --
 -- Deferred by one tick via CreateTimeEvent: custom_functor_autoinject queues

@@ -1,45 +1,45 @@
 -- Anthology Busy Hands Stability Fix v0.5.3 - repair chain vendor-base capture
 -- load-order: after zzzz_arti_jamming_repairs
 --
--- ЭТОТ ФАЙЛ ДОЛЖЕН ЗАГРУЗИТЬСЯ РОВНО МЕЖДУ zzzz_arti_jamming_repairs.script
--- И zzzzz_arti_outfit_repair.script. Имя файла подобрано так, чтобы попасть
--- именно в эту позицию по алфавиту ("zzzz_" - 4 буквы z, как у jamming, но
--- "zzz" после подчёркивания сортируется после "arti"; при этом 4 буквы z
--- всегда идут раньше 5 букв z у outfit_repair). ЕСЛИ вы переименуете любой
--- из трёх файлов - эта логика сломается молча. Не переименовывайте
+-- This file must load strictly between zzzz_arti_jamming_repairs.script
+-- and zzzzz_arti_outfit_repair.script. The filename is chosen so it lands
+-- in that alphabetic slot ("zzzz_" is 4 z letters, like jamming, but
+-- "zzz" after the underscore sorts after "arti"; 4 z letters still
+-- sort before the 5 z letters of outfit_repair). IF you rename any
+-- of the three files this logic breaks silently. Do not rename
 -- zzzz_arti_jamming_repairs.script / zzzzz_arti_outfit_repair.script /
--- этот файл относительно друг друга без пересмотра load-order.
+-- this file relative to the others without revisiting load-order.
 --
--- ЗАЧЕМ ЭТО НУЖНО (независимый от BusyHandsFix баг в самом Anthology 2.1):
+-- WHY (an Anthology 2.1 bug independent of BusyHandsFix):
 --
--- Оба вендорских файла - zzzz_arti_jamming_repairs.script и
--- zzzzz_arti_outfit_repair.script - патчат item_repair.UIRepair.OnItemSelect
--- цепочкой через ОДНО и то же имя ГЛОБАЛЬНОЙ переменной без local:
+-- Both vendor files, zzzz_arti_jamming_repairs.script and
+-- zzzzz_arti_outfit_repair.script, patch item_repair.UIRepair.OnItemSelect
+-- by chaining through ONE shared GLOBAL name with no local:
 --   RepairOnItemSelect = item_repair.UIRepair.OnItemSelect
 --   function item_repair.UIRepair:OnItemSelect(n) ... RepairOnItemSelect(self,n) end
 --
--- jamming_repairs (4z, грузится первым) захватывает исходную (vendor base,
--- назовём V) версию в RepairOnItemSelect, затем ставит СВОЮ версию (J).
--- outfit_repair (5z, грузится вторым) читает ТЕКУЩЕЕ значение
--- item_repair.UIRepair.OnItemSelect (это уже J, не V!) в ТУ ЖЕ переменную
--- RepairOnItemSelect - тем самым стирая V без возможности восстановления -
--- и ставит свою версию (O).
+-- jamming_repairs (4z, loads first) captures the original (vendor base,
+-- call it V) into RepairOnItemSelect, then installs ITS version (J).
+-- outfit_repair (5z, loads second) reads the CURRENT value of
+-- item_repair.UIRepair.OnItemSelect (already J, not V!) into the SAME
+-- RepairOnItemSelect, wiping V with no way to restore it,
+-- and installs its own version (O).
 --
--- Итог: на рантайме O вызывает RepairOnItemSelect(self,n) и корректно
--- попадает в J (т.к. глобал на тот момент = J). Но J САМ внутри себя тоже
--- вызывает RepairOnItemSelect(self,n), ожидая попасть в V - а глобал к
--- этому моменту уже был перезаписан на J. J вызывает сам себя -
--- БЕСКОНЕЧНАЯ РЕКУРСИЯ -> stack overflow -> вылет.
+-- Result: at runtime O calls RepairOnItemSelect(self,n) and correctly
+-- lands in J (the global is J at that moment). But J itself also
+-- calls RepairOnItemSelect(self,n), expecting V, and the global was
+-- already overwritten to J. J calls itself:
+-- INFINITE RECURSION -> stack overflow -> CTD.
 --
--- Триггерится КАЖДЫЙ раз, когда has_parts(obj_1) == false в O - то есть
--- практически при любом обычном ремонте брони/одежды через этот аддон
--- (has_parts относится к оружейным деталям, не к броне) - вероятно, самый
--- частый краш во всём этом наборе аддонов.
+-- Triggers EVERY time has_parts(obj_1) == false in O, that is
+-- almost any normal armor/outfit repair through this addon
+-- (has_parts is weapon parts, not armor). Likely the most
+-- common crash in this addon set.
 --
--- Настоящий фикс - в zzzzzz_anthology_bhs_repair_recursion_fix.script
--- (грузится последним, после обоих вендорских файлов). Этот файл здесь
--- только СОХРАНЯЕТ V под безопасным именем, пока она ещё не потеряна -
--- больше нигде и никогда её взять будет неоткуда.
+-- The real fix is in zzzzzz_anthology_bhs_repair_recursion_fix.script
+-- (loads last, after both vendor files). This file only SAVES V
+-- under a safe name while it still exists.
+-- There is nowhere else to recover it later.
 
 -- Env of zzzz_arti_jamming_repairs is visible as _G[filename] (axr_main).
 -- RepairOnItemSelect is a non-local assign in that file, so it SHOULD be

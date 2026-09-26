@@ -1,16 +1,16 @@
 -- Anthology Busy Hands Stability Fix v0.5.0 - DotMarks ui_inventory.start guard
 -- load-order: after z_ui_inventory_dotmarks
 --
--- ПРАВИЛО 2/3: z_ui_inventory_dotmarks.script (58 строк, вендорский DotMarks
--- addon) остаётся оригинальным - НЕ подменяется. Вместо этого мы оборачиваем
--- ui_inventory.start ЕЩЁ ОДНИМ слоем поверх - той же цепочкой monkey-patch,
--- которой сам DotMarks уже оборачивает исходный ui_inventory.start.
+-- RULE 2/3: z_ui_inventory_dotmarks.script (58 lines, vendor DotMarks
+-- addon) stays original and is NOT replaced. We wrap
+-- ui_inventory.start with ONE MORE layer on top, the same monkey-patch
+-- chain DotMarks already uses around the original ui_inventory.start.
 --
--- Наша обёртка работает СНАРУЖИ DotMarks: если объект невалиден, мы
--- останавливаемся ДО входа в DotMarks-версию и вообще не даём ей вызвать
--- obj:section()/obj:name() на потенциально уничтоженной userdata. Поэтому
--- нам не нужно знать/дублировать внутреннюю логику DotMarks (idm, dm,
--- whitelist и т.д.) - в отличие от mon_sleep, здесь чистая обёртка входа.
+-- Our wrapper runs OUTSIDE DotMarks: if the object is invalid we
+-- stop BEFORE entering the DotMarks version and never let it call
+-- obj:section()/obj:name() on userdata that may already be destroyed. So
+-- we do not need to know or duplicate DotMarks internals (idm, dm,
+-- whitelist, and so on). Unlike mon_sleep, this is a pure entry wrapper.
 
 local VERSION = "0.5.0"
 ANTHOLOGY_BHS_DOTMARKS_PATCH_VERSION = VERSION

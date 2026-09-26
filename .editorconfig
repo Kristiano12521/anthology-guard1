@@ -1,0 +1,10 @@
+# charset is intentionally omitted for *.script / *.ltx / *.xml.
+# EditorConfig spec allows only latin1, utf-8, utf-8-bom, utf-16be, utf-16le.
+# windows-1251 is not in the spec; unknown values are ignored by plugins.
+# Encoding is set in .vscode/settings.json (files.encoding = windows1251).
+
+root = true
+
+[*]
+end_of_line = crlf
+insert_final_newline = true

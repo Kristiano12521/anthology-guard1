@@ -110,7 +110,10 @@ class EncodingTests(unittest.TestCase):
                 '-- комментарий на русском\nfunction on_game_start() end\n', encoding="utf-8"
             )
             findings = lint_addon.lint(addon, lint_addon.ReferenceView())
-            self.assertIn("ENC-003", {f.code for f in findings})
+            enc = [f for f in findings if f.code == "ENC-003"]
+            self.assertEqual(len(enc), 1)
+            self.assertEqual(enc[0].severity, "error")
+            self.assertIn("ENC-006", {f.code for f in findings})
 
     def test_bom_is_error(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -179,7 +182,22 @@ class EncodingTests(unittest.TestCase):
             findings = lint_addon.lint(addon, lint_addon.ReferenceView())
             codes = {f.code for f in findings}
             self.assertNotIn("ENC-004", codes)
-            self.assertNotIn("ENC-005", codes)
+            self.assertNotIn("ENC-005", {f.code for f in findings})
+
+    def test_cp1251_cyrillic_in_script_warns_enc006_not_enc003(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = Path(tmp) / "cyr_mod"
+            scripts = addon / "gamedata" / "scripts"
+            scripts.mkdir(parents=True)
+            (scripts / "cyr_mod.script").write_bytes(
+                "-- комментарий\nfunction on_game_start() end\n".encode("cp1251")
+            )
+            findings = lint_addon.lint(addon, lint_addon.ReferenceView())
+            codes = {f.code for f in findings}
+            self.assertIn("ENC-006", codes)
+            self.assertNotIn("ENC-003", codes)
+            hit = next(f for f in findings if f.code == "ENC-006")
+            self.assertEqual(hit.severity, "warn")
 
     def test_load_order_question_marks_is_error(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -985,6 +1003,24 @@ class TimeEventLintTests(unittest.TestCase):
             )
             codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
             self.assertNotIn("LUA-008", codes)
+
+    def test_alife_scan_english_fallback_suppresses(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            addon = self._script(
+                Path(tmp),
+                "id_scan_en",
+                "local MAX_ALIFE_ID = 65534\n"
+                "local function scan()\n"
+                "    -- alife-scan: fallback, iterate_objects missing\n"
+                "    for id = 1, MAX_ALIFE_ID do\n"
+                "        alife():object(id)\n"
+                "    end\n"
+                "end\n",
+                encoding="ascii",
+            )
+            codes = {f.code for f in lint_addon.lint(addon, lint_addon.ReferenceView(), verify=False)}
+            self.assertNotIn("LUA-008", codes)
+            self.assertNotIn("ENC-006", codes)
 
     def test_alife_scan_justification_in_file_header_does_not_suppress(self):
         with tempfile.TemporaryDirectory() as tmp:

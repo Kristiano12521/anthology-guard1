@@ -6,7 +6,7 @@
 -- Guard both: return nil (same contract as zz_anthology_safe_offline_spawn).
 
 local LOG_TAG = "[fix_create_squad_nil_smart]"
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
@@ -50,7 +50,7 @@ local function caller_label()
 end
 
 ------------------------------------------------------------------------
--- SIMBOARD.create_squad ù primary guard (all call paths)
+-- SIMBOARD.create_squad - primary guard (all call paths)
 ------------------------------------------------------------------------
 local function patched_board_create_squad(self, smart, squad_section, ...)
 	if not smart then
@@ -85,7 +85,7 @@ local function install_board()
 end
 
 ------------------------------------------------------------------------
--- xr_effects.create_squad ù early exit + clear log
+-- xr_effects.create_squad - early exit + clear log
 ------------------------------------------------------------------------
 local function patched_xr_create_squad(actor, obj, p)
 	local squad_id = p and p[1]

@@ -1,5 +1,5 @@
 local LOG_TAG = "[campfires_anthology_compat]"
-local VERSION = "1.1.2"
+local VERSION = "1.1.4"
 printf("%s loaded v%s", LOG_TAG, VERSION)
 
 local orig_trader_update = nil
@@ -91,7 +91,7 @@ local function release_tracked_campfires(mode)
 	end
 
 	if not scanned then
-		-- alife-scan: запасной путь, основной sim:iterate_objects, если метода нет или pcall упал; docs/pitfalls.md §16
+		-- alife-scan: fallback, main path is sim:iterate_objects when the method is missing or pcall failed; docs/pitfalls.md
 		for id = 1, MAX_ALIFE_ID do
 			visit(alife_object(id))
 		end

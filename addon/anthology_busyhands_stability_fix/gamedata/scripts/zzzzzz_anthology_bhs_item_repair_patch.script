@@ -1,23 +1,23 @@
 -- Anthology Busy Hands Stability Fix v0.5.0 - item_repair.UIRepair patch
 -- load-order: after zz_item_repair_keep_crafting_window_open
 --
--- ПРАВИЛО 2/3: zz_item_repair_keep_crafting_window_open.script (вендорский
--- monkey-patch addon поверх item_repair.script) остаётся оригинальным - НЕ
--- подменяется. Патчим ТОЛЬКО 6 методов класса item_repair.UIRepair, которые
--- сам вендорский файл и так патчит цепочкой (InitControlsSuper/ResetSuper) -
--- мы добавляем ещё один слой этой же цепочки, не трогая файл.
+-- RULE 2/3: zz_item_repair_keep_crafting_window_open.script (vendor
+-- monkey-patch addon over item_repair.script) stays original and is NOT
+-- replaced. We patch ONLY 6 methods of item_repair.UIRepair, which
+-- the vendor file already chains (InitControlsSuper/ResetSuper).
+-- We add one more layer of that chain and do not touch the file.
 --
--- Причина бага: несколько методов держат self.obj как прямую ссылку на
--- userdata израсходованного/уничтоженного ремкомплекта (utils_item.discharge
--- освобождает объект) и продолжают вызывать на нём нативные методы
--- (obj:condition() и т.д.) в отложенных колбэках (CreateTimeEvent) - к
--- моменту срабатывания объект уже может быть невалиден.
+-- Bug: several methods keep self.obj as a direct reference to
+-- userdata of a spent/destroyed repair kit (utils_item.discharge
+-- frees the object) and keep calling native methods on it
+-- (obj:condition() and so on) from deferred callbacks (CreateTimeEvent).
+-- By the time they run the object may already be invalid.
 --
--- Все 6 методов используют только self:*/self.* и публичные глобальные
--- функции (db.actor, utils_item, utils_xml, ui_item, game_statistics,
--- utils_obj.play_sound) - единственная приватная зависимость вендорского
--- файла - local degrade_factor = item_repair.degrade_factor or 0.2,
--- тривиальная константа, воспроизведённая ниже.
+-- All 6 methods use only self:*/self.* and public globals
+-- (db.actor, utils_item, utils_xml, ui_item, game_statistics,
+-- utils_obj.play_sound). The only private dependency of the vendor
+-- file is local degrade_factor = item_repair.degrade_factor or 0.2,
+-- a trivial constant, reproduced below.
 
 local VERSION = "0.6.5"
 ANTHOLOGY_BHS_ITEM_REPAIR_PATCH_VERSION = VERSION
@@ -25,7 +25,7 @@ ANTHOLOGY_BHS_ITEM_REPAIR_PATCH_VERSION = VERSION
 local degrade_factor = item_repair.degrade_factor or 0.2
 
 -- --------------------------------------------------------------------------
--- Общие защитные хелперы (аналог того, что уже было в loose-копии v0.4.4)
+-- Shared guard helpers (same idea as the loose copy in v0.4.4)
 -- --------------------------------------------------------------------------
 
 local function find_actor_item(section, preferred_id)
@@ -95,8 +95,8 @@ local function delayed_collect_valid_items(self, section)
 end
 
 -- --------------------------------------------------------------------------
--- Патчи методов - каждый оборачивает текущую версию (цепочка, как у самого
--- вендорского файла), а не подменяет с нуля.
+-- Method patches. Each wraps the current version (a chain, like the
+-- vendor file itself), rather than replacing from scratch.
 -- --------------------------------------------------------------------------
 
 -- class "UIRepair" (CUIScriptWnd) lives in _G, not on the module table
@@ -138,9 +138,9 @@ local function install(UIRepair)
 			self.repair_section = section
 			self.repair_obj_id = nil
 
-			-- Привязываемся только через свежий обход инвентаря актёра.
-			-- Отложенный колбэк ниже не получает userdata ремкомплекта, поэтому
-			-- израсходованный объект не может пережить его в очереди событий.
+			-- Bind only via a fresh walk of the actor inventory.
+			-- The deferred callback below does not receive repair-kit userdata, so
+			-- a spent object cannot outlive it in the event queue.
 			local live_obj = find_actor_item(section, nil)
 			if live_obj then
 				self.obj = live_obj
@@ -152,10 +152,10 @@ local function install(UIRepair)
 		end
 	end
 
-	-- CollectValidItems подменяется целиком (не оборачивается вокруг
-	-- оригинала) - оригинал безусловно вызывает obj:condition() на
-	-- self.obj, а нам нужно сначала ревалидировать self.obj и, если это
-	-- невозможно, вернуть false ДО этого вызова, не после.
+	-- CollectValidItems is replaced wholesale (not wrapped around
+	-- the original). The original unconditionally calls obj:condition() on
+	-- self.obj, and we must revalidate self.obj first and, if that is
+	-- impossible, return false BEFORE that call, not after.
 	UIRepair.CollectValidItems = function(self, obj, section)
 		section = section or self.section or self.repair_section
 		if not section then return false end
@@ -222,9 +222,9 @@ local function install(UIRepair)
 	end
 
 	UIRepair.UpdateUi = function(self)
-		-- Ремонтные/вспомогательные предметы могут быть освобождены
-		-- асинхронно - ревалидируем self.obj перед тем, как остальной код
-		-- метода к нему обратится.
+		-- Repair/helper items can be freed
+		-- asynchronously. Revalidate self.obj before the rest of the
+		-- method touches it.
 		if not rebind_repair_object(self) then
 			self:OnCancel()
 			return true
@@ -287,8 +287,8 @@ local function install(UIRepair)
 			local item_id = nil
 			local item_uses = nil
 
-			-- Предпочитаем уже привязанный к окну ремкомплект. Если он исчез -
-			-- берём первый живой того же раздела.
+			-- Prefer the kit already bound to the window. If it is gone,
+			-- take the first live one of the same section.
 			for _, group in ipairs(self.multiUseItemsObj) do
 				for id, amount in pairs(group) do
 					if not item_id then
@@ -322,8 +322,8 @@ local function install(UIRepair)
 
 			local item = find_actor_item(self.section, item_id)
 			if item then
-				-- Не держим и не переиспользуем объект в тот же кадр, что и
-				-- discharge - движок может освободить его userdata немедленно.
+				-- Do not hold or reuse the object in the same frame as
+				-- discharge. The engine may free its userdata immediately.
 				utils_item.discharge(item)
 				self.obj = nil
 				self.repair_obj_id = next_id
@@ -354,9 +354,9 @@ local function install(UIRepair)
 		end
 	end
 
-	-- OnCancel заменяется целиком, а не оборачивается вокруг оригинала - в
-	-- патче сброс repair_obj_id/repair_section/obj идёт МЕЖДУ partSection и
-	-- HideDialog(), как в оригинале, а не после всего метода.
+	-- OnCancel is replaced wholesale, not wrapped around the original.
+	-- The patch clears repair_obj_id/repair_section/obj BETWEEN partSection and
+	-- HideDialog(), as the original does, not after the whole method.
 	UIRepair.OnCancel = function(self)
 		if (self.hasCraftedItem and self.use_actor_effects and actor_effects) then
 			actor_effects.play_item_fx(self.section .. "_dummy")
